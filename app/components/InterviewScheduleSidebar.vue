@@ -709,7 +709,7 @@ async function handleMoveToInterview() {
                 id="interview-title"
                 v-model="form.title"
                 type="text"
-                placeholder="e.g., Technical Interview Round 1"
+                placeholder="e.g., Assessment Interview Round 1"
                 class="w-full rounded-xl border bg-surface-50/50 dark:bg-surface-800/50 px-4 py-2.5 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 focus:bg-white dark:focus:bg-surface-800 transition-all"
                 :class="errors.title ? 'border-danger-300 dark:border-danger-700' : 'border-surface-200 dark:border-surface-700/80'"
               />

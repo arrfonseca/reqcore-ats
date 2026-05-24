@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Sun, Moon } from 'lucide-vue-next'
 const { isDark, toggle: toggleColorMode } = useColorMode()
+const { t } = useI18n()
 </script>
 
 <template>
@@ -27,7 +28,7 @@ const { isDark, toggle: toggleColorMode } = useColorMode()
           <img src="/eagle-mascot-logo.png" alt="Reqcore mascot" class="size-16 object-contain" />
         </div>
         <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">Reqcore</h1>
-        <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">Open-source ATS for developer teams</p>
+        <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">{{ t('auth.tagline') }}</p>
       </div>
       <slot />
     </div>

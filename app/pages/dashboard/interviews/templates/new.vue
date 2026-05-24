@@ -143,7 +143,7 @@ async function handleCreate() {
             id="template-name"
             v-model="form.name"
             type="text"
-            placeholder="e.g., Welcome Interview, Engineering Screen"
+            placeholder="e.g., Welcome Interview, Phone Screen"
             class="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
           />
         </div>

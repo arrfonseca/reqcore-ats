@@ -74,7 +74,7 @@ async function handleRequestReset() {
 
             <p class="text-center text-sm text-surface-500 dark:text-surface-400 mt-2">
                 <NuxtLink
-                    :to="$localePath('/auth/sign-in')"
+                    :to="$localePath('/')"
                     class="text-brand-600 dark:text-brand-400 hover:underline"
                 >
                     Back to sign in
@@ -120,7 +120,7 @@ async function handleRequestReset() {
             <p class="text-center text-sm text-surface-500 dark:text-surface-400">
                 Remember your password?
                 <NuxtLink
-                    :to="$localePath('/auth/sign-in')"
+                    :to="$localePath('/')"
                     class="text-brand-600 dark:text-brand-400 hover:underline"
                 >
                     Sign in

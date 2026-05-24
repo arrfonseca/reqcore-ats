@@ -82,5 +82,5 @@ export const updateWeightsSchema = z.object({
 // ─── Generate Criteria Schema ─────────────────────────────────────
 
 export const generateCriteriaSchema = z.object({
-  template: z.enum(['standard', 'technical', 'non_technical']).optional(),
+  template: z.enum(['standard', 'technical', 'non_technical', 'software_engineering']).optional(),
 })

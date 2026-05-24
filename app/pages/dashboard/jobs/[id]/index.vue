@@ -711,7 +711,7 @@ const interviewTypeLabels: Record<string, string> = {
   video: 'Video',
   phone: 'Phone',
   in_person: 'In Person',
-  technical: 'Technical',
+  technical: 'Assessment',
   panel: 'Panel',
   take_home: 'Take Home',
 }
@@ -2073,7 +2073,7 @@ function closeDocPreview() {
                                 <option value="video">Video Call</option>
                                 <option value="phone">Phone</option>
                                 <option value="in_person">In Person</option>
-                                <option value="technical">Technical</option>
+                                <option value="technical">Assessment</option>
                                 <option value="panel">Panel</option>
                                 <option value="take_home">Take Home</option>
                               </select>

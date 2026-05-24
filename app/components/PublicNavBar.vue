@@ -77,7 +77,7 @@ const { isDark, toggle: toggleColorMode } = useColorMode()
         </template>
         <template v-else>
           <NuxtLink
-            :to="localePath('/auth/sign-in')"
+            :to="localePath('/')"
             class="hidden rounded-md px-3 py-1.5 text-[13px] font-medium text-surface-500 dark:text-surface-400 transition hover:text-surface-900 dark:hover:text-white sm:inline-flex"
           >
             {{ t('home.nav.logIn') }}

@@ -9,6 +9,7 @@ const props = defineProps<{
 const toast = useToast()
 const { track } = useTrack()
 const localePath = useLocalePath()
+const { t } = useI18n()
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 
 const { job, updateJob, deleteJob, refresh: refreshJob } = useJob(props.jobId)
@@ -265,7 +266,7 @@ function openPropertyEditor(scope: 'org' | 'job') {
                 @click="scoreAllCandidates()"
               >
                 <Brain class="size-3.5 text-surface-400" />
-                {{ isScoringAll ? `Scoring ${scoringProgress.done}/${scoringProgress.total}…` : 'Score All Candidates' }}
+                {{ isScoringAll ? `Scoring ${scoringProgress.done}/${scoringProgress.total}…` : t('dashboard.actions.scoreAllCandidates') }}
               </button>
               <button
                 class="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 transition-colors"

@@ -110,7 +110,8 @@ type ScoringCriterionDraft = {
 }
 const scoringCriteria = ref<ScoringCriterionDraft[]>([])
 const scoringMode = ref<'none' | 'premade' | 'ai' | 'custom'>('none')
-const selectedTemplate = ref<'standard' | 'technical' | 'non_technical'>('standard')
+const selectedTemplateId = ref<string | null>(null)
+const { getCriteria: getTemplateCriteria } = useScoringCriteriaTemplates()
 const isGeneratingCriteria = ref(false)
 const showCustomForm = ref(false)
 const editingCriterion = ref<ScoringCriterionDraft | null>(null)
@@ -126,7 +127,7 @@ const customCriterionForm = ref({
 })
 
 const categoryLabels: Record<string, string> = {
-  technical: 'Technical',
+  technical: 'Qualifications',
   experience: 'Experience',
   soft_skills: 'Soft Skills',
   education: 'Education',
@@ -143,35 +144,15 @@ const categoryColorClasses: Record<string, string> = {
   custom: 'bg-surface-50 text-surface-700 ring-surface-200 dark:bg-surface-800/50 dark:text-surface-300 dark:ring-surface-700',
 }
 
-async function loadPremadeCriteria(template: 'standard' | 'technical' | 'non_technical') {
-  try {
-    // Use local pre-made templates (no API call needed)
-    const templates: Record<string, ScoringCriterionDraft[]> = {
-      standard: [
-        { key: 'technical_skills', name: 'Technical Skills', description: 'Evaluate the candidate\'s technical competencies against the job requirements.', category: 'technical', maxScore: 10, weight: 50 },
-        { key: 'relevant_experience', name: 'Relevant Experience', description: 'Assess years and quality of experience directly relevant to the role.', category: 'experience', maxScore: 10, weight: 50 },
-        { key: 'education_fit', name: 'Education & Certifications', description: 'Evaluate educational background and certifications relevant to the position.', category: 'education', maxScore: 10, weight: 30 },
-      ],
-      technical: [
-        { key: 'core_tech_stack', name: 'Core Tech Stack Match', description: 'How well the candidate\'s technical skills match the primary technologies.', category: 'technical', maxScore: 10, weight: 70 },
-        { key: 'system_design', name: 'System Design & Architecture', description: 'Evidence of system design experience and architectural decision-making.', category: 'technical', maxScore: 10, weight: 50 },
-        { key: 'engineering_practices', name: 'Engineering Practices', description: 'Testing, CI/CD, code review, and software development lifecycle experience.', category: 'technical', maxScore: 10, weight: 40 },
-        { key: 'relevant_experience', name: 'Relevant Experience', description: 'Years and depth of experience in similar roles or domains.', category: 'experience', maxScore: 10, weight: 50 },
-        { key: 'leadership_collab', name: 'Leadership & Collaboration', description: 'Evidence of mentoring, tech leadership, and cross-team collaboration.', category: 'soft_skills', maxScore: 10, weight: 30 },
-      ],
-      non_technical: [
-        { key: 'relevant_experience', name: 'Relevant Experience', description: 'Depth and breadth of experience applicable to the role.', category: 'experience', maxScore: 10, weight: 60 },
-        { key: 'communication', name: 'Communication Skills', description: 'Evidence of written and verbal communication ability.', category: 'soft_skills', maxScore: 10, weight: 50 },
-        { key: 'domain_knowledge', name: 'Domain Knowledge', description: 'Relevant industry or domain expertise.', category: 'experience', maxScore: 10, weight: 40 },
-        { key: 'education_fit', name: 'Education & Certifications', description: 'Educational background and certifications relevant to the position.', category: 'education', maxScore: 10, weight: 30 },
-        { key: 'culture_fit', name: 'Culture & Values Alignment', description: 'Indicators of alignment with company values and team culture.', category: 'culture', maxScore: 10, weight: 30 },
-      ],
-    }
-    scoringCriteria.value = templates[template] ?? []
-    scoringMode.value = 'premade'
-  } catch (err: any) {
-    toast.error('Failed to load template', { message: err?.data?.statusMessage })
+function loadPremadeCriteria(templateId: string) {
+  const criteria = getTemplateCriteria(templateId)
+  if (criteria.length === 0) {
+    toast.error('Failed to load template', { message: 'Unknown or empty template.' })
+    return
   }
+  selectedTemplateId.value = templateId
+  scoringCriteria.value = criteria
+  scoringMode.value = 'premade'
 }
 
 async function generateAiCriteria() {
@@ -1326,27 +1307,9 @@ const questionTypeLabels: Record<QuestionType, string> = {
                 </button>
               </div>
 
-              <!-- Pre-made template selector -->
-              <div v-if="scoringMode === 'premade' && scoringCriteria.length === 0" class="space-y-4 mt-4">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <button
-                    v-for="tmpl in [
-                      { key: 'standard', label: 'Standard', desc: '3 balanced criteria for any role' },
-                      { key: 'technical', label: 'Technical', desc: '5 criteria focused on engineering' },
-                      { key: 'non_technical', label: 'Non-Technical', desc: '5 criteria for business roles' },
-                    ] as const"
-                    :key="tmpl.key"
-                    type="button"
-                    class="p-4 rounded-lg border text-left transition-all"
-                    :class="selectedTemplate === tmpl.key
-                      ? 'border-brand-400 dark:border-brand-600 bg-brand-50 dark:bg-brand-950/30'
-                      : 'border-surface-200 dark:border-surface-800 hover:bg-surface-50 dark:hover:bg-surface-800/50'"
-                    @click="selectedTemplate = tmpl.key; loadPremadeCriteria(tmpl.key)"
-                  >
-                    <span class="block text-sm font-medium text-surface-900 dark:text-surface-100">{{ tmpl.label }}</span>
-                    <span class="text-xs text-surface-500">{{ tmpl.desc }}</span>
-                  </button>
-                </div>
+              <!-- Pre-made template selector (ISCO + universal) -->
+              <div v-if="scoringMode === 'premade' && scoringCriteria.length === 0" class="mt-4">
+                <ScoringCriteriaTemplatePicker @select="loadPremadeCriteria" />
               </div>
 
               <!-- Criteria list with weight sliders -->

@@ -1,8 +1,8 @@
 # Reqcore — Product Vision & Goals
 
-## The Developer-First ATS
+## A Modern, Self-Hosted ATS
 
-Reqcore is a lean, open-source Applicant Tracking System (ATS) designed for engineering teams and developer-led companies. Built by developers, for developers.
+Reqcore is a lean, open-source Applicant Tracking System (ATS) for recruiting teams who want control over their hiring data and workflow. It supports general hiring use cases with optional AI-assisted screening and scoring.
 
 ## Problem Statement
 
@@ -18,29 +18,29 @@ Modern ATS platforms suffer from three structural problems:
 You *own* the infrastructure (Postgres + MinIO). Your talent pool is a permanent asset — not a monthly subscription. Self-host on your own servers or use a managed deployment; either way, the data is yours.
 
 ### 2. Auditable Intelligence
-The source code is public — anyone can read exactly how the system works. Planned AI features will expose ranking logic in a visible **Matching Logic** summary so recruiters can verify and override results. No secret algorithms.
+The source code is public — anyone can read exactly how the system works. AI features expose ranking logic in a visible **Matching Logic** summary so recruiters can verify and override results. No secret algorithms.
 
 ### 3. No Per-Seat Pricing
 Reqcore is designed to let companies scale their hiring teams without increasing their software bill.
 
 ### 4. Runs on Your Network
-By supporting local-first storage (MinIO) and local AI models (Ollama), Reqcore is the only ATS where sensitive candidate PII never has to leave the company's private network.
+By supporting local-first storage (MinIO) and local AI models (Ollama), Reqcore is an ATS where sensitive candidate PII can stay on your private network.
 
 ## Target Users
 
 | Persona | Description | Primary Need |
 |---------|-------------|--------------|
-| **Engineering Manager / CTO** | Decides on tooling, deploys infrastructure | Simple self-hosting, Docker Compose, clear infra docs, extensibility |
+| **Operations / IT** | Deploys and maintains the stack | Simple self-hosting, Docker Compose, clear infra docs |
 | **Recruiter** | Day-to-day user managing candidates and pipeline | Fast candidate pipeline, clean UI, minimal friction |
 | **Hiring Manager** | Reviews candidates, makes hiring decisions | Clear candidate comparisons, process visibility |
 | **HR Administrator** | Manages org settings, team access, compliance | Multi-tenant control, data ownership, audit trails |
 
 ### Who this is for
 
-- **Startups and scale-ups** with engineering-led cultures who deploy their own tools
-- **Dev agencies and consultancies** that hire technical talent regularly
-- **Engineering-led orgs** that want to own their hiring data like they own their code
-- **Anyone who deploys with Docker** and doesn't want to go through procurement for an ATS
+- **Growing companies** that want an ATS they can host and customize
+- **Agencies and consultancies** that hire across roles and clients
+- **Teams** that want to own hiring data and integrate AI on their terms
+- **Anyone who deploys with Docker** and prefers open source over long procurement cycles
 
 ## Core Features (Current & Planned)
 
@@ -51,26 +51,26 @@ By supporting local-first storage (MinIO) and local AI models (Ollama), Reqcore 
 - [x] Application tracking (link candidates to jobs, status workflow)
 - [x] Document storage (resumes, cover letters via MinIO/S3)
 - [x] Dashboard with pipeline overview
-- [x] Organic SEO (sitemap, robots, JSON-LD structured data, blog content engine)
+- [x] Organic SEO (sitemap, robots, JSON-LD structured data)
 
 ### Phase 2 — Intelligence
-- [ ] Resume parsing (PDF → structured JSON)
-- [ ] AI candidate ranking with visible **Matching Logic** summary
-- [ ] Skill extraction and matching
-- [ ] Local AI support via Ollama (privacy-first)
+- [x] Resume text extraction (PDF/DOCX)
+- [x] AI candidate scoring with visible criterion breakdown
+- [ ] Skill extraction and matching enhancements
+- [ ] Broader local AI support via Ollama (privacy-first)
 
 ### Phase 3 — Collaboration
-- [ ] Team comments and notes on candidates
-- [ ] Interview scheduling
-- [ ] Email integration (send/receive from within Reqcore)
+- [x] Team comments and notes on candidates
+- [x] Interview scheduling
+- [ ] Deeper email integration (send/receive from within Reqcore)
 - [ ] Candidate portal (self-service application status)
 
 ## Design Principles
 
-1. **Show the Proof**: Decisions should be backed by visible data. If a skill matched, highlight it. If a candidate is ranked highly, show why.
-2. **Developer-First UX**: Every screen should feel like a tool built by engineers — fast, keyboard-friendly, no unnecessary friction.
+1. **Show the Proof**: Decisions should be backed by visible data. If a qualification matched, highlight it. If a candidate is ranked highly, show why.
+2. **Efficient UX**: Screens should feel fast and purposeful — keyboard-friendly where it matters, no unnecessary friction.
 3. **Progressive Disclosure**: Show summaries first, details on demand. Don't overwhelm with data.
-4. **Tone**: Professional, high-integrity, and engineering-grade. No marketing fluff in the UI.
+4. **Tone**: Professional, high-integrity, and clear. No marketing fluff in the product UI.
 
 ## Success Metrics
 

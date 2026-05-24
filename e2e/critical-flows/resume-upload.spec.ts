@@ -77,11 +77,11 @@ test.describe('Resume Upload — All File Formats', () => {
     ])
 
     await page.waitForURL(
-      url => url.pathname.includes('/onboarding/') || url.pathname.includes('/auth/sign-in'),
+      url => url.pathname.includes('/onboarding/') || url.pathname === '/' || url.pathname.includes('/auth/sign-in'),
       { waitUntil: 'commit', timeout: 30_000 },
     )
 
-    if (page.url().includes('/auth/sign-in')) {
+    if (page.url().includes('/auth/sign-in') || new URL(page.url()).pathname === '/') {
       await page.waitForLoadState('networkidle')
       await page.getByLabel('Email').fill(account.email)
       await page.getByLabel('Password').fill(account.password)

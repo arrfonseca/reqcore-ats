@@ -12,6 +12,7 @@ import {
 const route = useRoute()
 const localePath = useLocalePath()
 const getRouteBaseName = useRouteBaseName()
+const { t } = useI18n()
 const { data: session } = await authClient.useSession(useFetch)
 const isSigningOut = ref(false)
 const { isDark, toggle: toggleColorMode } = useColorMode()
@@ -55,7 +56,7 @@ async function handleSignOut() {
   isSigningOut.value = true
   await authClient.signOut()
   clearNuxtData()
-  await navigateTo(localePath('/auth/sign-in'))
+  await navigateTo(localePath('/'))
 }
 
 // ─────────────────────────────────────────────
@@ -112,11 +113,11 @@ const jobTabs = computed(() => {
   if (!activeJobId.value) return []
   const base = `/dashboard/jobs/${activeJobId.value}`
   return [
-    { label: 'Pipeline', to: base, icon: Kanban, exact: true },
-    { label: 'Table', to: `${base}/candidates`, icon: Table2, exact: true },
-    { label: 'Application Form', to: `${base}/application-form`, icon: FileText, exact: true },
-    { label: 'AI Analysis', to: `${base}/ai-analysis`, icon: Sparkles, exact: true },
-    { label: 'Settings', to: `${base}/settings`, icon: Settings, exact: true },
+    { label: t('dashboard.jobTabs.pipeline'), to: base, icon: Kanban, exact: true },
+    { label: t('dashboard.jobTabs.table'), to: `${base}/candidates`, icon: Table2, exact: true },
+    { label: t('dashboard.jobTabs.applicationForm'), to: `${base}/application-form`, icon: FileText, exact: true },
+    { label: t('dashboard.jobTabs.aiAnalysis'), to: `${base}/ai-analysis`, icon: Sparkles, exact: true },
+    { label: t('dashboard.jobTabs.settings'), to: `${base}/settings`, icon: Settings, exact: true },
   ]
 })
 
@@ -124,32 +125,38 @@ const jobTabs = computed(() => {
 // Main navigation
 // ─────────────────────────────────────────────
 
-const mainNav: Array<{ label: string; to: string; icon: typeof Briefcase; exact: boolean; comingSoon?: boolean }> = [
-  { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard, exact: true },
-  { label: 'Jobs', to: '/dashboard/jobs', icon: Briefcase, exact: false },
-  { label: 'Candidates', to: '/dashboard/candidates', icon: Users, exact: false },
-  { label: 'Applications', to: '/dashboard/applications', icon: FileText, exact: false },
-  { label: 'Interviews', to: '/dashboard/interviews', icon: Calendar, exact: false },
-  { label: 'Timeline', to: '/dashboard/timeline', icon: History, exact: true },
-  { label: 'Source Tracking', to: '/dashboard/source-tracking', icon: Radio, exact: true },
-  { label: 'AI Analysis', to: '/dashboard/ai-analysis', icon: Sparkles, exact: true },
-  { label: 'Settings', to: '/dashboard/settings', icon: Settings, exact: false },
-]
+const mainNav = computed<Array<{ label: string; to: string; icon: typeof Briefcase; exact: boolean; comingSoon?: boolean }>>(() => [
+  { label: t('dashboard.nav.dashboard'), to: '/dashboard', icon: LayoutDashboard, exact: true },
+  { label: t('dashboard.nav.jobs'), to: '/dashboard/jobs', icon: Briefcase, exact: false },
+  { label: t('dashboard.nav.candidates'), to: '/dashboard/candidates', icon: Users, exact: false },
+  { label: t('dashboard.nav.applications'), to: '/dashboard/applications', icon: FileText, exact: false },
+  { label: t('dashboard.nav.interviews'), to: '/dashboard/interviews', icon: Calendar, exact: false },
+  { label: t('dashboard.nav.timeline'), to: '/dashboard/timeline', icon: History, exact: true },
+  { label: t('dashboard.nav.sourceTracking'), to: '/dashboard/source-tracking', icon: Radio, exact: true },
+  { label: t('dashboard.nav.aiAnalysis'), to: '/dashboard/ai-analysis', icon: Sparkles, exact: true },
+  { label: t('dashboard.nav.settings'), to: '/dashboard/settings', icon: Settings, exact: false },
+])
 
 // Items shown only when their feature flag is enabled. Filtered into mainNav
 // reactively so the gating happens at render time (PostHog flags load async).
 const flaggedNav = computed(() => {
-  const items: Array<{ label: string; to: string; icon: typeof Briefcase; exact: boolean; afterLabel: string }> = []
+  const items: Array<{ label: string; to: string; icon: typeof Briefcase; exact: boolean; afterTo: string }> = []
   if (showChatbot.value) {
-    items.push({ label: 'Assistant', to: '/dashboard/chatbot', icon: MessageCircle, exact: false, afterLabel: 'AI Analysis' })
+    items.push({
+      label: t('dashboard.nav.assistant'),
+      to: '/dashboard/chatbot',
+      icon: MessageCircle,
+      exact: false,
+      afterTo: '/dashboard/ai-analysis',
+    })
   }
   return items
 })
 
 const navItems = computed(() => {
-  const merged = [...mainNav]
+  const merged = [...mainNav.value]
   for (const item of flaggedNav.value) {
-    const idx = merged.findIndex((n) => n.label === item.afterLabel)
+    const idx = merged.findIndex((n) => n.to === item.afterTo)
     const insertAt = idx >= 0 ? idx + 1 : merged.length
     merged.splice(insertAt, 0, {
       label: item.label, to: item.to, icon: item.icon, exact: item.exact,
@@ -164,9 +171,15 @@ function isActiveRoute(to: string, exact: boolean) {
   return route.path === localizedTo || route.path.startsWith(`${localizedTo}/`)
 }
 
-const primaryNavLabels = ['Dashboard', 'Jobs', 'Candidates', 'Applications', 'Interviews']
-const primaryNavItems = computed(() => navItems.value.filter(i => primaryNavLabels.includes(i.label)))
-const moreNavItems = computed(() => navItems.value.filter(i => !primaryNavLabels.includes(i.label)))
+const primaryNavPaths = [
+  '/dashboard',
+  '/dashboard/jobs',
+  '/dashboard/candidates',
+  '/dashboard/applications',
+  '/dashboard/interviews',
+]
+const primaryNavItems = computed(() => navItems.value.filter(i => primaryNavPaths.includes(i.to)))
+const moreNavItems = computed(() => navItems.value.filter(i => !primaryNavPaths.includes(i.to)))
 
 // Close menus on route change
 watch(() => route.path, () => {
@@ -359,7 +372,7 @@ onUnmounted(() => {
             @click="handleNewJobClick"
           >
             <Plus class="size-3.5" />
-            New Job
+            {{ t('dashboard.actions.newJob') }}
           </button>
 
           <!-- Org Switcher -->
@@ -535,7 +548,7 @@ onUnmounted(() => {
             class="hidden sm:flex items-center gap-1 text-xs font-medium text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors no-underline shrink-0"
           >
             <ChevronLeft class="size-3.5" />
-            All Jobs
+            {{ t('dashboard.actions.allJobs') }}
           </NuxtLink>
 
           <div class="hidden sm:block w-px h-4 bg-surface-200 dark:bg-surface-700 shrink-0" />
@@ -614,7 +627,7 @@ onUnmounted(() => {
             @click="handleNewJobClick(); showMobileMenu = false"
           >
             <Plus class="size-4" />
-            New Job
+            {{ t('dashboard.actions.newJob') }}
           </button>
 
           <!-- Get Started CTA (demo mode, mobile) -->

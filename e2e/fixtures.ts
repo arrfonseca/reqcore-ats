@@ -61,14 +61,14 @@ export const test = base.extend<Fixtures>({
 
     // After sign-up the app navigates to /onboarding/create-org, but the
     // auth middleware may not yet recognise the freshly-set session cookie
-    // and redirect to /auth/sign-in instead.  Handle both outcomes.
+    // and redirect to sign-in instead.  Handle both outcomes.
     await page.waitForURL(
-      url => url.pathname.includes('/onboarding/') || url.pathname.includes('/auth/sign-in'),
+      url => url.pathname.includes('/onboarding/') || url.pathname === '/' || url.pathname.includes('/auth/sign-in'),
       { waitUntil: 'commit', timeout: 30_000 },
     )
 
     // If we landed on sign-in, explicitly sign in with the new credentials
-    if (page.url().includes('/auth/sign-in')) {
+    if (page.url().includes('/auth/sign-in') || new URL(page.url()).pathname === '/') {
       await page.waitForLoadState('networkidle')
       await page.getByLabel('Email').fill(testAccount.email)
       await page.getByLabel('Password').fill(testAccount.password)

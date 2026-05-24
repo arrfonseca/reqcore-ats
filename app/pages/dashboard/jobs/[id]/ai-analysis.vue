@@ -36,7 +36,7 @@ type ScoringCriterionDraft = {
 }
 
 const categoryLabels: Record<string, string> = {
-  technical: 'Technical',
+  technical: 'Qualifications',
   experience: 'Experience',
   soft_skills: 'Soft Skills',
   education: 'Education',
@@ -119,32 +119,17 @@ async function toggleAutoScore() {
 // Template loading
 // ─────────────────────────────────────────────
 
-const selectedTemplate = ref<'standard' | 'technical' | 'non_technical'>('standard')
+const scoringSetupMode = ref<'none' | 'premade'>('none')
+const { getCriteria: getTemplateCriteria } = useScoringCriteriaTemplates()
 
-const templates: Record<string, ScoringCriterionDraft[]> = {
-  standard: [
-    { key: 'technical_skills', name: 'Technical Skills', description: 'Evaluate the candidate\'s technical competencies against the job requirements.', category: 'technical', maxScore: 10, weight: 50 },
-    { key: 'relevant_experience', name: 'Relevant Experience', description: 'Assess years and quality of experience directly relevant to the role.', category: 'experience', maxScore: 10, weight: 50 },
-    { key: 'education_fit', name: 'Education & Certifications', description: 'Evaluate educational background and certifications relevant to the position.', category: 'education', maxScore: 10, weight: 30 },
-  ],
-  technical: [
-    { key: 'core_tech_stack', name: 'Core Tech Stack Match', description: 'How well the candidate\'s technical skills match the primary technologies.', category: 'technical', maxScore: 10, weight: 70 },
-    { key: 'system_design', name: 'System Design & Architecture', description: 'Evidence of system design experience and architectural decision-making.', category: 'technical', maxScore: 10, weight: 50 },
-    { key: 'engineering_practices', name: 'Engineering Practices', description: 'Testing, CI/CD, code review, and software development lifecycle experience.', category: 'technical', maxScore: 10, weight: 40 },
-    { key: 'relevant_experience', name: 'Relevant Experience', description: 'Years and depth of experience in similar roles or domains.', category: 'experience', maxScore: 10, weight: 50 },
-    { key: 'leadership_collab', name: 'Leadership & Collaboration', description: 'Evidence of mentoring, tech leadership, and cross-team collaboration.', category: 'soft_skills', maxScore: 10, weight: 30 },
-  ],
-  non_technical: [
-    { key: 'relevant_experience', name: 'Relevant Experience', description: 'Depth and breadth of experience applicable to the role.', category: 'experience', maxScore: 10, weight: 60 },
-    { key: 'communication', name: 'Communication Skills', description: 'Evidence of written and verbal communication ability.', category: 'soft_skills', maxScore: 10, weight: 50 },
-    { key: 'domain_knowledge', name: 'Domain Knowledge', description: 'Relevant industry or domain expertise.', category: 'experience', maxScore: 10, weight: 40 },
-    { key: 'education_fit', name: 'Education & Certifications', description: 'Educational background and certifications relevant to the position.', category: 'education', maxScore: 10, weight: 30 },
-    { key: 'culture_fit', name: 'Culture & Values Alignment', description: 'Indicators of alignment with company values and team culture.', category: 'culture', maxScore: 10, weight: 30 },
-  ],
-}
-
-function loadTemplate(template: 'standard' | 'technical' | 'non_technical') {
-  scoringCriteria.value = structuredClone(templates[template] ?? [])
+function loadTemplate(templateId: string) {
+  const criteria = getTemplateCriteria(templateId)
+  if (criteria.length === 0) {
+    toast.error('Failed to load template', { message: 'Unknown or empty template.' })
+    return
+  }
+  scoringCriteria.value = criteria
+  hasUnsavedChanges.value = true
 }
 
 // ─────────────────────────────────────────────
@@ -327,8 +312,11 @@ function resetCriteria() {
           <!-- Pre-made templates -->
           <button
             type="button"
-            class="relative flex flex-col items-start gap-3 p-5 rounded-xl border-2 text-left transition-all hover:shadow-md border-surface-200 dark:border-surface-800 hover:border-surface-300 dark:hover:border-surface-700"
-            @click="selectedTemplate = 'standard'"
+            class="relative flex flex-col items-start gap-3 p-5 rounded-xl border-2 text-left transition-all hover:shadow-md"
+            :class="scoringSetupMode === 'premade'
+              ? 'border-brand-500 dark:border-brand-400 bg-brand-50/70 dark:bg-brand-950/30 ring-2 ring-brand-200 dark:ring-brand-900'
+              : 'border-surface-200 dark:border-surface-800 hover:border-surface-300 dark:hover:border-surface-700'"
+            @click="scoringSetupMode = 'premade'"
           >
             <div class="inline-flex items-center justify-center size-10 rounded-lg bg-brand-100 dark:bg-brand-900/50">
               <Brain class="size-5 text-brand-600 dark:text-brand-400" />
@@ -379,29 +367,14 @@ function resetCriteria() {
           </button>
         </div>
 
-        <!-- Pre-made template selector -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <button
-            v-for="tmpl in [
-              { key: 'standard', label: 'Standard', desc: '3 balanced criteria for any role' },
-              { key: 'technical', label: 'Technical', desc: '5 criteria focused on engineering' },
-              { key: 'non_technical', label: 'Non-Technical', desc: '5 criteria for business roles' },
-            ] as const"
-            :key="tmpl.key"
-            type="button"
-            class="p-4 rounded-lg border text-left transition-all"
-            :class="selectedTemplate === tmpl.key
-              ? 'border-brand-400 dark:border-brand-600 bg-brand-50 dark:bg-brand-950/30'
-              : 'border-surface-200 dark:border-surface-800 hover:bg-surface-50 dark:hover:bg-surface-800/50'"
-            @click="selectedTemplate = tmpl.key; loadTemplate(tmpl.key)"
-          >
-            <span class="block text-sm font-medium text-surface-900 dark:text-surface-100">{{ tmpl.label }}</span>
-            <span class="text-xs text-surface-500">{{ tmpl.desc }}</span>
-          </button>
-        </div>
+        <!-- Pre-made template selector (ISCO + universal) -->
+        <ScoringCriteriaTemplatePicker
+          v-if="scoringSetupMode === 'premade'"
+          @select="loadTemplate"
+        />
 
         <!-- No criteria hint -->
-        <div class="text-center py-4 text-sm text-surface-400">
+        <div v-if="scoringSetupMode !== 'premade'" class="text-center py-4 text-sm text-surface-400">
           <p>No scoring criteria configured yet. Choose a starting point above, or add criteria manually.</p>
         </div>
       </div>

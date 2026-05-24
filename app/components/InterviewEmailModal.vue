@@ -69,7 +69,7 @@ const previewVariables: Record<string, string> = {
   interviewDuration: String(props.interview.duration),
   interviewType: {
     video: 'Video Call', phone: 'Phone Call', in_person: 'In Person',
-    technical: 'Technical Interview', panel: 'Panel Interview', take_home: 'Take-Home Assignment',
+    technical: 'Assessment Interview', panel: 'Panel Interview', take_home: 'Take-Home Assignment',
   }[props.interview.type] ?? props.interview.type,
   interviewLocation: props.interview.location ?? 'To be confirmed',
   interviewers: props.interview.interviewers?.join(', ') ?? 'To be confirmed',

@@ -443,7 +443,7 @@ const interviewTypeLabels: Record<string, string> = {
   video: 'Video',
   in_person: 'In-person',
   panel: 'Panel',
-  technical: 'Technical',
+  technical: 'Qualifications',
   take_home: 'Take-home',
 }
 

@@ -202,8 +202,8 @@ jobs:
             fi
           }
 
-          check "Home page"               "http://localhost:3000"                "200"
-          check "Sign-in page"            "http://localhost:3000/auth/sign-in"   "200"
+          check "Home (sign-in)"          "http://localhost:3000"                "200"
+          check "Legacy /auth/sign-in"    "http://localhost:3000/auth/sign-in"   "301"
           check "Sign-up page"            "http://localhost:3000/auth/sign-up"   "200"
           check "Public job board"        "http://localhost:3000/jobs"           "200"
           check "API/jobs (no auth→401)"  "http://localhost:3000/api/jobs"       "401"

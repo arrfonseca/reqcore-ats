@@ -5,6 +5,104 @@
     "save": "Save",
     "cancel": "Cancel"
   },
+  "auth": {
+    "tagline": "Open-source ATS for modern hiring teams"
+  },
+  "dashboard": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "jobs": "Jobs",
+      "candidates": "Candidates",
+      "applications": "Applications",
+      "interviews": "Interviews",
+      "timeline": "Timeline",
+      "sourceTracking": "Source Tracking",
+      "aiAnalysis": "AI Analysis",
+      "settings": "Settings",
+      "assistant": "Assistant"
+    },
+    "jobTabs": {
+      "pipeline": "Pipeline",
+      "table": "Table",
+      "applicationForm": "Application Form",
+      "aiAnalysis": "AI Analysis",
+      "settings": "Settings"
+    },
+    "actions": {
+      "allJobs": "All Jobs",
+      "newJob": "New Job",
+      "scoreAllCandidates": "Score All Candidates"
+    }
+  },
+  "scoring": {
+    "sections": {
+      "universal": "Universal rubrics",
+      "isco": "By occupation category (ISCO)"
+    },
+    "comingSoon": "Premade rubrics for this category are coming soon. Use a universal rubric, generate from the job description, or write your own criteria.",
+    "templates": {
+      "universal": {
+        "standard": {
+          "label": "Standard",
+          "description": "3 balanced criteria for any role"
+        },
+        "general": {
+          "label": "General",
+          "description": "5 criteria for business and operations roles"
+        },
+        "technical": {
+          "label": "Role-specific",
+          "description": "5 criteria focused on specialized role requirements"
+        }
+      },
+      "software_engineering": {
+        "label": "Software & Engineering",
+        "description": "5 criteria for developer and engineering hiring"
+      }
+    },
+    "isco": {
+      "executive_management": {
+        "label": "Executive & Management",
+        "description": "Leadership, directors, and senior management roles."
+      },
+      "science_engineering_it": {
+        "label": "Science, Engineering & IT",
+        "description": "Software, engineering, research, and technical roles."
+      },
+      "healthcare_medical": {
+        "label": "Healthcare & Medical Services",
+        "description": "Clinical, nursing, and allied health professions."
+      },
+      "legal_finance_business": {
+        "label": "Legal, Finance & Business",
+        "description": "Legal, accounting, consulting, and corporate functions."
+      },
+      "education_arts": {
+        "label": "Education & Arts",
+        "description": "Teaching, creative, cultural, and academic roles."
+      },
+      "sales_customer_service": {
+        "label": "Sales & Customer Service",
+        "description": "Revenue, account management, and customer-facing roles."
+      },
+      "administration_operations": {
+        "label": "Administration & Operations",
+        "description": "Office support, coordination, and operational roles."
+      },
+      "services_hospitality_tourism": {
+        "label": "Services, Hospitality & Tourism",
+        "description": "Hospitality, personal services, and tourism."
+      },
+      "agriculture_trades_manufacturing": {
+        "label": "Agriculture, Trades & Manufacturing",
+        "description": "Production, skilled trades, and agricultural work."
+      },
+      "other_lifecycle": {
+        "label": "Retired, Student & Unemployed",
+        "description": "Non-employed or transitional candidate profiles."
+      }
+    }
+  },
   "home": {
     "nav": {
       "features": "Features",
@@ -16,11 +114,11 @@
       "logIn": "Log in",
       "signUp": "Sign up"
     },
-    "badge": "Open Source ATS for Developer Teams",
+    "badge": "Open Source ATS for Modern Hiring",
     "hero": {
       "titleLine1": "Your hiring.",
       "titleHighlight": "Your infrastructure.",
-      "subtitle": "Open-source applicant tracking built for teams that self-host.",
+      "subtitle": "AI-assisted applicant tracking built for teams that self-host.",
       "goToDashboard": "Go to Dashboard",
       "signIn": "Sign in",
       "createAccount": "Create account",

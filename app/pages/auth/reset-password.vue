@@ -90,7 +90,7 @@ async function handleResetPassword() {
             </div>
 
             <NuxtLink
-                :to="$localePath('/auth/sign-in')"
+                :to="$localePath('/')"
                 class="mt-2 px-4 py-2.5 bg-brand-600 text-white rounded-md text-sm font-medium cursor-pointer hover:bg-brand-700 transition-colors text-center block"
             >
                 Sign in with new password
@@ -162,7 +162,7 @@ async function handleResetPassword() {
 
             <p class="text-center text-sm text-surface-500 dark:text-surface-400">
                 <NuxtLink
-                    :to="$localePath('/auth/sign-in')"
+                    :to="$localePath('/')"
                     class="text-brand-600 dark:text-brand-400 hover:underline"
                 >
                     Back to sign in
