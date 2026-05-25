@@ -2,14 +2,13 @@
  * Client-only plugin that applies the saved color mode preference
  * before first paint to avoid a flash of wrong theme.
  *
- * Reads from `localStorage` and falls back to OS preference.
+ * Reads from `localStorage` and defaults to light mode.
  */
 export default defineNuxtPlugin(() => {
   if (import.meta.server) return
 
   const stored = localStorage.getItem('reqcore-color-mode') as 'light' | 'dark' | null
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const shouldBeDark = stored === 'dark' || (!stored && prefersDark)
+  const shouldBeDark = stored === 'dark'
 
   if (shouldBeDark) {
     document.documentElement.classList.add('dark')

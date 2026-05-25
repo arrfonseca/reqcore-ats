@@ -2,7 +2,7 @@
 import {
   Briefcase, Plus, Bell,
   Kanban, FileText, LogOut, Table2,
-  Sun, Moon, MessageSquarePlus, Settings,
+  Sun, Moon, Settings,
   ChevronDown, Menu, X, Users, ChevronLeft,
   LayoutDashboard, Calendar, ArrowUpCircle,
   Cloud, Server, Sparkles, Radio, History,
@@ -16,8 +16,6 @@ const { t } = useI18n()
 const { data: session } = await authClient.useSession(useFetch)
 const isSigningOut = ref(false)
 const { isDark, toggle: toggleColorMode } = useColorMode()
-
-const showFeedbackModal = ref(false)
 const showUserMenu = ref(false)
 const showMobileMenu = ref(false)
 const showGetStartedMenu = ref(false)
@@ -100,12 +98,6 @@ const jobStatusBadgeClasses: Record<string, string> = {
   archived: 'bg-surface-50 text-surface-400 ring-surface-200 dark:bg-surface-800/60 dark:text-surface-500 dark:ring-surface-700',
 }
 
-const { data: feedbackConfig } = useFetch('/api/feedback/config', {
-  key: 'feedback-config',
-  headers: useRequestHeaders(['cookie']),
-})
-
-const isFeedbackEnabled = computed(() => feedbackConfig.value?.enabled === true)
 
 const showChatbot = useFeatureFlagEnabled('chatbot-experience')
 
@@ -430,14 +422,6 @@ onUnmounted(() => {
                     <ArrowUpCircle class="size-4" />
                     Updates & changelog
                   </NuxtLink>
-                  <button
-                    v-if="isFeedbackEnabled"
-                    class="flex items-center gap-2.5 w-full px-3 py-2 text-[13px] font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors cursor-pointer border-0 bg-transparent text-left"
-                    @click="showFeedbackModal = true; showMoreActions = false"
-                  >
-                    <MessageSquarePlus class="size-4" />
-                    Report issue
-                  </button>
                 </div>
               </div>
             </Transition>
@@ -661,7 +645,4 @@ onUnmounted(() => {
       </div>
     </Transition>
   </header>
-
-  <!-- Feedback modal -->
-  <FeedbackModal v-if="showFeedbackModal" @close="showFeedbackModal = false" />
 </template>

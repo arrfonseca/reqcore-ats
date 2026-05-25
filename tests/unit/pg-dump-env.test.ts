@@ -20,7 +20,6 @@ describe('buildPgDumpEnv', () => {
     'CRON_SECRET',
     'RESEND_API_KEY',
     'SMTP_PASS',
-    'GITHUB_FEEDBACK_TOKEN',
     'SENTRY_DSN',
     'POSTHOG_PUBLIC_KEY',
   ]

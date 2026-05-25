@@ -1,5 +1,3 @@
-import type { PostHog } from 'posthog-js'
-
 export type ToastType = 'error' | 'success' | 'warning' | 'info'
 
 export interface Toast {
@@ -10,17 +8,6 @@ export interface Toast {
   details?: string
   link?: { label: string; href: string }
   duration?: number
-}
-
-const GITHUB_ISSUES_URL = 'https://github.com/reqcore-inc/reqcore/issues/new'
-
-function getPostHog(): PostHog | undefined {
-  try {
-    const $ph = (useNuxtApp() as Record<string, unknown>).$posthog as (() => PostHog) | undefined
-    return $ph?.()
-  } catch {
-    return undefined
-  }
 }
 
 let counter = 0
@@ -49,32 +36,12 @@ export function useToast() {
     toasts.value = []
   }
 
-  /**
-   * Show an error toast with a link to report the issue on GitHub.
-   * Also tracks the error in PostHog if the user has consented.
-   */
   function error(title: string, opts?: { message?: string; details?: string; statusCode?: number; path?: string }) {
-    if (import.meta.client) {
-      const ph = getPostHog()
-      if (ph?.has_opted_in_capturing()) {
-        ph.capture('app_error', {
-          error_title: title,
-          error_message: opts?.message,
-          error_status_code: opts?.statusCode,
-          path: opts?.path ?? window.location.pathname,
-        })
-      }
-    }
-
     return add({
       type: 'error',
       title,
       message: opts?.message,
       details: opts?.details,
-      link: {
-        label: 'Report issue',
-        href: GITHUB_ISSUES_URL,
-      },
     })
   }
 

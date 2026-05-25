@@ -89,14 +89,6 @@ export const envSchema = z
     TRUSTED_PROXY_IP: z.string().min(1).optional(),
     /** Slug of the demo organization. When set, write operations are blocked for this org. */
     DEMO_ORG_SLUG: emptyToUndefined.optional(),
-    /** Fine-grained GitHub PAT with Issues:write scope. When set (along with GITHUB_FEEDBACK_REPO), enables in-app feedback. */
-    GITHUB_FEEDBACK_TOKEN: emptyToUndefined.pipe(z.string().min(1)).optional(),
-    /** GitHub repo in "owner/repo" format for feedback issues. */
-    GITHUB_FEEDBACK_REPO: emptyToUndefined
-      .pipe(
-        z.string().regex(/^[^/]+\/[^/]+$/, 'Must be in "owner/repo" format'),
-      )
-      .optional(),
     /** Resend API key for transactional emails (invitations, etc.). When not set, emails are logged to console. */
     RESEND_API_KEY: emptyToUndefined.pipe(z.string().min(1)).optional(),
     /** Sender email address for Resend emails. Must be a verified domain in Resend. Defaults to "Reqcore <noreply@reqcore.com>". */

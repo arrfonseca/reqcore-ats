@@ -28,7 +28,7 @@ describe('Fix 1: Nonce-based CSP', () => {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://eu.i.posthog.com https://eu.posthog.com",
+      "connect-src 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -85,13 +85,11 @@ describe('Fix 1: Nonce-based CSP', () => {
       return (
         path.startsWith('/api/') ||
         path.startsWith('/_nuxt/') ||
-        path.startsWith('/ingest/') ||
         /\.(js|css|png|jpg|jpeg|svg|ico|woff2?|ttf|eot|webp|avif|gif|json|xml|txt|map)$/i.test(path)
       )
     }
     expect(shouldSkip('/api/auth/sign-in')).toBe(true)
     expect(shouldSkip('/_nuxt/app.js')).toBe(true)
-    expect(shouldSkip('/ingest/decide')).toBe(true)
     expect(shouldSkip('/favicon.ico')).toBe(true)
     expect(shouldSkip('/logo.png')).toBe(true)
     // HTML pages — must NOT be skipped

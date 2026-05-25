@@ -2,7 +2,7 @@
  * SSR-safe composable for managing dark/light mode.
  *
  * - Persists preference to `localStorage` under the key `reqcore-color-mode`.
- * - Defaults to OS preference (`prefers-color-scheme: dark`) on first visit.
+ * - Defaults to light mode on first visit (unless the user has saved a preference).
  * - Manages the `.dark` class on `<html>` via both Nuxt's useHead (so it
  *   survives Unhead's reactive attribute patching) and direct DOM manipulation
  *   for immediate visual feedback.
@@ -65,8 +65,7 @@ export function useColorMode() {
   if (import.meta.client) {
     onMounted(() => {
       const stored = localStorage.getItem('reqcore-color-mode') as 'light' | 'dark' | null
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      const resolved: 'light' | 'dark' = stored ? stored : (prefersDark ? 'dark' : 'light')
+      const resolved: 'light' | 'dark' = stored ?? 'light'
       if (colorMode.value !== resolved) {
         colorMode.value = resolved
         applyClass()

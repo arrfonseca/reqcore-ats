@@ -4,17 +4,13 @@
  * ────────────────────────────────────────────────────────────────────────────
  * Why a registry?
  * ────────────────────────────────────────────────────────────────────────────
- * Reqcore is open source and many users self-host. They typically do NOT run
- * PostHog. We still want feature flags to "just work" for them (using the
- * registered default value) without any external dependency.
+ * Reqcore is open source and many users self-host. Feature flags use registry
+ * defaults and optional env/URL overrides — no external analytics service.
  *
  * Resolution order (highest → lowest priority):
  *   1. URL query string  e.g.  ?ff_chatbot-experience=true     (dev / QA)
  *   2. Env var override  e.g.  FEATURE_FLAG_CHATBOT_EXPERIENCE=true
- *      (self-hosters can force a flag on/off without PostHog)
- *   3. PostHog rollout   (only when POSTHOG_PUBLIC_KEY is configured —
- *      used on cloud for gradual rollouts and per-user targeting)
- *   4. Registry default  (defined here)
+ *   3. Registry default  (defined here)
  *
  * ────────────────────────────────────────────────────────────────────────────
  * Adding a new flag
@@ -23,9 +19,7 @@
  *   2. Pick a `defaultValue` that is safe for self-hosters (usually `false`
  *      for in-development features, `true` for stable features being
  *      gradually retired behind a kill-switch).
- *   3. If the flag should be available on the cloud version with gradual
- *      rollout, create the matching flag in PostHog with the SAME key.
- *   4. Use it via `useFeatureFlag('your-key')` in components or
+ *   3. Use it via `useFeatureFlag('your-key')` in components or
  *      `resolveServerFeatureFlag(event, 'your-key', ...)` in API handlers.
  */
 
