@@ -2,6 +2,8 @@
 import { ArrowLeft, User, Briefcase, Calendar, Clock, Hash, FileText, MessageSquare } from 'lucide-vue-next'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
 
+const { t, locale } = useI18n()
+
 definePageMeta({
   layout: 'dashboard',
   middleware: ['auth', 'require-org'],
@@ -19,24 +21,41 @@ const { formatCandidateName } = useOrgSettings()
 useSeoMeta({
   title: computed(() =>
     application.value
-      ? `${application.value.candidate.firstName} ${application.value.candidate.lastName} → ${application.value.job.title} — Reqcore`
-      : 'Application — Reqcore',
+      ? `${application.value.candidate.firstName} ${application.value.candidate.lastName} → ${application.value.job.title} — ${t('common.brand.name')}`
+      : t('dashboard.applications.detail.seoTitle'),
   ),
 })
+
+function formatLocaleDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString(locale.value, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
 
 // ─────────────────────────────────────────────
 // Status transitions
 // ─────────────────────────────────────────────
 import { APPLICATION_STATUS_TRANSITIONS } from '~~/shared/status-transitions'
 
-const transitionLabels: Record<string, string> = {
-  new: 'Re-open',
-  screening: 'Move to Screening',
-  interview: 'Move to Interview',
-  offer: 'Make Offer',
-  hired: 'Mark Hired',
-  rejected: 'Reject',
-}
+const transitionLabels = computed<Record<string, string>>(() => ({
+  new: t('dashboard.applications.detail.transitions.new'),
+  screening: t('dashboard.applications.detail.transitions.screening'),
+  interview: t('dashboard.applications.detail.transitions.interview'),
+  offer: t('dashboard.applications.detail.transitions.offer'),
+  hired: t('dashboard.applications.detail.transitions.hired'),
+  rejected: t('dashboard.applications.detail.transitions.rejected'),
+}))
+
+const stageLabels = computed(() => ({
+  new: t('common.stages.new'),
+  screening: t('common.stages.screening'),
+  interview: t('common.stages.interview'),
+  offer: t('common.stages.offer'),
+  hired: t('common.stages.hired'),
+  rejected: t('common.stages.rejected'),
+}))
 
 const transitionClasses: Record<string, string> = {
   new: 'border border-surface-300 dark:border-surface-700 bg-white/80 dark:bg-surface-900 text-surface-700 dark:text-surface-300 hover:border-surface-400 dark:hover:border-surface-600 hover:bg-surface-50 dark:hover:bg-surface-800',
@@ -70,7 +89,7 @@ async function handleTransition(newStatus: string) {
     await updateApplication({ status: newStatus as any })
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to update status', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('dashboard.applications.detail.errors.updateStatusFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
   } finally {
     isTransitioning.value = false
   }
@@ -96,7 +115,7 @@ async function saveNotes() {
     isEditingNotes.value = false
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to save notes', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('dashboard.applications.detail.errors.saveNotesFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
   } finally {
     isSavingNotes.value = false
   }
@@ -117,7 +136,7 @@ const statusBadgeClasses: Record<string, string> = {
 
 function formatResponseValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (typeof value === 'boolean') return value ? t('dashboard.applications.detail.yes') : t('dashboard.applications.detail.no')
   return String(value ?? '—')
 }
 </script>
@@ -130,12 +149,12 @@ function formatResponseValue(value: unknown): string {
       class="mb-4 inline-flex items-center gap-1 rounded-full border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-1.5 text-sm text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
     >
       <ArrowLeft class="size-4" />
-      Back to Applications
+      {{ t('dashboard.applications.detail.backToApplications') }}
     </NuxtLink>
 
     <!-- Loading -->
     <div v-if="fetchStatus === 'pending'" class="text-center py-12 text-surface-400">
-      Loading application…
+      {{ t('dashboard.applications.detail.loading') }}
     </div>
 
     <!-- Error / not found -->
@@ -143,8 +162,8 @@ function formatResponseValue(value: unknown): string {
       v-else-if="error"
       class="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-700"
     >
-      {{ error.statusCode === 404 ? 'Application not found.' : 'Failed to load application.' }}
-      <NuxtLink :to="$localePath('/dashboard/applications')" class="underline ml-1">Back to Applications</NuxtLink>
+      {{ error.statusCode === 404 ? t('dashboard.applications.detail.notFound') : t('dashboard.applications.detail.loadFailed') }}
+      <NuxtLink :to="$localePath('/dashboard/applications')" class="underline ml-1">{{ t('dashboard.applications.detail.backToApplications') }}</NuxtLink>
     </div>
 
     <!-- Application detail -->
@@ -152,7 +171,7 @@ function formatResponseValue(value: unknown): string {
       <!-- Header -->
       <div class="mb-4 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
         <p class="mb-2 text-xs font-medium uppercase tracking-wide text-surface-500 dark:text-surface-400">
-          Application Overview
+          {{ t('dashboard.applications.detail.overview') }}
         </p>
         <div class="mb-2 flex flex-wrap items-center gap-2 text-surface-400">
           <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50 truncate">
@@ -171,10 +190,10 @@ function formatResponseValue(value: unknown): string {
             class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
             :class="statusBadgeClasses[application.status] ?? 'bg-surface-100 text-surface-600'"
           >
-            {{ application.status }}
+            {{ stageLabels[application.status as keyof typeof stageLabels] ?? application.status }}
           </span>
           <TimelineDateLink :date="application.createdAt" class="text-sm text-surface-500 dark:text-surface-400">
-            Applied {{ new Date(application.createdAt).toLocaleDateString() }}
+            {{ t('dashboard.applications.detail.applied') }} {{ formatLocaleDate(application.createdAt) }}
           </TimelineDateLink>
         </div>
       </div>
@@ -182,7 +201,7 @@ function formatResponseValue(value: unknown): string {
       <!-- Quick actions -->
       <div class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white/80 dark:bg-surface-900/70 p-3">
         <div class="flex flex-wrap items-center gap-2">
-          <span class="inline-flex items-center rounded-full bg-surface-100 dark:bg-surface-800 px-2.5 py-1 text-xs font-medium text-surface-600 dark:text-surface-400">Quick actions</span>
+          <span class="inline-flex items-center rounded-full bg-surface-100 dark:bg-surface-800 px-2.5 py-1 text-xs font-medium text-surface-600 dark:text-surface-400">{{ t('dashboard.applications.detail.quickActions') }}</span>
           <button
             v-for="nextStatus in allowedTransitions"
             :key="nextStatus"
@@ -197,13 +216,11 @@ function formatResponseValue(value: unknown): string {
             />
             {{ transitionLabels[nextStatus] ?? nextStatus }}
           </button>
-          <button
-            class="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-surface-300 dark:border-surface-700 bg-white/80 dark:bg-surface-900 px-3.5 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:border-brand-400 dark:hover:border-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/30 hover:text-brand-700 dark:hover:text-brand-300 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-            @click="showInterviewSidebar = true"
-          >
-            <Calendar class="size-3.5" />
-            Schedule Interview
-          </button>
+          <ScheduleInterviewButton
+            :application-id="applicationId"
+            variant="pill"
+            @schedule="showInterviewSidebar = true"
+          />
         </div>
       </div>
 
@@ -212,11 +229,11 @@ function formatResponseValue(value: unknown): string {
         <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <div class="flex items-center gap-2 mb-3">
             <User class="size-4 text-surface-500 dark:text-surface-400" />
-            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Candidate</h2>
+            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">{{ t('dashboard.applications.detail.candidate') }}</h2>
           </div>
           <dl class="grid grid-cols-1 gap-3 text-sm">
             <div>
-              <dt class="text-surface-400">Name</dt>
+              <dt class="text-surface-400">{{ t('dashboard.applications.detail.name') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
                 <NuxtLink
                   :to="$localePath(`/dashboard/candidates/${application.candidate.id}`)"
@@ -227,7 +244,7 @@ function formatResponseValue(value: unknown): string {
               </dd>
             </div>
             <div>
-              <dt class="text-surface-400">Email</dt>
+              <dt class="text-surface-400">{{ t('dashboard.applications.detail.email') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
                 <a
                   :href="`mailto:${application.candidate.email}`"
@@ -237,7 +254,7 @@ function formatResponseValue(value: unknown): string {
               </dd>
             </div>
             <div v-if="application.candidate.phone">
-              <dt class="text-surface-400">Phone</dt>
+              <dt class="text-surface-400">{{ t('dashboard.applications.detail.phone') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ application.candidate.phone }}</dd>
             </div>
           </dl>
@@ -247,11 +264,11 @@ function formatResponseValue(value: unknown): string {
         <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <div class="flex items-center gap-2 mb-3">
             <Briefcase class="size-4 text-surface-500 dark:text-surface-400" />
-            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Job</h2>
+            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">{{ t('dashboard.applications.detail.job') }}</h2>
           </div>
           <dl class="grid grid-cols-1 gap-3 text-sm">
             <div>
-              <dt class="text-surface-400">Title</dt>
+              <dt class="text-surface-400">{{ t('dashboard.applications.detail.title') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
                 <NuxtLink
                   :to="$localePath(`/dashboard/jobs/${application.job.id}`)"
@@ -262,7 +279,7 @@ function formatResponseValue(value: unknown): string {
               </dd>
             </div>
             <div>
-              <dt class="text-surface-400">Job Status</dt>
+              <dt class="text-surface-400">{{ t('dashboard.applications.detail.jobStatus') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium capitalize">{{ application.job.status }}</dd>
             </div>
           </dl>
@@ -272,33 +289,33 @@ function formatResponseValue(value: unknown): string {
         <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 md:col-span-2">
           <div class="flex items-center gap-2 mb-3">
             <Hash class="size-4 text-surface-500 dark:text-surface-400" />
-            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Details</h2>
+            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">{{ t('dashboard.applications.detail.details') }}</h2>
           </div>
           <dl class="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <dt class="text-surface-400">Score</dt>
+              <dt class="text-surface-400">{{ t('dashboard.applications.detail.score') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ application.score ?? '—' }}</dd>
             </div>
             <div>
-              <dt class="text-surface-400">Status</dt>
-              <dd class="text-surface-700 dark:text-surface-200 font-medium capitalize">{{ application.status }}</dd>
+              <dt class="text-surface-400">{{ t('dashboard.applications.detail.status') }}</dt>
+              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ stageLabels[application.status as keyof typeof stageLabels] ?? application.status }}</dd>
             </div>
             <div>
               <dt class="text-surface-400 inline-flex items-center gap-1">
                 <Calendar class="size-3.5" />
-                Applied
+                {{ t('dashboard.applications.detail.applied') }}
               </dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
-                <TimelineDateLink :date="application.createdAt">{{ new Date(application.createdAt).toLocaleDateString() }}</TimelineDateLink>
+                <TimelineDateLink :date="application.createdAt">{{ formatLocaleDate(application.createdAt) }}</TimelineDateLink>
               </dd>
             </div>
             <div>
               <dt class="text-surface-400 inline-flex items-center gap-1">
                 <Clock class="size-3.5" />
-                Updated
+                {{ t('dashboard.applications.detail.updated') }}
               </dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
-                <TimelineDateLink :date="application.updatedAt">{{ new Date(application.updatedAt).toLocaleDateString() }}</TimelineDateLink>
+                <TimelineDateLink :date="application.updatedAt">{{ formatLocaleDate(application.updatedAt) }}</TimelineDateLink>
               </dd>
             </div>
           </dl>
@@ -310,14 +327,14 @@ function formatResponseValue(value: unknown): string {
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
             <MessageSquare class="size-4 text-surface-500 dark:text-surface-400" />
-            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Notes</h2>
+            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">{{ t('dashboard.applications.detail.notes') }}</h2>
           </div>
           <button
             v-if="!isEditingNotes"
             class="cursor-pointer text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
             @click="startEditNotes"
           >
-            {{ application.notes ? 'Edit' : 'Add Notes' }}
+            {{ application.notes ? t('common.actions.edit') : t('dashboard.applications.detail.addNotes') }}
           </button>
         </div>
 
@@ -325,7 +342,7 @@ function formatResponseValue(value: unknown): string {
           <textarea
             v-model="notesInput"
             rows="4"
-            placeholder="Add notes about this application…"
+            :placeholder="t('dashboard.applications.detail.notesPlaceholder')"
             class="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
           />
           <div class="flex items-center gap-2 mt-2">
@@ -334,13 +351,13 @@ function formatResponseValue(value: unknown): string {
               class="cursor-pointer rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               @click="saveNotes"
             >
-              {{ isSavingNotes ? 'Saving…' : 'Save' }}
+              {{ isSavingNotes ? t('common.actions.saving') : t('common.save') }}
             </button>
             <button
               class="cursor-pointer rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
               @click="isEditingNotes = false"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
           </div>
         </div>
@@ -351,12 +368,12 @@ function formatResponseValue(value: unknown): string {
         >
           {{ application.notes }}
         </p>
-        <p v-else class="text-sm text-surface-400 italic">No notes yet.</p>
+        <p v-else class="text-sm text-surface-400 italic">{{ t('dashboard.applications.detail.noNotes') }}</p>
       </div>
 
       <!-- Custom properties (Notion-style) -->
       <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-4 mb-4">
-        <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200 mb-2 px-2">Properties</h2>
+        <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200 mb-2 px-2">{{ t('dashboard.applications.detail.properties') }}</h2>
         <PropertyBlock
           entity-type="application"
           :entity-id="applicationId"
@@ -374,7 +391,7 @@ function formatResponseValue(value: unknown): string {
         <div class="flex items-center gap-2 mb-3">
           <FileText class="size-4 text-surface-500 dark:text-surface-400" />
           <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">
-            Application Responses ({{ application.responses.length }})
+            {{ t('dashboard.applications.detail.responsesCount', { count: application.responses.length }) }}
           </h2>
         </div>
         <div class="space-y-3">
@@ -384,7 +401,7 @@ function formatResponseValue(value: unknown): string {
             class="border-b border-surface-100 dark:border-surface-800 pb-3 last:border-0 last:pb-0"
           >
             <dt class="text-xs font-medium text-surface-500 dark:text-surface-400 mb-0.5">
-              {{ response.question?.label ?? 'Unknown question' }}
+              {{ response.question?.label ?? t('dashboard.applications.detail.unknownQuestion') }}
             </dt>
             <dd class="text-sm text-surface-700 dark:text-surface-200">
               {{ formatResponseValue(response.value) }}

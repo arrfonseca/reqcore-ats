@@ -58,5 +58,5 @@ export const sendInterviewInvitationSchema = z.object({
 // Pre-made (system) templates — single source of truth in shared/
 // ─────────────────────────────────────────────
 
-export { SYSTEM_TEMPLATES } from '~~/shared/system-templates'
+export { SYSTEM_TEMPLATES, getSystemTemplates } from '~~/shared/system-templates'
 export type { SystemTemplate } from '~~/shared/system-templates'

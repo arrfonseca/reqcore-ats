@@ -27,6 +27,7 @@ export function useCandidate(id: MaybeRefOrGetter<string>) {
     phone: string | null
     gender: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null
     dateOfBirth: string | null
+    quickNotes: string | null
   }>) {
     try {
       const updated = await $fetch(`/api/candidates/${candidateId.value}`, {
@@ -51,7 +52,7 @@ export function useCandidate(id: MaybeRefOrGetter<string>) {
       throw error
     }
     await refreshNuxtData('candidates')
-    await navigateTo(localePath('/dashboard/candidates'))
+    await navigateTo(tenantPath('candidates'))
   }
 
   return { candidate, status, error, refresh, updateCandidate, deleteCandidate }

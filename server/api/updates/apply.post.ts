@@ -25,7 +25,7 @@ interface UpdateResult {
  * Requires authentication (owner only).
  */
 export default defineEventHandler(async (event) => {
-  await requirePermission(event, { organization: ['delete'] })
+  await requireSaasAdmin(event)
 
   const steps: UpdateResult['steps'] = []
 

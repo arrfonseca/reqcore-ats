@@ -1,11 +1,14 @@
 /**
- * Deletes the demo organization and all cascaded data so seed.ts can re-run.
+ * Deletes demo organizations and demo users (reqcore-demo, legacy applirank-demo).
  * Usage: npx tsx server/scripts/delete-demo-org.ts
  */
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import * as schema from '../database/schema'
+
+const DEMO_ORG_SLUGS = ['reqcore-demo', 'applirank-demo'] as const
+const DEMO_USER_EMAILS = ['demo@reqcore.com', 'demo@applirank.com'] as const
 
 const processWithLoadEnv = process as NodeJS.Process & { loadEnvFile?: (path?: string) => void }
 if (!process.env.DATABASE_URL && typeof processWithLoadEnv.loadEnvFile === 'function') {
@@ -22,47 +25,40 @@ const client = postgres(DATABASE_URL, { max: 1 })
 const db = drizzle(client, { schema })
 
 async function main() {
-  const [org] = await db
-    .select({ id: schema.organization.id })
+  const orgs = await db
+    .select({ id: schema.organization.id, slug: schema.organization.slug })
     .from(schema.organization)
-    .where(eq(schema.organization.slug, 'reqcore-demo'))
-    .limit(1)
+    .where(inArray(schema.organization.slug, [...DEMO_ORG_SLUGS]))
 
-  if (org) {
-    const orgId = org.id
-    // Invalidate sessions referencing the demo org so logged-in users
-    // are forced to re-authenticate after reseed
-    const deleted = await db.delete(schema.session)
-      .where(eq(schema.session.activeOrganizationId, orgId))
-      .returning({ id: schema.session.id })
-    if (deleted.length)
-      console.log(`🔒 Invalidated ${deleted.length} session(s) tied to demo org`)
-
-    // Delete in dependency order to avoid FK violations
-    // (some migrations may not have applied CASCADE correctly)
-    await db.delete(schema.activityLog).where(eq(schema.activityLog.organizationId, orgId))
-    await db.delete(schema.criterionScore).where(eq(schema.criterionScore.organizationId, orgId))
-    await db.delete(schema.analysisRun).where(eq(schema.analysisRun.organizationId, orgId))
-    await db.delete(schema.scoringCriterion).where(eq(schema.scoringCriterion.organizationId, orgId))
-    await db.delete(schema.aiConfig).where(eq(schema.aiConfig.organizationId, orgId))
-    await db.delete(schema.comment).where(eq(schema.comment.organizationId, orgId))
-    await db.delete(schema.interview).where(eq(schema.interview.organizationId, orgId))
-    await db.delete(schema.questionResponse).where(eq(schema.questionResponse.organizationId, orgId))
-    await db.delete(schema.application).where(eq(schema.application.organizationId, orgId))
-    await db.delete(schema.jobQuestion).where(eq(schema.jobQuestion.organizationId, orgId))
-    await db.delete(schema.document).where(eq(schema.document.organizationId, orgId))
-    await db.delete(schema.candidate).where(eq(schema.candidate.organizationId, orgId))
-    await db.delete(schema.job).where(eq(schema.job.organizationId, orgId))
-    await db.delete(schema.emailTemplate).where(eq(schema.emailTemplate.organizationId, orgId))
-    await db.delete(schema.inviteLink).where(eq(schema.inviteLink.organizationId, orgId))
-    await db.delete(schema.joinRequest).where(eq(schema.joinRequest.organizationId, orgId))
-    await db.delete(schema.member).where(eq(schema.member.organizationId, orgId))
-    await db.delete(schema.invitation).where(eq(schema.invitation.organizationId, orgId))
-    await db.delete(schema.organization).where(eq(schema.organization.id, orgId))
-    console.log(`✅ Deleted demo organization and all related data: ${orgId}`)
+  if (orgs.length === 0) {
+    console.log('ℹ️  No demo organizations found.')
   }
-  else {
-    console.log('ℹ️  No demo organization found — nothing to delete.')
+
+  for (const org of orgs) {
+    const deletedSessions = await db.delete(schema.session)
+      .where(eq(schema.session.activeOrganizationId, org.id))
+      .returning({ id: schema.session.id })
+
+    await db.delete(schema.organization).where(eq(schema.organization.id, org.id))
+
+    console.log(`✅ Deleted demo org "${org.slug}" (${org.id})`)
+    if (deletedSessions.length) {
+      console.log(`   🔒 Invalidated ${deletedSessions.length} session(s)`)
+    }
+  }
+
+  const demoUsers = await db
+    .select({ id: schema.user.id, email: schema.user.email })
+    .from(schema.user)
+    .where(inArray(schema.user.email, [...DEMO_USER_EMAILS]))
+
+  for (const user of demoUsers) {
+    await db.delete(schema.user).where(eq(schema.user.id, user.id))
+    console.log(`✅ Deleted demo user: ${user.email}`)
+  }
+
+  if (orgs.length === 0 && demoUsers.length === 0) {
+    console.log('ℹ️  Nothing to delete.')
   }
 
   await client.end()

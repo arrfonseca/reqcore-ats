@@ -21,6 +21,8 @@ import {
 } from 'lucide-vue-next'
 import type { ChatbotConversationSummary, ChatbotFolder } from '~~/shared/chatbot'
 
+const { t } = useI18n()
+
 const {
   conversations, folders,
   currentConversationId,
@@ -78,10 +80,10 @@ function startRename(c: ChatbotConversationSummary) {
   openMenuId.value = null
 }
 async function commitRename(c: ChatbotConversationSummary) {
-  const t = editingTitle.value.trim()
+  const title = editingTitle.value.trim()
   editingConvId.value = null
-  if (t && t !== c.title) {
-    await updateConversation(c.id, { title: t })
+  if (title && title !== c.title) {
+    await updateConversation(c.id, { title })
   }
 }
 
@@ -98,12 +100,12 @@ async function moveToFolder(c: ChatbotConversationSummary, folderId: string | nu
 
 async function confirmDeleteConv(c: ChatbotConversationSummary) {
   openMenuId.value = null
-  if (!confirm(`Delete "${c.title}"? This cannot be undone.`)) return
+  if (!confirm(t('dashboard.chatbot.sidebar.confirmDeleteConversation', { title: c.title }))) return
   await deleteConversation(c.id)
 }
 
 async function confirmDeleteFolder(f: ChatbotFolder) {
-  if (!confirm(`Delete folder "${f.name}"? Conversations inside will be moved to Uncategorised.`)) return
+  if (!confirm(t('dashboard.chatbot.sidebar.confirmDeleteFolder', { name: f.name }))) return
   await deleteFolder(f.id)
 }
 
@@ -137,12 +139,12 @@ function relativeTime(ms: number | null) {
   if (!ms) return ''
   const diff = Date.now() - ms
   const mins = Math.round(diff / 60_000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m`
+  if (mins < 1) return t('dashboard.chatbot.relativeTime.justNow')
+  if (mins < 60) return t('dashboard.chatbot.relativeTime.minutes', { count: mins })
   const hrs = Math.round(mins / 60)
-  if (hrs < 24) return `${hrs}h`
+  if (hrs < 24) return t('dashboard.chatbot.relativeTime.hours', { count: hrs })
   const days = Math.round(hrs / 24)
-  if (days < 7) return `${days}d`
+  if (days < 7) return t('dashboard.chatbot.relativeTime.days', { count: days })
   return new Date(ms).toLocaleDateString()
 }
 </script>
@@ -156,11 +158,11 @@ function relativeTime(ms: number | null) {
         @click="handleNewChat()"
       >
         <Plus class="size-4" />
-        New chat
+        {{ t('dashboard.chatbot.sidebar.newChat') }}
       </button>
       <button
         class="inline-flex items-center justify-center size-9 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-surface-500 hover:text-surface-800 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors cursor-pointer"
-        title="New folder"
+        :title="t('dashboard.chatbot.sidebar.newFolder')"
         @click="startNewFolder"
       >
         <FolderPlus class="size-4" />
@@ -175,20 +177,20 @@ function relativeTime(ms: number | null) {
           ref="newFolderInput"
           v-model="newFolderName"
           class="flex-1 bg-transparent text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none"
-          placeholder="Folder name"
+          :placeholder="t('dashboard.chatbot.sidebar.folderNamePlaceholder')"
           @keydown.enter="commitNewFolder"
           @keydown.escape="showNewFolder = false"
         />
         <button
           class="inline-flex size-6 items-center justify-center rounded text-surface-500 hover:text-success-600 hover:bg-success-50 dark:hover:bg-success-950/30 cursor-pointer border-0 bg-transparent"
-          title="Create"
+          :title="t('dashboard.chatbot.sidebar.create')"
           @click="commitNewFolder"
         >
           <Check class="size-3.5" />
         </button>
         <button
           class="inline-flex size-6 items-center justify-center rounded text-surface-500 hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/30 cursor-pointer border-0 bg-transparent"
-          title="Cancel"
+          :title="t('dashboard.chatbot.sidebar.cancel')"
           @click="showNewFolder = false"
         >
           <X class="size-3.5" />
@@ -207,7 +209,7 @@ function relativeTime(ms: number | null) {
         <div class="group flex items-center gap-1 px-2 py-1">
           <button
             class="inline-flex size-5 items-center justify-center rounded text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 cursor-pointer border-0 bg-transparent"
-            :title="collapsed.has(f.id) ? 'Expand' : 'Collapse'"
+            :title="collapsed.has(f.id) ? t('dashboard.chatbot.sidebar.expand') : t('dashboard.chatbot.sidebar.collapse')"
             @click="toggleFolder(f.id)"
           >
             <ChevronRight class="size-3 transition-transform" :class="collapsed.has(f.id) ? '' : 'rotate-90'" />
@@ -234,21 +236,21 @@ function relativeTime(ms: number | null) {
           </button>
           <button
             class="invisible inline-flex size-5 items-center justify-center rounded text-surface-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/30 group-hover:visible cursor-pointer border-0 bg-transparent"
-            title="New chat in this folder"
+            :title="t('dashboard.chatbot.sidebar.newChatInFolder')"
             @click="handleNewChat(f.id)"
           >
             <Plus class="size-3" />
           </button>
           <button
             class="invisible inline-flex size-5 items-center justify-center rounded text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 group-hover:visible cursor-pointer border-0 bg-transparent"
-            title="Rename folder"
+            :title="t('dashboard.chatbot.sidebar.renameFolder')"
             @click="startRenameFolder(f)"
           >
             <Pencil class="size-3" />
           </button>
           <button
             class="invisible inline-flex size-5 items-center justify-center rounded text-surface-400 hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/30 group-hover:visible cursor-pointer border-0 bg-transparent"
-            title="Delete folder"
+            :title="t('dashboard.chatbot.sidebar.deleteFolder')"
             @click="confirmDeleteFolder(f)"
           >
             <Trash2 class="size-3" />
@@ -257,7 +259,7 @@ function relativeTime(ms: number | null) {
 
         <ul v-if="!collapsed.has(f.id)" class="space-y-0.5 px-1.5 pl-5">
           <li v-if="conversationsForFolder(f.id).length === 0" class="px-2 py-1 text-xs italic text-surface-400">
-            Empty.
+            {{ t('dashboard.chatbot.sidebar.emptyFolder') }}
           </li>
           <li
             v-for="c in [...conversationsForFolder(f.id)].sort((a, b) => Number(b.pinned) - Number(a.pinned))"
@@ -289,13 +291,13 @@ function relativeTime(ms: number | null) {
       <div class="mb-2">
         <div class="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-surface-500">
           <Inbox class="size-3" />
-          Uncategorised
+          {{ t('dashboard.chatbot.sidebar.uncategorised') }}
         </div>
         <p
           v-if="uncategorised.length === 0"
           class="px-3 py-1 text-xs italic text-surface-400 dark:text-surface-500"
         >
-          No chats yet.
+          {{ t('dashboard.chatbot.sidebar.noChats') }}
         </p>
         <ul v-else class="space-y-0.5 px-1.5">
           <li
@@ -332,7 +334,7 @@ function relativeTime(ms: number | null) {
         @click="emit('openAgents')"
       >
         <Sparkles class="size-4 text-brand-500" />
-        Manage agents
+        {{ t('dashboard.chatbot.sidebar.manageAgents') }}
       </button>
     </div>
   </aside>

@@ -8,6 +8,11 @@ import { z } from 'zod'
 import { buildPremadeCriteriaMap } from '~~/shared/scoring-criteria-templates'
 import { generateStructuredOutput, type ProviderConfig } from './provider'
 
+// ─── Scoring Output Locale ─────────────────────────────────────────
+
+/** All LLM-generated scoring text is produced in Brazilian Portuguese. */
+const SCORING_OUTPUT_LANGUAGE = 'Brazilian Portuguese (pt-BR)'
+
 // ─── Scoring Output Schema ────────────────────────────────────────
 
 /** Schema for a single criterion evaluation from the LLM */
@@ -77,6 +82,7 @@ Rules:
 - Avoid criteria that could introduce bias (age, gender, ethnicity, disability)
 - Focus on skills, experience, and qualifications that are directly relevant to the role
 - Use clear, professional language
+- Write criterion names and descriptions in ${SCORING_OUTPUT_LANGUAGE}
 - Each key must be unique, lowercase, and use underscores (e.g. "react_expertise")
 - Set suggestedWeight higher for more critical criteria (10–100 scale)`,
     prompt: `Job Title: ${jobTitle}\n\nJob Description:\n${jobDescription}`,
@@ -134,7 +140,8 @@ IMPORTANT RULES:
 - Evidence must cite specific details from the candidate's materials
 - Each strength and gap must be a single, specific statement
 - applicantScore must not exceed maxScore for each criterion
-- Provide a brief summary of the overall evaluation`,
+- Provide a brief summary of the overall evaluation
+- Write all text output (evidence, strengths, gaps, summary) in ${SCORING_OUTPUT_LANGUAGE}`,
     prompt: `JOB TITLE: ${params.jobTitle}
 
 JOB DESCRIPTION:

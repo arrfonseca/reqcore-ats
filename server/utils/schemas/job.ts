@@ -1,6 +1,11 @@
 import { z } from 'zod'
+import { ISCO_CATEGORY_IDS } from '~~/shared/scoring-criteria-templates'
+import { ALL_JOB_TYPE_IDS, DEFAULT_JOB_TYPE } from '~~/shared/job-types'
 
 export { JOB_STATUS_TRANSITIONS } from '~~/shared/status-transitions'
+
+const iscoCategoryIdSchema = z.enum(ISCO_CATEGORY_IDS)
+const jobTypeSchema = z.enum(ALL_JOB_TYPE_IDS)
 
 // ─────────────────────────────────────────────
 // Job validation schemas — shared across API routes
@@ -11,7 +16,7 @@ export const createJobSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
   description: z.string().optional(),
   location: z.string().optional(),
-  type: z.enum(['full_time', 'part_time', 'contract', 'internship']).default('full_time'),
+  type: jobTypeSchema.default(DEFAULT_JOB_TYPE),
   /** Optional custom slug — if omitted, generated from title */
   slug: z.string().max(80).optional(),
   /** Salary range fields for SEO-rich job postings (Google Jobs) */
@@ -33,6 +38,8 @@ export const createJobSchema = z.object({
   autoScoreOnApply: z.boolean().optional().default(false),
   /** Experience level required for this role */
   experienceLevel: z.enum(['junior', 'mid', 'senior', 'lead']).optional(),
+  /** Internal ISCO occupation category for org reporting — not shown on public listings */
+  iscoCategoryId: iscoCategoryIdSchema,
 })
 
 /** Schema for updating an existing job (all fields optional, no defaults — PATCH semantics) */
@@ -40,7 +47,7 @@ export const updateJobSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200).optional(),
   description: z.string().nullable().optional(),
   location: z.string().nullable().optional(),
-  type: z.enum(['full_time', 'part_time', 'contract', 'internship']).optional(),
+  type: jobTypeSchema.optional(),
   slug: z.string().max(80).optional(),
   /** Pass null to explicitly clear a salary field */
   salaryMin: z.coerce.number().int().min(0).nullable().optional(),
@@ -57,6 +64,8 @@ export const updateJobSchema = z.object({
   autoScoreOnApply: z.boolean().optional(),
   /** Experience level required for this role */
   experienceLevel: z.enum(['junior', 'mid', 'senior', 'lead']).nullable().optional(),
+  /** Internal ISCO occupation category for org reporting — not shown on public listings */
+  iscoCategoryId: iscoCategoryIdSchema.nullable().optional(),
   status: z.enum(['draft', 'open', 'closed', 'archived']).optional(),
 })
 

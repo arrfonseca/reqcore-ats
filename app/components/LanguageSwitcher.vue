@@ -216,9 +216,9 @@ async function handleLocaleChange(nextLocale: string) {
           <span
             v-if="option.partial"
             class="rounded bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400"
-            title="Translation incomplete"
+            :title="t('common.language.translationIncomplete')"
           >
-            partial
+            {{ t('common.language.partial') }}
           </span>
         </li>
       </ul>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const { tenantPath, platformPath } = useTenantPaths()
 import {
   X, User, Calendar, Clock, Hash, MessageSquare, FileText,
   ExternalLink, Mail, Phone, Upload, Download, Eye, Trash2,
@@ -16,6 +17,7 @@ const emit = defineEmits<{
   (e: 'updated'): void
 }>()
 
+const { t, locale } = useI18n()
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 const toast = useToast()
 const { track } = useTrack()
@@ -78,13 +80,31 @@ const documents = computed(() => candidateData.value?.documents ?? [])
 // ─────────────────────────────────────────────
 import { APPLICATION_STATUS_TRANSITIONS } from '~~/shared/status-transitions'
 
-const transitionLabels: Record<string, string> = {
-  new: 'Re-open',
-  screening: 'Screening',
-  interview: 'Interview',
-  offer: 'Offer',
-  hired: 'Hired',
-  rejected: 'Reject',
+const transitionLabels = computed(() => ({
+  new: t('dashboard.applications.detail.transitions.new'),
+  screening: t('dashboard.applications.detail.transitions.screening'),
+  interview: t('dashboard.applications.detail.transitions.interview'),
+  offer: t('dashboard.applications.detail.transitions.offer'),
+  hired: t('dashboard.applications.detail.transitions.hired'),
+  rejected: t('dashboard.applications.detail.transitions.rejected'),
+}))
+
+const stageLabels = computed(() => ({
+  new: t('common.stages.new'),
+  screening: t('common.stages.screening'),
+  interview: t('common.stages.interview'),
+  offer: t('common.stages.offer'),
+  hired: t('common.stages.hired'),
+  rejected: t('common.stages.rejected'),
+}))
+
+function statusLabel(status: string): string {
+  return stageLabels.value[status as keyof typeof stageLabels.value] ?? status
+}
+
+function interviewStatusLabel(status: string): string {
+  const key = status as 'scheduled' | 'completed' | 'cancelled' | 'no_show'
+  return t(`dashboard.interviews.shared.status.${key}`)
 }
 
 const transitionClasses: Record<string, string> = {
@@ -128,7 +148,7 @@ async function handleTransition(newStatus: string) {
     emit('updated')
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to update status', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('dashboard.applications.detail.errors.updateStatusFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
   } finally {
     isTransitioning.value = false
   }
@@ -159,7 +179,7 @@ async function saveNotes() {
     isEditingNotes.value = false
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to save notes', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('dashboard.applications.detail.errors.saveNotesFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
   } finally {
     isSavingNotes.value = false
   }
@@ -189,11 +209,11 @@ const previewError = ref<string | null>(null)
 
 const isPdfPreview = computed(() => previewMimeType.value === 'application/pdf')
 
-const documentTypeLabels: Record<string, string> = {
-  resume: 'Resume',
-  cover_letter: 'Cover Letter',
-  other: 'Other',
-}
+const documentTypeLabels = computed(() => ({
+  resume: t('dashboard.candidates.shared.documentTypes.resume'),
+  cover_letter: t('dashboard.candidates.shared.documentTypes.cover_letter'),
+  other: t('dashboard.candidates.shared.documentTypes.other'),
+}))
 
 function triggerFileSelect() {
   fileInput.value?.click()
@@ -211,7 +231,7 @@ async function handleFileSelected(event: Event) {
     await uploadDocument(candidateId.value, file, selectedDocType.value)
     await refreshCandidate()
   } catch (err: any) {
-    uploadError.value = err.data?.statusMessage ?? err.statusMessage ?? 'Upload failed'
+    uploadError.value = err.data?.statusMessage ?? err.statusMessage ?? t('dashboard.candidates.detail.errors.uploadFailed')
   } finally {
     isUploading.value = false
     input.value = ''
@@ -225,12 +245,12 @@ async function handleReparse(docId: string) {
       method: 'POST',
       headers: useRequestHeaders(['cookie']),
     })
-    toast.add({ title: 'Resume parsed successfully', type: 'success' })
+    toast.add({ title: t('common.actions.saved'), type: 'success' })
     await refreshCandidate()
   } catch (err: any) {
     toast.add({
-      title: 'Parse failed',
-      message: err?.data?.statusMessage ?? 'Could not extract text from this document.',
+      title: t('dashboard.candidates.sidebar.textExtractionFailed'),
+      message: err?.data?.statusMessage ?? t('dashboard.candidates.sidebar.textExtractionFailed'),
       type: 'error',
     })
   } finally {
@@ -251,7 +271,7 @@ async function handlePreview(docId: string, mimeType?: string) {
 
   // Find the document name from the loaded data
   const doc = documents.value?.find((d: any) => d.id === docId)
-  previewFilename.value = doc?.originalFilename ?? 'Document'
+  previewFilename.value = doc?.originalFilename ?? t('dashboard.candidates.documents.preview')
   previewMimeType.value = doc?.mimeType ?? 'application/pdf'
 
   // Use the API endpoint URL directly — server streams the PDF (same-origin)
@@ -272,7 +292,7 @@ async function handleDownload(docId: string) {
     track('document_downloaded', { document_id: docId })
     await downloadDocument(docId)
   } catch {
-    toast.error('Failed to download document')
+    toast.error(t('dashboard.candidates.detail.errors.downloadFailed'))
   }
 }
 
@@ -285,7 +305,7 @@ async function handleDeleteDoc(docId: string) {
     showDocDeleteConfirm.value = null
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to delete document', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('dashboard.candidates.detail.errors.deleteDocumentFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
   } finally {
     isDeletingDoc.value = false
   }
@@ -333,19 +353,22 @@ const timelineLoading = ref(false)
 const timelineError = ref<string | null>(null)
 const timelineLoaded = ref(false)
 
-const timelineActionLabels: Record<string, string> = {
-  created: 'Created',
-  updated: 'Updated',
-  deleted: 'Deleted',
-  status_changed: 'Status changed',
-  comment_added: 'Comment added',
-  scored: 'Scored',
-  scheduled: 'Scheduled',
+const timelineActionLabels = computed(() => ({
+  created: t('dashboard.jobs.detail.candidates.timeline.created'),
+  updated: t('dashboard.jobs.detail.candidates.timeline.updated'),
+  deleted: t('dashboard.jobs.detail.candidates.timeline.deleted'),
+  status_changed: t('dashboard.jobs.detail.candidates.timeline.statusChanged'),
+  comment_added: t('dashboard.jobs.detail.candidates.timeline.commentAdded'),
+  scored: t('dashboard.jobs.detail.candidates.timeline.scored'),
+  scheduled: t('dashboard.jobs.detail.candidates.timeline.scheduled'),
+}))
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString(locale.value)
 }
 
 function formatTimelineDate(dateStr: string) {
-  const d = new Date(dateStr)
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return new Date(dateStr).toLocaleDateString(locale.value, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function getTimelineActionColor(action: string): string {
@@ -362,22 +385,39 @@ function getTimelineActionColor(action: string): string {
 }
 
 function describeTimelineItem(item: TimelineEntry): string {
-  const actor = item.actorName ?? item.actorEmail ?? 'System'
-  const action = timelineActionLabels[item.action] ?? item.action
+  const actor = item.actorName ?? item.actorEmail ?? t('dashboard.jobs.shared.system')
+  const action = timelineActionLabels.value[item.action] ?? item.action
   const resource = item.resourceType
 
   if (item.action === 'status_changed' && item.metadata) {
     const from = item.metadata.from_status ?? item.metadata.fromStatus
     const to = item.metadata.to_status ?? item.metadata.toStatus
-    if (from && to) return `${actor} changed ${resource} status from ${from} to ${to}`
+    if (from && to) {
+      return t('dashboard.jobs.detail.candidates.timeline.statusChangeDesc', {
+        actor,
+        resource,
+        from: statusLabel(String(from)),
+        to: statusLabel(String(to)),
+      })
+    }
   }
 
   if (item.action === 'scored' && item.metadata) {
     const score = item.metadata.score
-    if (score != null) return `${actor} scored ${resource} — ${score} pts`
+    if (score != null) {
+      return t('dashboard.jobs.detail.candidates.timeline.scoredDesc', {
+        actor,
+        resource,
+        score,
+      })
+    }
   }
 
-  return `${actor} ${action.toLowerCase()} ${resource}`
+  return t('dashboard.jobs.detail.candidates.timeline.genericDesc', {
+    actor,
+    action: action.toLowerCase(),
+    resource,
+  })
 }
 
 async function loadTimeline() {
@@ -391,7 +431,7 @@ async function loadTimeline() {
     timelineItems.value = result.items
     timelineLoaded.value = true
   } catch (err: any) {
-    timelineError.value = err?.data?.statusMessage ?? 'Failed to load timeline'
+    timelineError.value = err?.data?.statusMessage ?? t('dashboard.jobs.detail.candidates.timeline.loadFailed')
   } finally {
     timelineLoading.value = false
   }
@@ -422,7 +462,7 @@ watch(() => props.applicationId, () => {
 
 function formatResponseValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (typeof value === 'boolean') return value ? t('dashboard.applications.detail.yes') : t('dashboard.applications.detail.no')
   return String(value ?? '—')
 }
 
@@ -438,17 +478,17 @@ const { interviews: applicationInterviews } = useInterviews({
   applicationId: computed(() => props.applicationId),
 })
 
-const interviewTypeLabels: Record<string, string> = {
-  phone: 'Phone',
-  video: 'Video',
-  in_person: 'In-person',
-  panel: 'Panel',
-  technical: 'Qualifications',
-  take_home: 'Take-home',
-}
+const interviewTypeLabels = computed(() => ({
+  phone: t('dashboard.interviews.shared.types.phone'),
+  video: t('dashboard.interviews.shared.types.video'),
+  in_person: t('dashboard.interviews.shared.types.in_person'),
+  panel: t('dashboard.interviews.shared.types.panel'),
+  technical: t('dashboard.interviews.shared.types.technical'),
+  take_home: t('dashboard.interviews.shared.types.take_home'),
+}))
 
 function formatInterviewDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return new Date(dateStr).toLocaleDateString(locale.value, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 </script>
 
@@ -488,21 +528,18 @@ function formatInterviewDate(dateStr: string) {
           </div>
         </div>
         <div v-else class="min-w-0">
-          <h2 class="text-lg font-semibold text-surface-400">Loading…</h2>
+          <h2 class="text-lg font-semibold text-surface-400">{{ t('dashboard.candidates.sidebar.loading') }}</h2>
         </div>
         <div class="flex items-center gap-1 shrink-0 ml-3">
-          <button
+          <ScheduleInterviewButton
             v-if="application"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 dark:border-surface-700 px-2.5 py-1.5 text-sm font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/30 hover:text-brand-700 dark:hover:text-brand-300 transition-all cursor-pointer"
-            title="Schedule Interview"
-            @click="showScheduleSidebar = true"
-          >
-            <Calendar class="size-3.5" />
-            Schedule
-          </button>
+            :application-id="props.applicationId"
+            variant="compact"
+            @schedule="showScheduleSidebar = true"
+          />
           <button
             class="rounded-md p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-800 transition-colors"
-            title="Close (Esc)"
+            :title="t('filters.close')"
             @click="emit('close')"
           >
             <X class="size-5" />
@@ -520,7 +557,7 @@ function formatInterviewDate(dateStr: string) {
               : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:hover:text-surface-300'"
             @click="activeTab = 'overview'"
           >
-            Overview
+            {{ t('dashboard.candidates.sidebar.overview') }}
           </button>
           <button
             class="cursor-pointer px-3 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
@@ -529,7 +566,7 @@ function formatInterviewDate(dateStr: string) {
               : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:hover:text-surface-300'"
             @click="activeTab = 'documents'"
           >
-            Documents ({{ documents.length }})
+            {{ t('dashboard.candidates.detail.documents') }} ({{ documents.length }})
           </button>
           <button
             v-if="responsesCount > 0"
@@ -539,7 +576,7 @@ function formatInterviewDate(dateStr: string) {
               : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:hover:text-surface-300'"
             @click="activeTab = 'responses'"
           >
-            Responses ({{ responsesCount }})
+            {{ t('dashboard.candidates.sidebar.responses') }} ({{ responsesCount }})
           </button>
           <button
             class="cursor-pointer px-3 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px inline-flex items-center gap-1.5"
@@ -549,7 +586,7 @@ function formatInterviewDate(dateStr: string) {
             @click="activeTab = 'ai_analysis'"
           >
             <Brain class="size-3.5" />
-            AI Analysis
+            {{ t('dashboard.candidates.sidebar.aiAnalysis') }}
           </button>
           <button
             class="cursor-pointer px-3 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px inline-flex items-center gap-1.5"
@@ -559,7 +596,7 @@ function formatInterviewDate(dateStr: string) {
             @click="activeTab = 'timeline'"
           >
             <History class="size-3.5" />
-            Timeline
+            {{ t('dashboard.candidates.sidebar.timeline') }}
           </button>
         </div>
       </div>
@@ -568,7 +605,7 @@ function formatInterviewDate(dateStr: string) {
       <div class="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
         <!-- Loading -->
         <div v-if="fetchStatus === 'pending'" class="text-center py-12 text-surface-400">
-          Loading details…
+          {{ t('dashboard.candidates.sidebar.loadingDetails') }}
         </div>
 
         <template v-else-if="application">
@@ -584,15 +621,15 @@ function formatInterviewDate(dateStr: string) {
                   class="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold capitalize ring-1 ring-inset"
                   :class="statusBadgeClasses[application.status] ?? 'bg-surface-100 text-surface-600 ring-surface-200'"
                 >
-                  {{ application.status }}
+                  {{ statusLabel(application.status) }}
                 </span>
                 <span class="text-sm text-surface-400">
-                  Applied {{ new Date(application.createdAt).toLocaleDateString() }}
+                  {{ t('dashboard.candidates.sidebar.applied') }} {{ formatDate(application.createdAt) }}
                 </span>
               </div>
 
               <div v-if="allowedTransitions.length > 0" class="flex flex-wrap items-center gap-2">
-                <span class="text-xs font-medium text-surface-500 dark:text-surface-400 mr-0.5">Move to:</span>
+                <span class="text-xs font-medium text-surface-500 dark:text-surface-400 mr-0.5">{{ t('dashboard.candidates.sidebar.moveTo') }}</span>
                 <button
                   v-for="nextStatus in allowedTransitions"
                   :key="nextStatus"
@@ -612,17 +649,17 @@ function formatInterviewDate(dateStr: string) {
                 <div class="flex size-7 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
                   <User class="size-3.5 text-brand-600 dark:text-brand-400" />
                 </div>
-                <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Candidate</h3>
+                <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ t('dashboard.applications.detail.candidate') }}</h3>
               </div>
               <dl class="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">Name</dt>
+                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">{{ t('dashboard.applications.detail.name') }}</dt>
                   <dd class="text-surface-800 dark:text-surface-200 font-medium">
                     {{ formatCandidateName(application.candidate) }}
                   </dd>
                 </div>
                 <div>
-                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">Email</dt>
+                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">{{ t('dashboard.applications.detail.email') }}</dt>
                   <dd class="text-surface-800 dark:text-surface-200 font-medium truncate">
                     <a
                       :href="`mailto:${application.candidate.email}`"
@@ -632,7 +669,7 @@ function formatInterviewDate(dateStr: string) {
                   </dd>
                 </div>
                 <div v-if="application.candidate.phone">
-                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">Phone</dt>
+                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">{{ t('dashboard.applications.detail.phone') }}</dt>
                   <dd class="text-surface-800 dark:text-surface-200 font-medium">
                     {{ application.candidate.phone }}
                   </dd>
@@ -646,40 +683,56 @@ function formatInterviewDate(dateStr: string) {
                 <div class="flex size-7 items-center justify-center rounded-lg bg-info-50 dark:bg-info-950/40">
                   <Hash class="size-3.5 text-info-600 dark:text-info-400" />
                 </div>
-                <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Details</h3>
+                <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ t('dashboard.applications.detail.details') }}</h3>
               </div>
               <dl class="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">Score</dt>
+                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">{{ t('dashboard.applications.detail.score') }}</dt>
                   <dd class="text-surface-800 dark:text-surface-200 font-medium">
                     {{ application.score ?? '—' }}
                   </dd>
+                  <button
+                    type="button"
+                    class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 cursor-pointer border-0 bg-transparent p-0"
+                    @click="activeTab = 'ai_analysis'"
+                  >
+                    <Brain class="size-3.5" />
+                    {{ application.score != null ? t('dashboard.candidates.sidebar.viewAiAnalysis') : t('dashboard.candidates.sidebar.runAiAnalysis') }}
+                  </button>
                 </div>
                 <div>
-                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">Status</dt>
+                  <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1">{{ t('dashboard.applications.detail.status') }}</dt>
                   <dd class="text-surface-800 dark:text-surface-200 font-medium capitalize">
-                    {{ application.status }}
+                    {{ statusLabel(application.status) }}
                   </dd>
                 </div>
                 <div>
                   <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1 inline-flex items-center gap-1">
                     <Calendar class="size-3.5" />
-                    Applied
+                    {{ t('dashboard.applications.detail.applied') }}
                   </dt>
                   <dd class="text-surface-800 dark:text-surface-200 font-medium">
-                    {{ new Date(application.createdAt).toLocaleDateString() }}
+                    {{ formatDate(application.createdAt) }}
                   </dd>
                 </div>
                 <div>
                   <dt class="text-xs font-medium text-surface-400 dark:text-surface-500 mb-1 inline-flex items-center gap-1">
                     <Clock class="size-3.5" />
-                    Updated
+                    {{ t('dashboard.applications.detail.updated') }}
                   </dt>
                   <dd class="text-surface-800 dark:text-surface-200 font-medium">
-                    {{ new Date(application.updatedAt).toLocaleDateString() }}
+                    {{ formatDate(application.updatedAt) }}
                   </dd>
                 </div>
               </dl>
+              <NuxtLink
+                v-if="application.job?.id"
+                :to="tenantPath(`jobs/${application.job.id}`)"
+                class="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 no-underline"
+              >
+                <ExternalLink class="size-3.5" />
+                {{ t('dashboard.candidates.sidebar.openJobPipeline') }}
+              </NuxtLink>
             </div>
 
             <!-- Notes -->
@@ -689,14 +742,14 @@ function formatInterviewDate(dateStr: string) {
                   <div class="flex size-7 items-center justify-center rounded-lg bg-warning-50 dark:bg-warning-950/40">
                     <MessageSquare class="size-3.5 text-warning-600 dark:text-warning-400" />
                   </div>
-                  <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Notes</h3>
+                  <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ t('dashboard.applications.detail.notes') }}</h3>
                 </div>
                 <button
                   v-if="!isEditingNotes"
                   class="text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
                   @click="startEditNotes"
                 >
-                  {{ application.notes ? 'Edit' : 'Add Notes' }}
+                  {{ application.notes ? t('common.actions.edit') : t('dashboard.applications.detail.addNotes') }}
                 </button>
               </div>
 
@@ -704,7 +757,7 @@ function formatInterviewDate(dateStr: string) {
                 <textarea
                   v-model="notesInput"
                   rows="4"
-                  placeholder="Add notes about this application…"
+                  :placeholder="t('dashboard.applications.detail.notesPlaceholder')"
                   class="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
                 />
                 <div class="flex items-center gap-2 mt-2">
@@ -713,13 +766,13 @@ function formatInterviewDate(dateStr: string) {
                     class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
                     @click="saveNotes"
                   >
-                    {{ isSavingNotes ? 'Saving…' : 'Save' }}
+                    {{ isSavingNotes ? t('common.actions.saving') : t('common.actions.save') }}
                   </button>
                   <button
                     class="rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                     @click="isEditingNotes = false"
                   >
-                    Cancel
+                    {{ t('common.actions.cancel') }}
                   </button>
                 </div>
               </div>
@@ -730,7 +783,7 @@ function formatInterviewDate(dateStr: string) {
               >
                 {{ application.notes }}
               </p>
-              <p v-else class="text-sm text-surface-400 italic">No notes yet.</p>
+              <p v-else class="text-sm text-surface-400 italic">{{ t('dashboard.applications.detail.noNotes') }}</p>
             </div>
 
             <!-- Scheduled interviews -->
@@ -739,7 +792,7 @@ function formatInterviewDate(dateStr: string) {
                 <div class="flex size-7 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
                   <Calendar class="size-3.5 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Interviews</h3>
+                <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ t('dashboard.candidates.sidebar.interviews') }}</h3>
               </div>
               <div class="space-y-3">
                 <div
@@ -749,7 +802,7 @@ function formatInterviewDate(dateStr: string) {
                 >
                   <div class="flex items-center justify-between mb-1">
                     <NuxtLink
-                      :to="$localePath(`/dashboard/interviews/${iv.id}`)"
+                      :to="tenantPath(`interviews/${iv.id}`)"
                       class="text-sm font-medium text-surface-800 dark:text-surface-200 hover:text-brand-600 dark:hover:text-brand-400 transition-colors truncate"
                     >
                       {{ iv.title }}
@@ -762,7 +815,7 @@ function formatInterviewDate(dateStr: string) {
                         'bg-surface-100 text-surface-500 dark:bg-surface-800 dark:text-surface-400': iv.status === 'cancelled' || iv.status === 'no_show',
                       }"
                     >
-                      {{ iv.status === 'no_show' ? 'No show' : iv.status }}
+                      {{ interviewStatusLabel(iv.status) }}
                     </span>
                   </div>
                   <div class="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500">
@@ -770,7 +823,7 @@ function formatInterviewDate(dateStr: string) {
                     <span class="text-surface-200 dark:text-surface-700">&middot;</span>
                     <span>{{ interviewTypeLabels[iv.type] ?? iv.type }}</span>
                     <span class="text-surface-200 dark:text-surface-700">&middot;</span>
-                    <span>{{ iv.duration }} min</span>
+                    <span>{{ iv.duration }} {{ t('dashboard.jobs.candidates.min') }}</span>
                   </div>
                   <div class="mt-2">
                     <a
@@ -781,7 +834,7 @@ function formatInterviewDate(dateStr: string) {
                       class="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-colors"
                     >
                       <Calendar class="size-2.5" />
-                      Open in Google Calendar
+                      {{ t('dashboard.candidates.sidebar.openInGoogleCalendar') }}
                       <ExternalLink class="size-2" />
                     </a>
                   </div>
@@ -792,18 +845,18 @@ function formatInterviewDate(dateStr: string) {
             <!-- Quick links -->
             <div class="flex items-center gap-4 pt-1">
               <NuxtLink
-                :to="$localePath(`/dashboard/candidates/${application.candidate.id}`)"
+                :to="tenantPath(`candidates/${application.candidate.id}`)"
                 class="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
               >
                 <ExternalLink class="size-3.5" />
-                Full candidate profile
+                {{ t('dashboard.candidates.sidebar.fullCandidateProfile') }}
               </NuxtLink>
               <NuxtLink
-                :to="$localePath(`/dashboard/applications/${application.id}`)"
+                :to="tenantPath(`applications/${application.id}`)"
                 class="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
               >
                 <ExternalLink class="size-3.5" />
-                Full application page
+                {{ t('dashboard.candidates.sidebar.fullApplicationPage') }}
               </NuxtLink>
             </div>
           </div>
@@ -830,13 +883,13 @@ function formatInterviewDate(dateStr: string) {
                   @click="closePreview"
                 >
                   <ArrowLeft class="size-3.5" />
-                  Back to documents
+                  {{ t('dashboard.candidates.documents.backToDocuments') }}
                 </button>
                 <div class="flex items-center gap-1">
                   <button
                     v-if="previewDocId"
                     class="rounded-lg p-1.5 text-surface-400 hover:text-brand-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                    title="Download"
+                    :title="t('dashboard.candidates.documents.download')"
                     @click="handleDownload(previewDocId!)"
                   >
                     <Download class="size-4" />
@@ -863,7 +916,7 @@ function formatInterviewDate(dateStr: string) {
                   class="mt-3 text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 font-medium"
                   @click="closePreview"
                 >
-                  Go back
+                  {{ t('dashboard.candidates.documents.goBack') }}
                 </button>
               </div>
 
@@ -873,7 +926,7 @@ function formatInterviewDate(dateStr: string) {
                 :src="previewUrl"
                 class="w-full rounded-lg border border-surface-200 dark:border-surface-800"
                 style="height: calc(100vh - 280px);"
-                title="Document preview"
+                :title="t('dashboard.candidates.documents.preview')"
               />
             </template>
 
@@ -886,9 +939,9 @@ function formatInterviewDate(dateStr: string) {
                     v-model="selectedDocType"
                     class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 px-2.5 py-1.5 text-sm text-surface-700 dark:text-surface-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
-                    <option value="resume">Resume</option>
-                    <option value="cover_letter">Cover Letter</option>
-                    <option value="other">Other</option>
+                    <option value="resume">{{ t('dashboard.candidates.shared.documentTypes.resume') }}</option>
+                    <option value="cover_letter">{{ t('dashboard.candidates.shared.documentTypes.cover_letter') }}</option>
+                    <option value="other">{{ t('dashboard.candidates.shared.documentTypes.other') }}</option>
                   </select>
                 </div>
                 <button
@@ -897,7 +950,7 @@ function formatInterviewDate(dateStr: string) {
                   @click="triggerFileSelect"
                 >
                   <Upload class="size-3.5" />
-                  {{ isUploading ? 'Uploading…' : 'Upload Document' }}
+                  {{ isUploading ? t('dashboard.candidates.documents.uploading') : t('dashboard.candidates.documents.upload') }}
                 </button>
               </div>
 
@@ -907,7 +960,7 @@ function formatInterviewDate(dateStr: string) {
                 class="rounded-lg border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-950 p-3 text-sm text-danger-700 dark:text-danger-400"
               >
                 {{ uploadError }}
-                <button class="underline ml-1" @click="uploadError = null">Dismiss</button>
+                <button class="underline ml-1" @click="uploadError = null">{{ t('common.actions.dismiss') }}</button>
               </div>
 
               <!-- Empty state -->
@@ -918,9 +971,9 @@ function formatInterviewDate(dateStr: string) {
                 <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
                   <FileText class="size-6 text-surface-400 dark:text-surface-500" />
                 </div>
-                <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No documents yet.</p>
+                <p class="text-sm font-medium text-surface-600 dark:text-surface-300">{{ t('dashboard.candidates.documents.empty') }}</p>
                 <p class="text-xs text-surface-400 dark:text-surface-500 mt-1">
-                  Upload a resume, cover letter, or other document (PDF, DOC, DOCX — max 10 MB).
+                  {{ t('dashboard.candidates.documents.uploadHint') }}
                 </p>
               </div>
 
@@ -941,11 +994,11 @@ function formatInterviewDate(dateStr: string) {
                       </p>
                       <span class="text-xs text-surface-400">
                         {{ documentTypeLabels[doc.type] ?? doc.type }}
-                        · {{ new Date(doc.createdAt).toLocaleDateString() }}
+                        · {{ formatDate(doc.createdAt) }}
                         <template v-if="doc.parsed === false">
-                          · <span class="text-warning-500 dark:text-warning-400">Text extraction failed</span>
+                          · <span class="text-warning-500 dark:text-warning-400">{{ t('dashboard.candidates.sidebar.textExtractionFailed') }}</span>
                         </template>
-                        <template v-else-if="doc.mimeType === 'application/pdf'"> · <span class="text-brand-500 dark:text-brand-400">Click to preview</span></template>
+                        <template v-else-if="doc.mimeType === 'application/pdf'"> · <span class="text-brand-500 dark:text-brand-400">{{ t('dashboard.candidates.documents.clickToPreview') }}</span></template>
                       </span>
                     </div>
                   </div>
@@ -954,7 +1007,7 @@ function formatInterviewDate(dateStr: string) {
                       v-if="doc.parsed === false"
                       :disabled="reparsingDocId === doc.id"
                       class="rounded-lg p-1.5 text-warning-500 hover:text-brand-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-50"
-                      title="Retry text extraction"
+                      :title="t('dashboard.candidates.sidebar.retryTextExtraction')"
                       @click="handleReparse(doc.id)"
                     >
                       <RefreshCw class="size-4" :class="{ 'animate-spin': reparsingDocId === doc.id }" />
@@ -962,21 +1015,21 @@ function formatInterviewDate(dateStr: string) {
                     <button
                       v-if="doc.mimeType === 'application/pdf'"
                       class="rounded-lg p-1.5 text-surface-400 hover:text-brand-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                      title="Preview PDF"
+                      :title="t('dashboard.candidates.documents.previewPdf')"
                       @click="handlePreview(doc.id, doc.mimeType)"
                     >
                       <Eye class="size-4" />
                     </button>
                     <button
                       class="rounded-lg p-1.5 text-surface-400 hover:text-brand-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                      title="Download"
+                      :title="t('dashboard.candidates.documents.download')"
                       @click="handleDownload(doc.id)"
                     >
                       <Download class="size-4" />
                     </button>
                     <button
                       class="rounded-lg p-1.5 text-surface-400 hover:text-danger-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                      title="Delete"
+                      :title="t('common.actions.delete')"
                       @click="showDocDeleteConfirm = doc.id"
                     >
                       <Trash2 class="size-4" />
@@ -997,7 +1050,7 @@ function formatInterviewDate(dateStr: string) {
               <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
                 <FileText class="size-6 text-surface-400 dark:text-surface-500" />
               </div>
-              <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No application responses.</p>
+              <p class="text-sm font-medium text-surface-600 dark:text-surface-300">{{ t('dashboard.candidates.sidebar.noApplicationResponses') }}</p>
             </div>
 
             <div v-else class="space-y-3">
@@ -1007,7 +1060,7 @@ function formatInterviewDate(dateStr: string) {
                 class="rounded-xl border border-surface-200/80 dark:border-surface-800/60 bg-white dark:bg-surface-950 p-4 shadow-sm shadow-surface-900/[0.03] dark:shadow-none"
               >
                 <dt class="text-xs font-semibold text-surface-400 dark:text-surface-500 mb-1.5 uppercase tracking-wider">
-                  {{ response.question?.label ?? 'Unknown question' }}
+                  {{ response.question?.label ?? t('dashboard.candidates.sidebar.unknownQuestion') }}
                 </dt>
                 <dd class="text-sm text-surface-700 dark:text-surface-200 leading-relaxed">
                   {{ formatResponseValue(response.value) }}
@@ -1030,7 +1083,7 @@ function formatInterviewDate(dateStr: string) {
             <!-- Loading -->
             <div v-if="timelineLoading" class="text-center py-12 text-surface-400">
               <div class="size-6 rounded-full border-2 border-brand-200 border-t-brand-600 dark:border-brand-800 dark:border-t-brand-400 animate-spin mx-auto mb-3" />
-              Loading timeline…
+              {{ t('dashboard.candidates.sidebar.loadingTimeline') }}
             </div>
 
             <!-- Error -->
@@ -1044,7 +1097,7 @@ function formatInterviewDate(dateStr: string) {
                 class="mt-3 text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 font-medium"
                 @click="loadTimeline"
               >
-                Retry
+                {{ t('common.actions.retry') }}
               </button>
             </div>
 
@@ -1056,8 +1109,8 @@ function formatInterviewDate(dateStr: string) {
               <div class="flex size-14 items-center justify-center rounded-2xl bg-surface-100 dark:bg-surface-800/60 mx-auto mb-3">
                 <History class="size-6 text-surface-400 dark:text-surface-500" />
               </div>
-              <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No activity recorded yet.</p>
-              <p class="text-xs text-surface-400 dark:text-surface-500 mt-1">Activity for this candidate will appear here.</p>
+              <p class="text-sm font-medium text-surface-600 dark:text-surface-300">{{ t('dashboard.candidates.sidebar.noActivity') }}</p>
+              <p class="text-xs text-surface-400 dark:text-surface-500 mt-1">{{ t('dashboard.candidates.sidebar.activityHint') }}</p>
             </div>
 
             <!-- Timeline list -->
@@ -1122,9 +1175,9 @@ function formatInterviewDate(dateStr: string) {
     <div v-if="showDocDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/50" @click="showDocDeleteConfirm = null" />
       <div class="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl shadow-surface-900/10 dark:shadow-black/30 ring-1 ring-surface-200/80 dark:ring-surface-700/60 p-6 max-w-sm w-full mx-4">
-        <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-2">Delete Document</h3>
+        <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-2">{{ t('dashboard.candidates.documents.deleteDocument') }}</h3>
         <p class="text-sm text-surface-600 dark:text-surface-400 mb-4">
-          Are you sure you want to delete this document? This action cannot be undone.
+          {{ t('dashboard.candidates.documents.deleteConfirm') }}
         </p>
         <div class="flex justify-end gap-2">
           <button
@@ -1132,14 +1185,14 @@ function formatInterviewDate(dateStr: string) {
             class="rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
             @click="showDocDeleteConfirm = null"
           >
-            Cancel
+            {{ t('common.actions.cancel') }}
           </button>
           <button
             :disabled="isDeletingDoc"
             class="rounded-lg bg-danger-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-50 transition-colors"
             @click="handleDeleteDoc(showDocDeleteConfirm!)"
           >
-            {{ isDeletingDoc ? 'Deleting…' : 'Delete' }}
+            {{ isDeletingDoc ? t('common.actions.deleting') : t('common.actions.delete') }}
           </button>
         </div>
       </div>

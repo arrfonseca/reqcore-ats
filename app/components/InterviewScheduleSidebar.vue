@@ -1,11 +1,12 @@
 <script setup lang="ts">
+const { tenantPath, platformPath } = useTenantPaths()
 import {
   X, Calendar, Clock, MapPin, Users, ChevronLeft, ChevronRight,
   Plus, AlertCircle, Mail, ChevronDown, RefreshCw, Globe,
   Send, UserPlus, Bell, Pencil, CheckCircle2, ExternalLink,
   ArrowRight, Eye,
 } from 'lucide-vue-next'
-import { SYSTEM_TEMPLATES } from '~/utils/system-templates'
+import { getSystemTemplates } from '~/utils/system-templates'
 
 const props = withDefaults(defineProps<{
   applicationId: string
@@ -20,6 +21,8 @@ const emit = defineEmits<{
   close: []
   scheduled: [createdInterview?: { id: string; googleCalendarEventLink?: string | null }]
 }>()
+
+const { t, locale } = useI18n()
 
 // ─── Success state ────────────────────────────────────────────────
 const showSuccess = ref(false)
@@ -63,12 +66,12 @@ const selectedTemplateId = ref('system-standard')
 const showTemplateDropdown = ref(false)
 
 const allTemplates = computed(() => [
-  ...SYSTEM_TEMPLATES.map(t => ({ id: t.id, name: t.name, description: t.description, isSystem: true as const })),
+  ...getSystemTemplates(locale.value).map(t => ({ id: t.id, name: t.name, description: t.description, isSystem: true as const })),
   ...(customTemplates.value ?? []).map(t => ({ id: t.id, name: t.name, description: '', isSystem: false as const })),
 ])
 
 const selectedTemplateName = computed(() => {
-  return allTemplates.value.find(t => t.id === selectedTemplateId.value)?.name ?? 'Select template'
+  return allTemplates.value.find(tmpl => tmpl.id === selectedTemplateId.value)?.name ?? t('dashboard.interviews.schedule.selectTemplate')
 })
 
 // Set a sensible default title
@@ -81,8 +84,9 @@ function toDateString(d: Date): string {
 }
 
 onMounted(() => {
-  form.title = `Interview — ${props.candidateName}`
-  calendarCustomization.eventTitle = `Interview — ${props.candidateName}`
+  const defaultTitle = t('dashboard.interviews.schedule.defaultTitle', { name: props.candidateName })
+  form.title = defaultTitle
+  calendarCustomization.eventTitle = defaultTitle
   // Default date to tomorrow
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
@@ -169,8 +173,18 @@ const calendarDays = computed(() => {
 })
 
 const calendarMonthLabel = computed(() => {
-  return calendarMonth.value.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  return calendarMonth.value.toLocaleDateString(locale.value, { month: 'long', year: 'numeric' })
 })
+
+const weekdayLabels = computed(() => [
+  t('dashboard.interviews.schedule.weekdays.mo'),
+  t('dashboard.interviews.schedule.weekdays.tu'),
+  t('dashboard.interviews.schedule.weekdays.we'),
+  t('dashboard.interviews.schedule.weekdays.th'),
+  t('dashboard.interviews.schedule.weekdays.fr'),
+  t('dashboard.interviews.schedule.weekdays.sa'),
+  t('dashboard.interviews.schedule.weekdays.su'),
+])
 
 function prevMonth() {
   const d = new Date(calendarMonth.value)
@@ -244,15 +258,14 @@ const commonTimezones = [
 const formattedDateTime = computed(() => {
   if (!form.date || !form.time) return ''
   const d = new Date(`${form.date}T${form.time}`)
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString(locale.value, {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
     year: 'numeric',
-  }) + ' at ' + d.toLocaleTimeString('en-US', {
+  }) + ' at ' + d.toLocaleTimeString(locale.value, {
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true,
   })
 })
 
@@ -260,26 +273,26 @@ const endTime = computed(() => {
   if (!form.date || !form.time) return ''
   const d = new Date(`${form.date}T${form.time}`)
   d.setMinutes(d.getMinutes() + form.duration)
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  return d.toLocaleTimeString(locale.value, { hour: 'numeric', minute: '2-digit' })
 })
 
 // ─── Submit ───────────────────────────────────────────────────────
 async function handleSubmit() {
   errors.value = {}
 
-  if (!form.title.trim()) errors.value.title = 'Title is required'
-  if (!form.date) errors.value.date = 'Date is required'
-  if (!form.time) errors.value.time = 'Time is required'
+  if (!form.title.trim()) errors.value.title = t('dashboard.interviews.schedule.errors.titleRequired')
+  if (!form.date) errors.value.date = t('dashboard.interviews.schedule.errors.dateRequired')
+  if (!form.time) errors.value.time = t('dashboard.interviews.schedule.errors.timeRequired')
 
   const scheduledDate = new Date(`${form.date}T${form.time}`)
   if (isNaN(scheduledDate.getTime())) {
-    errors.value.date = 'Invalid date/time'
+    errors.value.date = t('dashboard.interviews.schedule.errors.invalidDateTime')
   }
 
   const filteredInterviewers = form.interviewers.filter(i => i.trim())
   const invalidEmails = filteredInterviewers.filter(e => !EMAIL_RE.test(e.trim()))
   if (invalidEmails.length > 0) {
-    errors.value.interviewers = 'All interviewers must have a valid email address'
+    errors.value.interviewers = t('dashboard.interviews.schedule.errors.interviewerEmailRequired')
   }
 
   if (Object.keys(errors.value).length > 0) return
@@ -321,11 +334,14 @@ async function handleSubmit() {
       }
     }
 
-    await refreshNuxtData('interviews')
+    await Promise.all([
+      refreshNuxtData('interviews'),
+      refreshNuxtData(`interviews-by-app-${props.applicationId}`),
+    ])
     createdInterview.value = created ? { id: created.id, googleCalendarEventLink: created.googleCalendarEventLink ?? null } : null
     showSuccess.value = true
   } catch (err: any) {
-    errors.value.submit = err?.data?.statusMessage ?? 'Failed to schedule interview'
+    errors.value.submit = err?.data?.statusMessage ?? t('dashboard.interviews.schedule.errors.scheduleFailed')
   } finally {
     isSubmitting.value = false
   }
@@ -340,10 +356,13 @@ async function handleMoveToInterview() {
       method: 'PATCH',
       body: { status: 'interview' },
     })
-    await refreshNuxtData('interviews')
+    await Promise.all([
+      refreshNuxtData('interviews'),
+      refreshNuxtData(`interviews-by-app-${props.applicationId}`),
+    ])
     emit('scheduled')
   } catch (err: any) {
-    errors.value.submit = err?.data?.statusMessage ?? 'Failed to move to interview stage'
+    errors.value.submit = err?.data?.statusMessage ?? t('dashboard.interviews.schedule.errors.moveFailed')
   } finally {
     isMoving.value = false
   }
@@ -352,7 +371,7 @@ async function handleMoveToInterview() {
 
 <template>
   <Teleport :to="teleportTarget">
-    <div class="fixed inset-0 z-50 flex justify-end">
+    <div class="fixed inset-0 z-[70] flex justify-end">
       <!-- Backdrop -->
       <Transition
         enter-active-class="transition duration-300 ease-out"
@@ -374,7 +393,7 @@ async function handleMoveToInterview() {
         leave-from-class="translate-x-0"
         leave-to-class="translate-x-full"
       >
-        <div class="relative w-full max-w-2xl bg-white dark:bg-surface-900 shadow-2xl overflow-hidden flex flex-col border-l border-surface-200/40 dark:border-surface-800/60">
+        <div class="relative flex h-full w-full max-w-2xl flex-col overflow-hidden border-l border-surface-200/40 bg-white shadow-2xl dark:border-surface-800/60 dark:bg-surface-900">
           <!-- Header -->
           <div class="shrink-0 px-6 pt-5 pb-4">
             <div class="flex items-start justify-between">
@@ -388,7 +407,7 @@ async function handleMoveToInterview() {
                     <Calendar v-else class="size-4 text-brand-600 dark:text-brand-400" />
                   </div>
                   <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50 tracking-tight">
-                    {{ showSuccess ? 'Interview Scheduled' : 'Schedule Interview' }}
+                    {{ showSuccess ? t('dashboard.interviews.schedule.scheduled') : t('dashboard.interviews.schedule.title') }}
                   </h2>
                 </div>
                 <p class="text-[13px] text-surface-500 dark:text-surface-400 truncate pl-[42px]">
@@ -415,28 +434,28 @@ async function handleMoveToInterview() {
               </div>
 
               <h3 class="text-base font-semibold text-surface-900 dark:text-surface-50 mb-1.5 text-center">
-                Interview successfully scheduled
+                {{ t('dashboard.interviews.schedule.success') }}
               </h3>
               <p class="text-sm text-surface-500 dark:text-surface-400 text-center max-w-sm mb-6">
-                {{ form.title }} on {{ formattedDateTime }} ({{ form.duration }}m)
+                {{ form.title }} on {{ formattedDateTime }} ({{ t('dashboard.chatbot.relativeTime.minutes', { count: form.duration }) }})
               </p>
 
               <!-- Notification summary -->
               <div v-if="notifyViaEmail || notifyViaCalendar" class="flex flex-wrap items-center justify-center gap-2 mb-6">
                 <span v-if="notifyViaEmail" class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 dark:bg-brand-950/30 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-400">
                   <Mail class="size-3" />
-                  Email sent
+                  {{ t('dashboard.interviews.schedule.emailSent') }}
                 </span>
                 <span v-if="notifyViaCalendar" class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                   <Calendar class="size-3" />
-                  Calendar event created
+                  {{ t('dashboard.interviews.schedule.calendarEventCreated') }}
                 </span>
               </div>
 
               <!-- Quick links -->
               <div class="w-full max-w-sm space-y-2.5">
                 <p class="text-[11px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-2">
-                  Quick links
+                  {{ t('dashboard.interviews.schedule.quickLinks') }}
                 </p>
 
                 <!-- Google Calendar link -->
@@ -450,20 +469,20 @@ async function handleMoveToInterview() {
                   <div class="flex size-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
                     <Calendar class="size-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
-                  <span class="flex-1">Open in Google Calendar</span>
+                  <span class="flex-1">{{ t('dashboard.interviews.schedule.openInGoogleCalendar') }}</span>
                   <ExternalLink class="size-3.5 text-surface-400 group-hover:text-emerald-500 transition-colors" />
                 </a>
 
                 <!-- View application -->
                 <NuxtLink
-                  :to="`/dashboard/applications/${applicationId}`"
+                  :to="tenantPath(`applications/${applicationId}`)"
                   class="flex items-center gap-3 rounded-xl border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-800/40 px-4 py-3 text-sm font-medium text-surface-700 dark:text-surface-300 hover:border-brand-300 hover:bg-brand-50/50 dark:hover:border-brand-700 dark:hover:bg-brand-950/20 transition-all group"
                   @click="emit('scheduled', createdInterview ?? undefined)"
                 >
                   <div class="flex size-8 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/30">
                     <Eye class="size-4 text-brand-600 dark:text-brand-400" />
                   </div>
-                  <span class="flex-1">View application</span>
+                  <span class="flex-1">{{ t('dashboard.interviews.schedule.viewApplication') }}</span>
                   <ArrowRight class="size-3.5 text-surface-400 group-hover:text-brand-500 transition-colors" />
                 </NuxtLink>
 
@@ -476,7 +495,7 @@ async function handleMoveToInterview() {
                   <div class="flex size-8 items-center justify-center rounded-lg bg-surface-100 dark:bg-surface-800">
                     <Plus class="size-4 text-surface-500 dark:text-surface-400" />
                   </div>
-                  <span class="flex-1 text-left">Schedule another interview</span>
+                  <span class="flex-1 text-left">{{ t('dashboard.interviews.schedule.scheduleAnother') }}</span>
                   <ArrowRight class="size-3.5 text-surface-400 group-hover:text-surface-600 dark:group-hover:text-surface-300 transition-colors" />
                 </button>
               </div>
@@ -489,7 +508,7 @@ async function handleMoveToInterview() {
                 class="w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 transition-colors cursor-pointer shadow-sm shadow-brand-600/20 dark:shadow-brand-500/10"
                 @click="emit('scheduled', createdInterview ?? undefined)"
               >
-                Done
+                {{ t('dashboard.interviews.schedule.done') }}
               </button>
             </div>
           </template>
@@ -508,7 +527,7 @@ async function handleMoveToInterview() {
             <div>
               <label class="block text-[13px] font-medium text-surface-700 dark:text-surface-300 mb-2.5">
                 <Send class="inline size-3.5 mr-1.5 -mt-0.5 text-surface-400" />
-                Notify candidate
+                {{ t('dashboard.interviews.schedule.notifyCandidate') }}
               </label>
 
               <div class="space-y-2">
@@ -523,10 +542,10 @@ async function handleMoveToInterview() {
                     <Mail class="size-4 shrink-0 transition-colors" :class="notifyViaEmail ? 'text-brand-600 dark:text-brand-400' : 'text-surface-400 dark:text-surface-500'" />
                     <div class="min-w-0 flex-1">
                       <p class="text-[13px] font-medium transition-colors" :class="notifyViaEmail ? 'text-surface-900 dark:text-surface-100' : 'text-surface-600 dark:text-surface-400'">
-                        Standard email
+                        {{ t('dashboard.interviews.schedule.standardEmail') }}
                       </p>
                       <p class="text-[11px] text-surface-400 dark:text-surface-500">
-                        Send interview invitation via email (noreply)
+                        {{ t('dashboard.interviews.schedule.sendInvitationEmail') }}
                       </p>
                     </div>
                   </label>
@@ -535,7 +554,7 @@ async function handleMoveToInterview() {
                   <div v-if="notifyViaEmail" class="px-3.5 pb-3.5 pt-0">
                     <div class="relative">
                       <label class="block text-[12px] font-medium text-surface-500 dark:text-surface-400 mb-1.5">
-                        Email template
+                        {{ t('dashboard.interviews.schedule.emailTemplate') }}
                       </label>
                       <button
                         type="button"
@@ -558,41 +577,41 @@ async function handleMoveToInterview() {
                         <div v-if="showTemplateDropdown" class="absolute z-10 mt-1 w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 shadow-lg shadow-surface-900/10 dark:shadow-black/20 overflow-hidden">
                           <!-- System templates -->
                           <div class="px-2.5 pt-2 pb-1">
-                            <span class="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">Built-in</span>
+                            <span class="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">{{ t('dashboard.interviews.schedule.builtIn') }}</span>
                           </div>
                           <button
-                            v-for="t in allTemplates.filter(t => t.isSystem)"
-                            :key="t.id"
+                            v-for="tmpl in allTemplates.filter(item => item.isSystem)"
+                            :key="tmpl.id"
                             type="button"
                             class="w-full flex items-start gap-2.5 px-3 py-2 text-left text-sm hover:bg-surface-50 dark:hover:bg-surface-700/50 transition-colors cursor-pointer"
-                            :class="selectedTemplateId === t.id ? 'bg-brand-50/60 dark:bg-brand-950/20' : ''"
-                            @click="selectedTemplateId = t.id; showTemplateDropdown = false"
+                            :class="selectedTemplateId === tmpl.id ? 'bg-brand-50/60 dark:bg-brand-950/20' : ''"
+                            @click="selectedTemplateId = tmpl.id; showTemplateDropdown = false"
                           >
                             <div class="min-w-0 flex-1">
-                              <p class="font-medium text-surface-800 dark:text-surface-200 truncate">{{ t.name }}</p>
-                              <p v-if="t.description" class="text-xs text-surface-500 dark:text-surface-400 truncate">{{ t.description }}</p>
+                              <p class="font-medium text-surface-800 dark:text-surface-200 truncate">{{ tmpl.name }}</p>
+                              <p v-if="tmpl.description" class="text-xs text-surface-500 dark:text-surface-400 truncate">{{ tmpl.description }}</p>
                             </div>
-                            <div v-if="selectedTemplateId === t.id" class="shrink-0 mt-0.5 text-brand-600 dark:text-brand-400">
+                            <div v-if="selectedTemplateId === tmpl.id" class="shrink-0 mt-0.5 text-brand-600 dark:text-brand-400">
                               <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
                             </div>
                           </button>
 
                           <!-- Custom templates -->
-                          <template v-if="allTemplates.some(t => !t.isSystem)">
+                          <template v-if="allTemplates.some(item => !item.isSystem)">
                             <div class="border-t border-surface-100 dark:border-surface-700/60 mx-2.5" />
                             <div class="px-2.5 pt-2 pb-1">
-                              <span class="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">Custom</span>
+                              <span class="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">{{ t('dashboard.interviews.schedule.custom') }}</span>
                             </div>
                             <button
-                              v-for="t in allTemplates.filter(t => !t.isSystem)"
-                              :key="t.id"
+                              v-for="tmpl in allTemplates.filter(item => !item.isSystem)"
+                              :key="tmpl.id"
                               type="button"
                               class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-surface-50 dark:hover:bg-surface-700/50 transition-colors cursor-pointer"
-                              :class="selectedTemplateId === t.id ? 'bg-brand-50/60 dark:bg-brand-950/20' : ''"
-                              @click="selectedTemplateId = t.id; showTemplateDropdown = false"
+                              :class="selectedTemplateId === tmpl.id ? 'bg-brand-50/60 dark:bg-brand-950/20' : ''"
+                              @click="selectedTemplateId = tmpl.id; showTemplateDropdown = false"
                             >
-                              <p class="font-medium text-surface-800 dark:text-surface-200 truncate flex-1">{{ t.name }}</p>
-                              <div v-if="selectedTemplateId === t.id" class="shrink-0 text-brand-600 dark:text-brand-400">
+                              <p class="font-medium text-surface-800 dark:text-surface-200 truncate flex-1">{{ tmpl.name }}</p>
+                              <div v-if="selectedTemplateId === tmpl.id" class="shrink-0 text-brand-600 dark:text-brand-400">
                                 <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
                               </div>
                             </button>
@@ -617,13 +636,13 @@ async function handleMoveToInterview() {
                     <Calendar class="size-4 shrink-0 transition-colors" :class="notifyViaCalendar ? 'text-emerald-600 dark:text-emerald-400' : 'text-surface-400 dark:text-surface-500'" />
                     <div class="min-w-0 flex-1">
                       <p class="text-[13px] font-medium transition-colors" :class="notifyViaCalendar ? 'text-surface-900 dark:text-surface-100' : 'text-surface-600 dark:text-surface-400'">
-                        Google Calendar
+                        {{ t('dashboard.interviews.schedule.googleCalendar') }}
                       </p>
                       <p class="text-[11px] text-surface-400 dark:text-surface-500">
-                        <template v-if="calendarConnected">Create calendar event with invite</template>
+                        <template v-if="calendarConnected">{{ t('dashboard.interviews.schedule.createCalendarEvent') }}</template>
                         <template v-else>
-                          <NuxtLink to="/dashboard/settings/integrations" class="underline underline-offset-2 hover:text-surface-600 dark:hover:text-surface-400 transition-colors" @click.stop>Connect in Settings</NuxtLink>
-                          to enable
+                          <NuxtLink :to="tenantPath('settings/integrations')" class="underline underline-offset-2 hover:text-surface-600 dark:hover:text-surface-400 transition-colors" @click.stop>{{ t('dashboard.interviews.schedule.connectInSettings') }}</NuxtLink>
+                          {{ t('dashboard.interviews.schedule.toEnable') }}
                         </template>
                       </p>
                     </div>
@@ -632,7 +651,7 @@ async function handleMoveToInterview() {
                       v-if="notifyViaCalendar && calendarConnected"
                       type="button"
                       class="shrink-0 rounded-lg p-1.5 text-surface-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:text-emerald-400 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer"
-                      title="Customize event"
+                      :title="t('dashboard.interviews.schedule.customizeEvent')"
                       @click.prevent="calendarCustomization.showCustomize = !calendarCustomization.showCustomize"
                     >
                       <Pencil class="size-3.5" />
@@ -644,13 +663,13 @@ async function handleMoveToInterview() {
                     <!-- Event title -->
                     <div>
                       <label for="cal-event-title" class="block text-[12px] font-medium text-surface-500 dark:text-surface-400 mb-1.5">
-                        Event title
+                        {{ t('dashboard.interviews.schedule.eventTitle') }}
                       </label>
                       <input
                         id="cal-event-title"
                         v-model="calendarCustomization.eventTitle"
                         type="text"
-                        placeholder="Defaults to interview title"
+                        :placeholder="t('dashboard.interviews.schedule.eventTitleDefault')"
                         class="w-full rounded-lg border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-800 px-3 py-1.5 text-[13px] text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
                       />
                     </div>
@@ -658,13 +677,13 @@ async function handleMoveToInterview() {
                     <!-- Event description -->
                     <div>
                       <label for="cal-event-desc" class="block text-[12px] font-medium text-surface-500 dark:text-surface-400 mb-1.5">
-                        Event description
+                        {{ t('dashboard.interviews.schedule.eventDescription') }}
                       </label>
                       <textarea
                         id="cal-event-desc"
                         v-model="calendarCustomization.eventDescription"
                         rows="3"
-                        placeholder="Leave empty to auto-generate from interview details"
+                        :placeholder="t('dashboard.interviews.schedule.eventDescriptionHint')"
                         class="w-full rounded-lg border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-800 px-3 py-1.5 text-[13px] text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all resize-none"
                       />
                     </div>
@@ -678,7 +697,7 @@ async function handleMoveToInterview() {
                           class="size-3.5 rounded border-surface-300 dark:border-surface-600 text-emerald-600 focus:ring-emerald-500/20 focus:ring-offset-0 cursor-pointer"
                         />
                         <UserPlus class="size-3.5 text-surface-400" />
-                        <span class="text-[12px] text-surface-600 dark:text-surface-400">Add candidate as attendee</span>
+                        <span class="text-[12px] text-surface-600 dark:text-surface-400">{{ t('dashboard.interviews.schedule.addCandidateAttendee') }}</span>
                       </label>
                       <label class="flex items-center gap-2 cursor-pointer">
                         <input
@@ -687,7 +706,7 @@ async function handleMoveToInterview() {
                           class="size-3.5 rounded border-surface-300 dark:border-surface-600 text-emerald-600 focus:ring-emerald-500/20 focus:ring-offset-0 cursor-pointer"
                         />
                         <Bell class="size-3.5 text-surface-400" />
-                        <span class="text-[12px] text-surface-600 dark:text-surface-400">Send Google Calendar notifications</span>
+                        <span class="text-[12px] text-surface-600 dark:text-surface-400">{{ t('dashboard.interviews.schedule.sendGoogleNotifications') }}</span>
                       </label>
                     </div>
                   </div>
@@ -696,20 +715,19 @@ async function handleMoveToInterview() {
 
               <!-- Hint if neither selected -->
               <p v-if="!notifyViaEmail && !notifyViaCalendar" class="mt-2 text-[11px] text-surface-400 dark:text-surface-500 italic">
-                No notification will be sent — the interview will only be recorded internally.
+                {{ t('dashboard.interviews.schedule.noNotificationHint') }}
               </p>
             </div>
 
             <!-- Title -->
             <div>
               <label for="interview-title" class="block text-[13px] font-medium text-surface-700 dark:text-surface-300 mb-2">
-                Title
+                {{ t('dashboard.interviews.schedule.fields.title') }}
               </label>
               <input
                 id="interview-title"
                 v-model="form.title"
                 type="text"
-                placeholder="e.g., Assessment Interview Round 1"
                 class="w-full rounded-xl border bg-surface-50/50 dark:bg-surface-800/50 px-4 py-2.5 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 focus:bg-white dark:focus:bg-surface-800 transition-all"
                 :class="errors.title ? 'border-danger-300 dark:border-danger-700' : 'border-surface-200 dark:border-surface-700/80'"
               />
@@ -719,7 +737,7 @@ async function handleMoveToInterview() {
             <!-- Date & Time -->
             <div>
               <label class="block text-[13px] font-medium text-surface-700 dark:text-surface-300 mb-2.5">
-                Date & time
+                {{ t('dashboard.interviews.schedule.fields.dateTime') }}
               </label>
               <div class="flex items-stretch gap-3 h-80">
                 <!-- Calendar Date Picker -->
@@ -745,7 +763,7 @@ async function handleMoveToInterview() {
 
                   <!-- Weekday headers -->
                   <div class="grid grid-cols-7 text-center px-2">
-                    <div v-for="day in ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']" :key="day" class="pb-1.5 text-[11px] font-medium text-surface-400 dark:text-surface-500">
+                    <div v-for="(day, idx) in weekdayLabels" :key="idx" class="pb-1.5 text-[11px] font-medium text-surface-400 dark:text-surface-500">
                       {{ day }}
                     </div>
                   </div>
@@ -779,12 +797,12 @@ async function handleMoveToInterview() {
                 <div class="w-[96px] shrink-0 rounded-xl border border-surface-200/80 dark:border-surface-700/60 bg-white dark:bg-surface-800/40 overflow-hidden flex flex-col">
                   <!-- Time header -->
                   <div class="flex items-center justify-center px-3 py-2.5 shrink-0">
-                    <span class="text-sm font-semibold text-surface-800 dark:text-surface-200">Time</span>
+                    <span class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ t('dashboard.interviews.schedule.fields.time') }}</span>
                   </div>
                   <!-- Spacer to perfectly match calendar weekday headers -->
                   <div class="px-2 shrink-0">
                     <div class="pb-1.5 text-[11px] font-medium text-transparent select-none whitespace-nowrap">
-                      Time
+                      {{ t('dashboard.interviews.schedule.fields.time') }}
                     </div>
                   </div>
                   <!-- Time List -->
@@ -807,13 +825,13 @@ async function handleMoveToInterview() {
 
               <!-- Errors -->
               <div v-if="errors.date || errors.time" class="mt-1.5 flex flex-col gap-1">
-                <p v-if="errors.date" class="text-xs text-danger-600 dark:text-danger-400">Date: {{ errors.date }}</p>
-                <p v-if="errors.time" class="text-xs text-danger-600 dark:text-danger-400">Time: {{ errors.time }}</p>
+                <p v-if="errors.date" class="text-xs text-danger-600 dark:text-danger-400">{{ t('dashboard.interviews.schedule.fields.dateTime') }}: {{ errors.date }}</p>
+                <p v-if="errors.time" class="text-xs text-danger-600 dark:text-danger-400">{{ t('dashboard.interviews.schedule.fields.time') }}: {{ errors.time }}</p>
               </div>
 
               <!-- Duration -->
               <div class="mt-3">
-                <span class="text-[12px] font-medium text-surface-500 dark:text-surface-400 mb-2 block">Duration</span>
+                <span class="text-[12px] font-medium text-surface-500 dark:text-surface-400 mb-2 block">{{ t('dashboard.interviews.schedule.fields.duration') }}</span>
                 <div class="flex flex-wrap gap-2">
                   <button
                     v-for="preset in durationPresets"
@@ -825,7 +843,7 @@ async function handleMoveToInterview() {
                       : 'bg-surface-100 text-surface-600 hover:bg-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:hover:bg-surface-700'"
                     @click="form.duration = preset"
                   >
-                    {{ preset }}m
+                    {{ t('dashboard.chatbot.relativeTime.minutes', { count: preset }) }}
                   </button>
                 </div>
               </div>
@@ -834,7 +852,7 @@ async function handleMoveToInterview() {
               <div class="mt-3">
                 <label for="interview-timezone" class="text-[12px] font-medium text-surface-500 dark:text-surface-400 mb-1.5 flex items-center gap-1.5">
                   <Globe class="size-3 text-surface-400" />
-                  Timezone
+                  {{ t('dashboard.interviews.schedule.fields.timezone') }}
                 </label>
                 <select
                   id="interview-timezone"
@@ -850,13 +868,13 @@ async function handleMoveToInterview() {
             <div>
               <label for="interview-location" class="block text-[13px] font-medium text-surface-700 dark:text-surface-300 mb-2">
                 <MapPin class="inline size-3.5 mr-1.5 -mt-0.5 text-surface-400" />
-                Location or meeting link
+                {{ t('dashboard.interviews.schedule.fields.location') }}
               </label>
               <input
                 id="interview-location"
                 v-model="form.location"
                 type="text"
-                placeholder="Zoom link, office address…"
+                :placeholder="t('dashboard.interviews.edit.locationPlaceholder')"
                 class="w-full rounded-xl border border-surface-200 dark:border-surface-700/80 bg-surface-50/50 dark:bg-surface-800/50 px-4 py-2.5 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 focus:bg-white dark:focus:bg-surface-800 transition-all"
               />
             </div>
@@ -865,15 +883,15 @@ async function handleMoveToInterview() {
             <div>
               <label class="block text-[13px] font-medium text-surface-700 dark:text-surface-300 mb-2">
                 <Users class="inline size-3.5 mr-1.5 -mt-0.5 text-surface-400" />
-                Interviewers
-                <span class="font-normal text-surface-400 dark:text-surface-500">(optional)</span>
+                {{ t('dashboard.interviews.schedule.fields.interviewers') }}
+                <span class="font-normal text-surface-400 dark:text-surface-500">{{ t('dashboard.interviews.schedule.fields.optional') }}</span>
               </label>
               <div class="space-y-2">
                 <div v-for="(email, idx) in form.interviewers" :key="idx" class="flex items-center gap-2">
                   <input
                     v-model="form.interviewers[idx]"
                     type="email"
-                    :placeholder="`interviewer${idx + 1}@example.com`"
+                    :placeholder="t('dashboard.interviews.schedule.fields.interviewerPlaceholder')"
                     :class="errors.interviewers && email.trim() && !EMAIL_RE.test(email.trim()) ? 'border-danger-300 dark:border-danger-700' : 'border-surface-200 dark:border-surface-700/80'"
                     class="flex-1 rounded-xl border bg-surface-50/50 dark:bg-surface-800/50 px-4 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 focus:bg-white dark:focus:bg-surface-800 transition-all"
                   />
@@ -892,23 +910,26 @@ async function handleMoveToInterview() {
                   @click="addInterviewer"
                 >
                   <Plus class="size-3.5" />
-                  Add interviewer
+                  {{ t('dashboard.interviews.schedule.fields.addInterviewer') }}
                 </button>
                 <p v-if="errors.interviewers" class="mt-1 text-xs text-danger-600 dark:text-danger-400">{{ errors.interviewers }}</p>
+                <p v-else class="mt-1 text-[11px] text-surface-400 dark:text-surface-500">
+                  {{ t('dashboard.interviews.schedule.fields.interviewersHint') }}
+                </p>
               </div>
             </div>
 
             <!-- Notes -->
             <div>
               <label for="interview-notes" class="block text-[13px] font-medium text-surface-700 dark:text-surface-300 mb-2">
-                Notes
-                <span class="font-normal text-surface-400 dark:text-surface-500">(optional)</span>
+                {{ t('dashboard.interviews.schedule.fields.notes') }}
+                <span class="font-normal text-surface-400 dark:text-surface-500">{{ t('dashboard.interviews.schedule.fields.optional') }}</span>
               </label>
               <textarea
                 id="interview-notes"
                 v-model="form.notes"
                 rows="2"
-                placeholder="Topics to cover, preparation notes…"
+                :placeholder="t('dashboard.interviews.edit.notesPlaceholder')"
                 class="w-full rounded-xl border border-surface-200 dark:border-surface-700/80 bg-surface-50/50 dark:bg-surface-800/50 px-4 py-2.5 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 focus:bg-white dark:focus:bg-surface-800 transition-all resize-none"
               />
             </div>
@@ -921,7 +942,7 @@ async function handleMoveToInterview() {
             <div v-if="form.date && form.time" class="mb-3 flex items-center gap-2 min-w-0">
               <Calendar class="size-3.5 shrink-0 text-brand-500 dark:text-brand-400" />
               <span class="text-[12px] font-semibold text-surface-800 dark:text-surface-200 truncate">{{ formattedDateTime }}</span>
-              <span class="text-[12px] text-surface-400 dark:text-surface-500 shrink-0">· {{ form.duration }}m</span>
+              <span class="text-[12px] text-surface-400 dark:text-surface-500 shrink-0">· {{ t('dashboard.chatbot.relativeTime.minutes', { count: form.duration }) }}</span>
               <span class="text-[11px] text-surface-400 dark:text-surface-500 shrink-0">· {{ form.timezone.split('/').pop()?.replace(/_/g, ' ') }}</span>
             </div>
 
@@ -929,11 +950,11 @@ async function handleMoveToInterview() {
             <div v-if="notifyViaEmail || notifyViaCalendar" class="mb-3 flex flex-wrap items-center gap-1.5">
               <span v-if="notifyViaEmail" class="inline-flex items-center gap-1 rounded-full bg-brand-50 dark:bg-brand-950/30 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:text-brand-400">
                 <Mail class="size-3" />
-                Email
+                {{ t('dashboard.interviews.schedule.standardEmail') }}
               </span>
               <span v-if="notifyViaCalendar" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
                 <Calendar class="size-3" />
-                Google Calendar
+                {{ t('dashboard.interviews.schedule.googleCalendar') }}
               </span>
             </div>
 
@@ -944,7 +965,7 @@ async function handleMoveToInterview() {
                 :disabled="isSubmitting || isMoving"
                 @click="emit('close')"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="button"
@@ -952,7 +973,7 @@ async function handleMoveToInterview() {
                 class="flex-[1.5] rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-sm shadow-brand-600/20 dark:shadow-brand-500/10"
                 @click="handleSubmit"
               >
-                {{ isSubmitting ? 'Scheduling…' : 'Schedule Interview' }}
+                {{ isSubmitting ? t('dashboard.interviews.schedule.fields.scheduling') : t('dashboard.interviews.schedule.title') }}
               </button>
             </div>
             <div class="mt-2.5 text-center">
@@ -962,7 +983,7 @@ async function handleMoveToInterview() {
                 class="text-[12px] text-surface-400 hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-300 underline underline-offset-2 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 @click="handleMoveToInterview"
               >
-                {{ isMoving ? 'Moving…' : 'Skip scheduling — just move to interview stage' }}
+                {{ isMoving ? t('dashboard.interviews.schedule.fields.moving') : t('dashboard.interviews.schedule.fields.skipScheduling') }}
               </button>
             </div>
           </div>

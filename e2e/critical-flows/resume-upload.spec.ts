@@ -98,12 +98,12 @@ test.describe('Resume Upload — All File Formats', () => {
     await page.getByLabel('Organization name').waitFor({ state: 'visible', timeout: 30_000 })
     await page.getByLabel('Organization name').fill(account.orgName)
     await page.getByRole('button', { name: 'Create organization' }).click()
-    await page.waitForURL('**/dashboard**', { waitUntil: 'commit' })
+    await page.waitForURL('**/admin**', { waitUntil: 'commit' })
 
     // ── Create job ─────────────────────────────────────────────────────────
 
     // Step 1: Job details
-    await page.goto('/dashboard/jobs/new')
+    await page.goto(`/${testAccount.orgSlug}/admin/jobs/new`)
     await page.waitForLoadState('networkidle')
     await page.getByLabel('Job title').waitFor({ state: 'visible', timeout: 15_000 })
     await page.getByLabel('Job title').fill(JOB_TITLE)
@@ -150,8 +150,8 @@ test.describe('Resume Upload — All File Formats', () => {
     await expect(page.getByRole('heading', { name: 'Your job is live!' })).toBeVisible({ timeout: 20_000 })
 
     applicationLink = await page.locator('input[readonly]').inputValue()
-    expect(applicationLink).toMatch(/\/jobs\/[^/]+\/apply(?:$|[?#])/)
-    const slugMatch = applicationLink.match(/\/jobs\/([^/]+)\/apply(?:$|[?#])/)
+    expect(applicationLink).toMatch(/\/[^/]+\/[^/]+\/apply(?:$|[?#])/)
+    const slugMatch = applicationLink.match(/\/[^/]+\/([^/]+)\/apply(?:$|[?#])/)
     jobSlug = slugMatch?.[1] ?? ''
     expect(jobSlug.length).toBeGreaterThan(0)
 
@@ -270,7 +270,7 @@ async function assertUploadResult(
     expect(status, `${fileConfig.label}: expected 2xx but got ${status}`).toBeLessThan(300)
 
     // Verify confirmation page
-    await page.waitForURL(`**/jobs/${jobSlug}/confirmation`, {
+    await page.waitForURL(`**/${testAccount.orgSlug}/${jobSlug}/confirmation`, {
       waitUntil: 'commit',
       timeout: 15_000,
     })

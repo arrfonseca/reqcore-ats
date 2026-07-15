@@ -11,6 +11,7 @@ definePageMeta({
 
 const route = useRoute()
 const localePath = useLocalePath()
+const { t, locale } = useI18n()
 const templateId = route.params.id as string
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 
@@ -18,7 +19,7 @@ const isSystemTemplate = computed(() => templateId.startsWith('system-'))
 
 // ─── System template lookup ──────────────────────────────────────
 const systemTemplate = computed(() =>
-  SYSTEM_TEMPLATES.find(t => t.id === templateId),
+  getSystemTemplates(locale.value).find(t => t.id === templateId),
 )
 
 // ─── Custom template loading ─────────────────────────────────────
@@ -68,7 +69,7 @@ async function handleSave() {
   if (isSystemTemplate.value) return
   saveError.value = ''
   if (!form.name.trim() || !form.subject.trim() || !form.body.trim()) {
-    saveError.value = 'All fields are required'
+    saveError.value = t('dashboard.interviews.templates.detail.errors.allFieldsRequired')
     return
   }
 
@@ -84,7 +85,7 @@ async function handleSave() {
     setTimeout(() => { saveSuccess.value = false }, 2000)
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    saveError.value = err?.data?.statusMessage ?? 'Failed to save template'
+    saveError.value = err?.data?.statusMessage ?? t('dashboard.interviews.templates.detail.errors.saveFailed')
   } finally {
     isSaving.value = false
   }
@@ -97,14 +98,14 @@ async function handleDuplicate() {
   isDuplicating.value = true
   try {
     const created = await createTemplate({
-      name: `${form.name} (Copy)`,
+      name: `${form.name} ${t('dashboard.interviews.templates.detail.copySuffix')}`,
       subject: form.subject,
       body: form.body,
     })
     await navigateTo(localePath(`/dashboard/interviews/templates/${(created as any).id}`))
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    saveError.value = err?.data?.statusMessage ?? 'Failed to duplicate template'
+    saveError.value = err?.data?.statusMessage ?? t('dashboard.interviews.templates.detail.errors.duplicateFailed')
   } finally {
     isDuplicating.value = false
   }
@@ -121,7 +122,7 @@ async function handleDelete() {
     await navigateTo(localePath('/dashboard/interviews/templates'))
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    saveError.value = err?.data?.statusMessage ?? 'Failed to delete template'
+    saveError.value = err?.data?.statusMessage ?? t('dashboard.interviews.templates.detail.errors.deleteFailed')
   } finally {
     isDeleting.value = false
   }
@@ -130,27 +131,27 @@ async function handleDelete() {
 // ─── Preview ─────────────────────────────────────────────────────
 const showPreview = ref(false)
 
-const sampleVariables: Record<string, string> = {
-  candidateName: 'Alex Johnson',
-  candidateFirstName: 'Alex',
-  candidateLastName: 'Johnson',
-  candidateEmail: 'alex@example.com',
-  jobTitle: 'Senior Frontend Engineer',
-  interviewTitle: 'Technical Interview — Round 2',
-  interviewDate: 'Monday, March 16, 2026',
-  interviewTime: '2:00 PM',
-  interviewDuration: '60',
-  interviewType: 'Video Call',
-  interviewLocation: 'https://meet.google.com/abc-defg-hij',
-  interviewers: 'Sarah Chen, Michael Park',
-  organizationName: 'Acme Corp',
-}
+const sampleVariables = computed<Record<string, string>>(() => ({
+  candidateName: t('dashboard.interviews.templates.detail.samplePreview.candidateName'),
+  candidateFirstName: t('dashboard.interviews.templates.detail.samplePreview.candidateFirstName'),
+  candidateLastName: t('dashboard.interviews.templates.detail.samplePreview.candidateLastName'),
+  candidateEmail: t('dashboard.interviews.templates.detail.samplePreview.candidateEmail'),
+  jobTitle: t('dashboard.interviews.templates.detail.samplePreview.jobTitle'),
+  interviewTitle: t('dashboard.interviews.templates.detail.samplePreview.interviewTitle'),
+  interviewDate: t('dashboard.interviews.templates.detail.samplePreview.interviewDate'),
+  interviewTime: t('dashboard.interviews.templates.detail.samplePreview.interviewTime'),
+  interviewDuration: t('dashboard.interviews.templates.detail.samplePreview.interviewDuration'),
+  interviewType: t('dashboard.interviews.templates.detail.samplePreview.interviewType'),
+  interviewLocation: t('dashboard.interviews.templates.detail.samplePreview.interviewLocation'),
+  interviewers: t('dashboard.interviews.templates.detail.samplePreview.interviewers'),
+  organizationName: t('dashboard.interviews.templates.detail.samplePreview.organizationName'),
+}))
 
-const previewSubject = computed(() => renderTemplatePreview(form.subject, sampleVariables))
-const previewBody = computed(() => renderTemplatePreview(form.body, sampleVariables))
+const previewSubject = computed(() => renderTemplatePreview(form.subject, sampleVariables.value))
+const previewBody = computed(() => renderTemplatePreview(form.body, sampleVariables.value))
 
 useSeoMeta({
-  title: computed(() => form.name ? `${form.name} — Email Templates — Reqcore` : 'Email Template — Reqcore'),
+  title: computed(() => form.name ? `${form.name} — ${t('common.brand.name')}` : t('dashboard.interviews.templates.detail.seoTitle')),
   robots: 'noindex, nofollow',
 })
 </script>
@@ -163,18 +164,18 @@ useSeoMeta({
       class="mb-6 inline-flex items-center gap-1 rounded-full border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-1.5 text-sm text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors no-underline"
     >
       <ArrowLeft class="size-4" />
-      All Templates
+      {{ t('dashboard.interviews.templates.detail.allTemplates') }}
     </NuxtLink>
 
     <!-- Not found -->
     <div v-if="notFound" class="rounded-xl border border-danger-200 bg-danger-50 p-8 text-center dark:border-danger-800/60 dark:bg-danger-950/40">
-      <p class="text-sm text-danger-700 dark:text-danger-300 mb-2 font-semibold">Template not found</p>
-      <p class="text-xs text-danger-600 dark:text-danger-400 mb-4">This template may have been deleted or doesn't exist.</p>
+      <p class="text-sm text-danger-700 dark:text-danger-300 mb-2 font-semibold">{{ t('dashboard.interviews.templates.detail.notFound') }}</p>
+      <p class="text-xs text-danger-600 dark:text-danger-400 mb-4">{{ t('dashboard.interviews.templates.detail.notFoundHint') }}</p>
       <NuxtLink
         :to="localePath('/dashboard/interviews/templates')"
         class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition-all no-underline"
       >
-        Back to Templates
+        {{ t('dashboard.interviews.templates.detail.backToTemplates') }}
       </NuxtLink>
     </div>
 
@@ -201,7 +202,7 @@ useSeoMeta({
                 class="inline-flex items-center gap-1 rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold text-surface-400"
               >
                 <Lock class="size-2.5" />
-                Built-in
+                {{ t('dashboard.interviews.templates.detail.builtIn') }}
               </span>
             </div>
             <p v-if="isSystemTemplate && systemTemplate" class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
@@ -217,7 +218,7 @@ useSeoMeta({
             @click="showPreview = !showPreview"
           >
             <component :is="showPreview ? EyeOff : Eye" class="size-4" />
-            {{ showPreview ? 'Hide Preview' : 'Preview' }}
+            {{ showPreview ? t('dashboard.interviews.templates.detail.hidePreview') : t('dashboard.interviews.templates.detail.preview') }}
           </button>
           <button
             v-if="isSystemTemplate"
@@ -226,7 +227,7 @@ useSeoMeta({
             @click="handleDuplicate"
           >
             <Copy class="size-4" />
-            {{ isDuplicating ? 'Duplicating…' : 'Duplicate as Custom' }}
+            {{ isDuplicating ? t('dashboard.interviews.templates.detail.duplicating') : t('dashboard.interviews.templates.detail.duplicateAsCustom') }}
           </button>
           <template v-else>
             <button
@@ -235,7 +236,7 @@ useSeoMeta({
               @click="handleSave"
             >
               <Save class="size-4" />
-              {{ isSaving ? 'Saving…' : saveSuccess ? 'Saved!' : 'Save Changes' }}
+              {{ isSaving ? t('dashboard.interviews.templates.detail.saving') : saveSuccess ? t('dashboard.interviews.templates.detail.saved') : t('dashboard.interviews.templates.detail.saveChanges') }}
             </button>
           </template>
         </div>
@@ -253,14 +254,14 @@ useSeoMeta({
           <!-- Name -->
           <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
             <label for="template-name" class="block text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-2">
-              Template Name
+              {{ t('dashboard.interviews.templates.detail.templateName') }}
             </label>
             <input
               id="template-name"
               v-model="form.name"
               type="text"
               :disabled="isSystemTemplate"
-              placeholder="e.g., Welcome Interview"
+              :placeholder="t('dashboard.interviews.emailModal.templateName')"
               class="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
@@ -268,14 +269,14 @@ useSeoMeta({
           <!-- Subject -->
           <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
             <label for="template-subject" class="block text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-2">
-              Subject Line
+              {{ t('dashboard.interviews.templates.detail.subjectLine') }}
             </label>
             <input
               id="template-subject"
               v-model="form.subject"
               type="text"
               :disabled="isSystemTemplate"
-              placeholder="e.g., Interview Invitation: {{jobTitle}}"
+              :placeholder="t('dashboard.interviews.emailModal.subjectLinePlaceholder')"
               class="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all font-mono text-[13px] disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
@@ -283,29 +284,29 @@ useSeoMeta({
           <!-- Body -->
           <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
             <label for="template-body" class="block text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-2">
-              Email Body
+              {{ t('dashboard.interviews.templates.detail.emailBody') }}
             </label>
             <textarea
               id="template-body"
               v-model="form.body"
               :disabled="isSystemTemplate"
               rows="18"
-              placeholder="Write your invitation email here. Use {{variables}} for dynamic content…"
+              :placeholder="t('dashboard.interviews.emailModal.emailBodyPlaceholder')"
               class="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all resize-none font-mono text-[13px] leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
           <!-- Delete zone (custom templates only) -->
           <div v-if="!isSystemTemplate" class="rounded-xl border border-danger-200/60 dark:border-danger-900/40 bg-danger-50/30 dark:bg-danger-950/20 p-5">
-            <h3 class="text-sm font-semibold text-danger-700 dark:text-danger-400 mb-1">Danger Zone</h3>
-            <p class="text-xs text-danger-600/80 dark:text-danger-400/60 mb-3">Permanently delete this template. This action cannot be undone.</p>
+            <h3 class="text-sm font-semibold text-danger-700 dark:text-danger-400 mb-1">{{ t('dashboard.interviews.templates.detail.dangerZone') }}</h3>
+            <p class="text-xs text-danger-600/80 dark:text-danger-400/60 mb-3">{{ t('dashboard.interviews.templates.detail.deleteWarning') }}</p>
             <button
               :disabled="isDeleting"
               class="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-danger-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               @click="handleDelete"
             >
               <Trash2 class="size-3.5" />
-              {{ isDeleting ? 'Deleting…' : 'Delete Template' }}
+              {{ isDeleting ? t('common.actions.deleting') : t('dashboard.interviews.templates.detail.deleteTemplate') }}
             </button>
           </div>
         </div>
@@ -325,22 +326,22 @@ useSeoMeta({
               <div class="border-b border-brand-100 dark:border-brand-900/40 bg-brand-50/50 dark:bg-brand-950/20 px-5 py-3">
                 <div class="flex items-center gap-2">
                   <Mail class="size-4 text-brand-500 dark:text-brand-400" />
-                  <span class="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">Live Preview</span>
+                  <span class="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">{{ t('dashboard.interviews.templates.detail.livePreview') }}</span>
                 </div>
               </div>
               <div class="p-5 space-y-4">
                 <div>
-                  <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 block mb-1">Subject</span>
+                  <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 block mb-1">{{ t('dashboard.interviews.templates.detail.subject') }}</span>
                   <p class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ previewSubject }}</p>
                 </div>
                 <div class="border-t border-surface-100 dark:border-surface-800 pt-4">
-                  <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 block mb-2">Body</span>
+                  <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 block mb-2">{{ t('dashboard.interviews.templates.detail.body') }}</span>
                   <div class="text-sm text-surface-700 dark:text-surface-300 whitespace-pre-wrap leading-relaxed">{{ previewBody }}</div>
                 </div>
               </div>
               <div class="border-t border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-950/30 px-5 py-2.5">
                 <p class="text-[11px] text-surface-400 dark:text-surface-500 italic">
-                  Preview uses sample data. Actual values are populated when sending.
+                  {{ t('dashboard.interviews.templates.detail.previewHelper') }}
                 </p>
               </div>
             </div>
@@ -349,10 +350,10 @@ useSeoMeta({
           <!-- Variable reference -->
           <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
             <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-3">
-              Available Variables
+              {{ t('dashboard.interviews.templates.detail.availableVariables') }}
             </h3>
             <p class="text-xs text-surface-400 dark:text-surface-500 mb-3">
-              Use these placeholders in your subject and body. They'll be replaced with real data when the email is sent.
+              {{ t('dashboard.interviews.templates.detail.variablesHelper') }}
             </p>
             <div class="space-y-1.5">
               <div

@@ -4,65 +4,68 @@ import {
 } from 'lucide-vue-next'
 
 const route = useRoute()
-const localePath = useLocalePath()
+const { t } = useI18n()
+const { tenantPath } = useTenantPaths()
+const { allowOwnLlm } = useOrgSettings()
 
-const settingsNav = [
+const settingsNav = computed(() => [
   {
-    label: 'General',
-    description: 'Organization profile',
-    to: '/dashboard/settings',
+    label: t('settings.nav.general'),
+    description: t('settings.nav.generalDescription'),
+    to: tenantPath('settings'),
     icon: Building2,
     exact: true,
   },
   {
-    label: 'Localization',
-    description: 'Names & date formats',
-    to: '/dashboard/settings/localization',
+    label: t('settings.nav.domain'),
+    description: t('settings.nav.domainDescription'),
+    to: tenantPath('settings/domain'),
     icon: Globe,
     exact: true,
   },
   {
-    label: 'Members',
-    description: 'Team & invitations',
-    to: '/dashboard/settings/members',
+    label: t('settings.nav.members'),
+    description: t('settings.nav.membersDescription'),
+    to: tenantPath('settings/members'),
     icon: Users,
     exact: true,
   },
   {
-    label: 'Integrations',
-    description: 'Calendar & services',
-    to: '/dashboard/settings/integrations',
+    label: t('settings.nav.integrations'),
+    description: t('settings.nav.integrationsDescription'),
+    to: tenantPath('settings/integrations'),
     icon: Plug,
     exact: true,
   },
+  ...(allowOwnLlm.value
+    ? [{
+        label: t('settings.nav.aiAnalysis'),
+        description: t('settings.nav.aiAnalysisDescription'),
+        to: tenantPath('settings/ai-analysis'),
+        icon: Brain,
+        exact: true,
+      }]
+    : []),
   {
-    label: 'AI Configuration',
-    description: 'Models & API keys',
-    to: '/dashboard/settings/ai',
-    icon: Brain,
-    exact: true,
-  },
-  {
-    label: 'Single Sign-On',
-    description: 'Enterprise SSO',
-    to: '/dashboard/settings/sso',
+    label: t('settings.nav.sso'),
+    description: t('settings.nav.ssoDescription'),
+    to: tenantPath('settings/sso'),
     icon: ShieldCheck,
     exact: true,
-    badge: 'Beta',
+    badge: t('settings.nav.beta'),
   },
   {
-    label: 'Account',
-    description: 'Profile & security',
-    to: '/dashboard/settings/account',
+    label: t('settings.nav.account'),
+    description: t('settings.nav.accountDescription'),
+    to: tenantPath('settings/account'),
     icon: UserCircle,
     exact: true,
   },
-]
+])
 
 function isActive(to: string, exact: boolean) {
-  const localizedTo = localePath(to)
-  if (exact) return route.path === localizedTo
-  return route.path === localizedTo || route.path.startsWith(`${localizedTo}/`)
+  if (exact) return route.path === to
+  return route.path === to || route.path.startsWith(`${to}/`)
 }
 </script>
 
@@ -73,63 +76,51 @@ function isActive(to: string, exact: boolean) {
     <!-- Header -->
     <div class="px-4 pt-5 pb-4">
       <NuxtLink
-        :to="$localePath('/dashboard')"
+        :to="tenantPath('jobs')"
         class="inline-flex items-center gap-1.5 text-xs font-medium text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors no-underline mb-3"
       >
         <ChevronLeft class="size-3.5" />
-        Back to jobs
+        {{ t('settings.backToJobs') }}
       </NuxtLink>
       <div class="flex items-center gap-2.5">
         <div class="flex items-center justify-center size-8 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400">
           <Settings class="size-4" />
         </div>
-        <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">
-          Settings
-        </h2>
+        <div>
+          <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('settings.title') }}</h2>
+        </div>
       </div>
     </div>
 
-    <!-- Navigation -->
-    <nav class="flex-1 px-3 pb-5">
-      <div class="flex flex-col gap-0.5">
-        <NuxtLink
-          v-for="item in settingsNav"
-          :key="item.to"
-          :to="$localePath(item.to)"
-          class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all no-underline"
-          :class="isActive(item.to, item.exact)
-            ? 'bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300 font-medium'
-            : 'text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800/60 hover:text-surface-900 dark:hover:text-surface-100'"
-        >
-          <div
-            class="flex items-center justify-center size-8 rounded-md transition-colors"
-            :class="isActive(item.to, item.exact)
-              ? 'bg-brand-100 dark:bg-brand-900/50 text-brand-600 dark:text-brand-400'
-              : 'bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500 group-hover:text-surface-600 dark:group-hover:text-surface-300'"
-          >
-            <component :is="item.icon" class="size-4" />
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5 leading-tight">
-              <span class="truncate">{{ item.label }}</span>
-              <span
-                v-if="item.badge"
-                class="shrink-0 inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
-              >
-                {{ item.badge }}
-              </span>
-            </div>
-            <div
-              class="text-[11px] leading-tight mt-0.5 truncate"
-              :class="isActive(item.to, item.exact)
-                ? 'text-brand-500/70 dark:text-brand-400/60'
-                : 'text-surface-400 dark:text-surface-500'"
+    <!-- Nav -->
+    <nav class="flex-1 px-2 pb-4 space-y-0.5">
+      <NuxtLink
+        v-for="item in settingsNav"
+        :key="item.to"
+        :to="item.to"
+        class="group flex items-start gap-3 rounded-lg px-3 py-2.5 no-underline transition-colors"
+        :class="isActive(item.to, item.exact)
+          ? 'bg-brand-50 dark:bg-brand-950/50 text-brand-700 dark:text-brand-300'
+          : 'text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800/50 hover:text-surface-900 dark:hover:text-surface-200'"
+      >
+        <component
+          :is="item.icon"
+          class="size-4 mt-0.5 shrink-0"
+          :class="isActive(item.to, item.exact) ? 'text-brand-600 dark:text-brand-400' : 'text-surface-400 dark:text-surface-500 group-hover:text-surface-600 dark:group-hover:text-surface-300'"
+        />
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium truncate">{{ item.label }}</span>
+            <span
+              v-if="item.badge"
+              class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400"
             >
-              {{ item.description }}
-            </div>
+              {{ item.badge }}
+            </span>
           </div>
-        </NuxtLink>
-      </div>
+          <p class="text-xs text-surface-400 dark:text-surface-500 mt-0.5 line-clamp-2">{{ item.description }}</p>
+        </div>
+      </NuxtLink>
     </nav>
   </aside>
 </template>

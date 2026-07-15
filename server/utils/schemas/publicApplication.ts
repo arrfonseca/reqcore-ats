@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ALL_JOB_TYPE_IDS } from '~~/shared/job-types'
 
 // ─────────────────────────────────────────────
 // Public application submission schemas
@@ -20,7 +21,7 @@ export const publicApplicationSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   email: z.string().email('Invalid email address').max(254),
-  phone: z.string().max(50).optional(),
+  phone: z.string().min(1, 'Phone is required').max(50),
   responses: z.array(questionResponseSchema).default([]),
   /** Optional cover letter text submitted by the candidate */
   coverLetterText: z.string().max(10000).optional(),
@@ -54,6 +55,6 @@ export const publicJobsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().min(1).max(200).optional(),
-  type: z.enum(['full_time', 'part_time', 'contract', 'internship']).optional(),
+  type: z.enum(ALL_JOB_TYPE_IDS).optional(),
   location: z.string().min(1).max(200).optional(),
 })

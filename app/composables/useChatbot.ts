@@ -57,6 +57,7 @@ function newId() {
 }
 
 export function useChatbot() {
+  const { t } = useI18n()
   const toast = useToast()
 
   // ── Shared reactive state ──
@@ -89,7 +90,7 @@ export function useChatbot() {
   // Helpers
   // ──────────────────────────────────────────────────────────────────────────
   function reportError(err: unknown, title: string) {
-    const message = describeError(err, 'Something went wrong.')
+    const message = describeError(err, t('dashboard.chatbot.errors.generic'))
     error.value = message
     console.error(`[chatbot] ${title}`, err)
     toast.error(title, { message })
@@ -109,11 +110,16 @@ export function useChatbot() {
   // ──────────────────────────────────────────────────────────────────────────
   async function loadAll() {
     try {
+      const { allowOwnLlm } = useOrgSettings()
+      const configPromise = allowOwnLlm.value
+        ? $fetch<ChatbotAiConfigSummary[]>('/api/ai-config').catch(() => [] as ChatbotAiConfigSummary[])
+        : Promise.resolve([] as ChatbotAiConfigSummary[])
+
       const [convRes, folderRes, agentRes, configRes] = await Promise.all([
         $fetch<{ conversations: ChatbotConversationSummary[] }>('/api/chatbot/conversations'),
         $fetch<{ folders: ChatbotFolder[] }>('/api/chatbot/folders'),
         $fetch<{ agents: ChatbotAgent[] }>('/api/chatbot/agents'),
-        $fetch<ChatbotAiConfigSummary[]>('/api/ai-config').catch(() => [] as ChatbotAiConfigSummary[]),
+        configPromise,
       ])
       conversations.value = convRes.conversations
       folders.value = folderRes.folders
@@ -123,16 +129,21 @@ export function useChatbot() {
         selectedAgentId.value = defaultAgent.value.id
       }
     } catch (err) {
-      reportError(err, 'Failed to load chat data')
+      reportError(err, t('dashboard.chatbot.errors.loadChatData'))
     }
   }
 
   async function refreshAiConfigs() {
+    const { allowOwnLlm } = useOrgSettings()
+    if (!allowOwnLlm.value) {
+      aiConfigs.value = []
+      return
+    }
     try {
       const res = await $fetch<ChatbotAiConfigSummary[]>('/api/ai-config')
       aiConfigs.value = Array.isArray(res) ? res : []
     } catch (err) {
-      reportError(err, 'Failed to refresh AI configurations')
+      reportError(err, t('dashboard.chatbot.errors.refreshAiConfigs'))
     }
   }
 
@@ -141,7 +152,7 @@ export function useChatbot() {
       const res = await $fetch<{ conversations: ChatbotConversationSummary[] }>('/api/chatbot/conversations')
       conversations.value = res.conversations
     } catch (err) {
-      reportError(err, 'Failed to refresh conversations')
+      reportError(err, t('dashboard.chatbot.errors.refreshConversations'))
     }
   }
 
@@ -150,7 +161,7 @@ export function useChatbot() {
       const res = await $fetch<{ agents: ChatbotAgent[] }>('/api/chatbot/agents')
       agents.value = res.agents
     } catch (err) {
-      reportError(err, 'Failed to refresh agents')
+      reportError(err, t('dashboard.chatbot.errors.refreshAgents'))
     }
   }
 
@@ -159,7 +170,7 @@ export function useChatbot() {
       const res = await $fetch<{ folders: ChatbotFolder[] }>('/api/chatbot/folders')
       folders.value = res.folders
     } catch (err) {
-      reportError(err, 'Failed to refresh folders')
+      reportError(err, t('dashboard.chatbot.errors.refreshFolders'))
     }
   }
 
@@ -193,7 +204,7 @@ export function useChatbot() {
       }
       sources.value = all
     } catch (err) {
-      reportError(err, 'Failed to open conversation')
+      reportError(err, t('dashboard.chatbot.errors.openConversation'))
       currentConversationId.value = null
     } finally {
       loadingConversation.value = false
@@ -228,7 +239,7 @@ export function useChatbot() {
       selectedAiConfigId.value = (res.conversation as { aiConfigId?: string | null }).aiConfigId ?? null
       return res.conversation
     } catch (err) {
-      reportError(err, 'Failed to create conversation')
+      reportError(err, t('dashboard.chatbot.errors.createConversation'))
       return null
     }
   }
@@ -245,7 +256,7 @@ export function useChatbot() {
       conversations.value = conversations.value.map((c) => c.id === id ? res.conversation : c)
       return res.conversation
     } catch (err) {
-      reportError(err, 'Failed to update conversation')
+      reportError(err, t('dashboard.chatbot.errors.updateConversation'))
       return null
     }
   }
@@ -260,7 +271,7 @@ export function useChatbot() {
         sources.value = []
       }
     } catch (err) {
-      reportError(err, 'Failed to delete conversation')
+      reportError(err, t('dashboard.chatbot.errors.deleteConversation'))
     }
   }
 
@@ -274,7 +285,7 @@ export function useChatbot() {
       folders.value = [...folders.value, res.folder].sort((a, b) => a.position - b.position)
       return res.folder
     } catch (err) {
-      reportError(err, 'Failed to create folder')
+      reportError(err, t('dashboard.chatbot.errors.createFolder'))
       return null
     }
   }
@@ -287,7 +298,7 @@ export function useChatbot() {
       })
       folders.value = folders.value.map((f) => f.id === id ? res.folder : f)
     } catch (err) {
-      reportError(err, 'Failed to rename folder')
+      reportError(err, t('dashboard.chatbot.errors.renameFolder'))
     }
   }
 
@@ -300,7 +311,7 @@ export function useChatbot() {
         c.folderId === id ? { ...c, folderId: null } : c,
       )
     } catch (err) {
-      reportError(err, 'Failed to delete folder')
+      reportError(err, t('dashboard.chatbot.errors.deleteFolder'))
     }
   }
 
@@ -322,7 +333,7 @@ export function useChatbot() {
       await refreshAgents()
       return res.agent
     } catch (err) {
-      reportError(err, 'Failed to create agent')
+      reportError(err, t('dashboard.chatbot.errors.createAgent'))
       return null
     }
   }
@@ -339,7 +350,7 @@ export function useChatbot() {
       await $fetch(`/api/chatbot/agents/${id}`, { method: 'PATCH', body: patch })
       await refreshAgents()
     } catch (err) {
-      reportError(err, 'Failed to update agent')
+      reportError(err, t('dashboard.chatbot.errors.updateAgent'))
     }
   }
 
@@ -349,7 +360,7 @@ export function useChatbot() {
       agents.value = agents.value.filter((a) => a.id !== id)
       if (selectedAgentId.value === id) selectedAgentId.value = defaultAgent.value?.id ?? null
     } catch (err) {
-      reportError(err, 'Failed to delete agent')
+      reportError(err, t('dashboard.chatbot.errors.deleteAgent'))
     }
   }
 
@@ -365,7 +376,7 @@ export function useChatbot() {
       pendingAttachments.value = [...pendingAttachments.value, res]
       return res
     } catch (err) {
-      reportError(err, 'Upload failed')
+      reportError(err, t('dashboard.chatbot.errors.uploadFailed'))
       return null
     }
   }
@@ -451,7 +462,7 @@ export function useChatbot() {
       })
 
       if (!res.ok || !res.body) {
-        let msg = `Request failed (${res.status})`
+        let msg = t('dashboard.chatbot.errors.requestFailed', { status: res.status })
         try {
           const data = await res.json() as { statusMessage?: string; message?: string }
           msg = data.statusMessage || data.message || msg
@@ -465,13 +476,14 @@ export function useChatbot() {
       void refreshConversations()
     } catch (err) {
       if ((err as { name?: string })?.name === 'AbortError') {
-        assistantMessage.content += assistantMessage.content ? '\n\n_Stopped by user._' : '_Stopped by user._'
+        const stoppedMsg = t('dashboard.chatbot.errors.stoppedByUser')
+        assistantMessage.content += assistantMessage.content ? `\n\n${stoppedMsg}` : stoppedMsg
         // Still surface this as info so user knows it landed.
       } else {
-        const msg = describeError(err, 'Unknown error')
+        const msg = describeError(err, t('dashboard.chatbot.errors.unknownError'))
         error.value = msg
         assistantMessage.content = assistantMessage.content || `⚠️ ${msg}`
-        toast.error('Chat failed', { message: msg })
+        toast.error(t('dashboard.chatbot.errors.chatFailed'), { message: msg })
         console.error('[chatbot] send failed', err)
       }
     } finally {
@@ -552,7 +564,7 @@ export function useChatbot() {
           target.toolCalls = [...list]
         }
         // Also surface tool errors as toasts — silent failures are the worst.
-        toast.error('Tool failed', { message: ev.error })
+        toast.error(t('dashboard.chatbot.errors.toolFailed'), { message: ev.error })
         break
       }
       case 'source': {
@@ -576,7 +588,7 @@ export function useChatbot() {
       case 'error':
         target.content += `\n\n⚠️ ${ev.error}`
         error.value = ev.error
-        toast.error('Assistant error', { message: ev.error })
+        toast.error(t('dashboard.chatbot.errors.assistantError'), { message: ev.error })
         console.error('[chatbot] server error event', ev.error)
         break
     }

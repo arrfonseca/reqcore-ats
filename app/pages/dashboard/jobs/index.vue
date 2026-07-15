@@ -4,6 +4,9 @@ import {
   MapPin, Search, SlidersHorizontal, X,
   LayoutGrid, List, Table2, ArrowUp, ArrowDown, ArrowUpDown,
 } from 'lucide-vue-next'
+import { JOB_CONTRACT_TYPE_IDS } from '~~/shared/job-types'
+
+const { t, te } = useI18n()
 
 definePageMeta({
   layout: 'dashboard',
@@ -11,25 +14,34 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'My Jobs — Reqcore',
-  description: 'Your active job postings',
+  title: t('dashboard.jobs.list.seoTitle'),
+  description: t('dashboard.jobs.list.seoDescription'),
 })
 
 const { activeOrg } = useCurrentOrg()
 const localePath = useLocalePath()
+const { hasDraft, draftSummary, syncFromStorage } = useJobDraft()
+const route = useRoute()
+
+watch(() => route.path, () => syncFromStorage())
+
+const draftTitleSuffix = computed(() => {
+  const title = draftSummary.value?.title?.trim()
+  return title ? `: “${title}”` : t('dashboard.jobs.list.continueDraftUntitled')
+})
 
 // ─────────────────────────────────────────────
 // Stage config for clickable pipeline counts
 // ─────────────────────────────────────────────
 
-const stageConfig = [
-  { key: 'new', label: 'New', textColor: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950/40' },
-  { key: 'screening', label: 'Screening', textColor: 'text-violet-600 dark:text-violet-400', bgColor: 'bg-violet-50 dark:bg-violet-950/40' },
-  { key: 'interview', label: 'Interview', textColor: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-50 dark:bg-amber-950/40' },
-  { key: 'offer', label: 'Offer', textColor: 'text-teal-600 dark:text-teal-400', bgColor: 'bg-teal-50 dark:bg-teal-950/40' },
-  { key: 'hired', label: 'Hired', textColor: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-50 dark:bg-green-950/40' },
-  { key: 'rejected', label: 'Rejected', textColor: 'text-surface-500 dark:text-surface-400', bgColor: 'bg-surface-100 dark:bg-surface-800' },
-] as const
+const stageConfig = computed(() => [
+  { key: 'new', label: t('common.stages.new'), textColor: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950/40' },
+  { key: 'screening', label: t('common.stages.screening'), textColor: 'text-violet-600 dark:text-violet-400', bgColor: 'bg-violet-50 dark:bg-violet-950/40' },
+  { key: 'interview', label: t('common.stages.interview'), textColor: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-50 dark:bg-amber-950/40' },
+  { key: 'offer', label: t('common.stages.offer'), textColor: 'text-teal-600 dark:text-teal-400', bgColor: 'bg-teal-50 dark:bg-teal-950/40' },
+  { key: 'hired', label: t('common.stages.hired'), textColor: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-50 dark:bg-green-950/40' },
+  { key: 'rejected', label: t('common.stages.rejected'), textColor: 'text-surface-500 dark:text-surface-400', bgColor: 'bg-surface-100 dark:bg-surface-800' },
+])
 
 function getStageCount(pipeline: any, key: string): number {
   return pipeline?.[key] ?? 0
@@ -52,12 +64,9 @@ const statusBadgeClasses: Record<string, string> = {
   archived: 'bg-surface-100 text-surface-400 dark:bg-surface-800 dark:text-surface-500',
 }
 
-const typeLabels: Record<string, string> = {
-  full_time: 'Full-time',
-  part_time: 'Part-time',
-  contract: 'Contract',
-  internship: 'Internship',
-}
+const { contractTypeOptions, allTypeLabels } = useJobTypes()
+
+const typeLabels = allTypeLabels
 
 // ─────────────────────────────────────────────
 // View mode (gallery | table)
@@ -73,7 +82,7 @@ const search = ref('')
 const drawerOpen = ref(false)
 
 type StatusFilter = 'open' | 'draft' | 'closed' | 'archived'
-type TypeFilter = 'full_time' | 'part_time' | 'contract' | 'internship'
+type TypeFilter = typeof JOB_CONTRACT_TYPE_IDS[number]
 type ExperienceFilter = 'junior' | 'mid' | 'senior' | 'lead'
 type RemoteFilter = 'remote' | 'hybrid' | 'onsite'
 
@@ -82,29 +91,29 @@ const typeFilter = ref<TypeFilter[]>([])
 const experienceFilter = ref<ExperienceFilter[]>([])
 const remoteFilter = ref<RemoteFilter[]>([])
 
-const statusOptions: { value: StatusFilter, label: string }[] = [
-  { value: 'open', label: 'Open' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'archived', label: 'Archived' },
-]
-const typeOptions: { value: TypeFilter, label: string }[] = [
-  { value: 'full_time', label: 'Full-time' },
-  { value: 'part_time', label: 'Part-time' },
-  { value: 'contract', label: 'Contract' },
-  { value: 'internship', label: 'Internship' },
-]
-const experienceOptions: { value: ExperienceFilter, label: string }[] = [
-  { value: 'junior', label: 'Junior' },
-  { value: 'mid', label: 'Mid' },
-  { value: 'senior', label: 'Senior' },
-  { value: 'lead', label: 'Lead' },
-]
-const remoteOptions: { value: RemoteFilter, label: string }[] = [
-  { value: 'remote', label: 'Remote' },
-  { value: 'hybrid', label: 'Hybrid' },
-  { value: 'onsite', label: 'On-site' },
-]
+const statusOptions = computed<{ value: StatusFilter, label: string }[]>(() => [
+  { value: 'open', label: t('dashboard.jobs.shared.status.open') },
+  { value: 'draft', label: t('dashboard.jobs.shared.status.draft') },
+  { value: 'closed', label: t('dashboard.jobs.shared.status.closed') },
+  { value: 'archived', label: t('dashboard.jobs.shared.status.archived') },
+])
+
+function jobStatusLabel(status: string) {
+  const key = `dashboard.jobs.shared.status.${status}`
+  return te(key) ? t(key) : status
+}
+const typeOptions = contractTypeOptions
+const experienceOptions = computed<{ value: ExperienceFilter, label: string }[]>(() => [
+  { value: 'junior', label: t('dashboard.jobs.shared.experience.junior') },
+  { value: 'mid', label: t('dashboard.jobs.shared.experience.mid') },
+  { value: 'senior', label: t('dashboard.jobs.shared.experience.senior') },
+  { value: 'lead', label: t('dashboard.jobs.shared.experience.lead') },
+])
+const remoteOptions = computed<{ value: RemoteFilter, label: string }[]>(() => [
+  { value: 'remote', label: t('dashboard.jobs.shared.remote.remote') },
+  { value: 'hybrid', label: t('dashboard.jobs.shared.remote.hybrid') },
+  { value: 'onsite', label: t('dashboard.jobs.shared.remote.onsite') },
+])
 
 function toggleIn<T>(arr: T[], value: T): T[] {
   return arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]
@@ -344,7 +353,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
     <!-- ─── Header ─── -->
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">My Jobs</h1>
+        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">{{ t('dashboard.jobs.list.title') }}</h1>
         <p v-if="activeOrg" class="text-sm text-surface-500 dark:text-surface-400 mt-1">
           {{ activeOrg.name }}
         </p>
@@ -354,7 +363,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
         class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors no-underline"
       >
         <Plus class="size-4" />
-        New Job
+        {{ t('dashboard.jobs.list.newJob') }}
       </NuxtLink>
     </div>
 
@@ -384,27 +393,52 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
       v-else-if="error"
       class="rounded-lg border border-danger-200 dark:border-danger-900 bg-danger-50 dark:bg-danger-950 p-4 text-sm text-danger-700 dark:text-danger-400"
     >
-      Failed to load jobs.
-      <button class="underline ml-1 cursor-pointer" @click="refresh()">Retry</button>
+      {{ t('dashboard.jobs.list.failed') }}
+      <button class="underline ml-1 cursor-pointer" @click="refresh()">{{ t('common.actions.retry') }}</button>
     </div>
 
     <!-- ─── Empty state ─── -->
     <div v-else-if="isEmpty" class="flex flex-col items-center justify-center py-20">
       <div class="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-10 text-center max-w-md">
         <Briefcase class="size-12 text-brand-400 mx-auto mb-4" />
-        <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">
-          Welcome to Reqcore
-        </h2>
-        <p class="text-sm text-surface-500 dark:text-surface-400 mb-6 leading-relaxed">
-          Create your first job posting to start receiving and managing candidates.
-        </p>
-        <NuxtLink
-          :to="$localePath('/dashboard/jobs/new')"
-          class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors no-underline"
-        >
-          <Plus class="size-4" />
-          Create Your First Job
-        </NuxtLink>
+        <template v-if="hasDraft">
+          <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">
+            {{ t('dashboard.jobs.list.continueDraft') }}
+          </h2>
+          <p class="text-sm text-surface-500 dark:text-surface-400 mb-6 leading-relaxed">
+            {{ t('dashboard.jobs.list.continueDraftDescription', { title: draftTitleSuffix }) }}
+          </p>
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <NuxtLink
+              :to="localePath('/dashboard/jobs/new')"
+              class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors no-underline"
+            >
+              <Plus class="size-4" />
+              {{ t('dashboard.jobs.list.continueDraft') }}
+            </NuxtLink>
+            <NuxtLink
+              :to="localePath('/dashboard/jobs/new?fresh=1')"
+              class="inline-flex items-center gap-2 rounded-lg border border-surface-200 dark:border-surface-700 px-5 py-2.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors no-underline"
+            >
+              {{ t('dashboard.jobs.list.startNewInstead') }}
+            </NuxtLink>
+          </div>
+        </template>
+        <template v-else>
+          <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">
+            {{ t('dashboard.jobs.list.welcome') }}
+          </h2>
+          <p class="text-sm text-surface-500 dark:text-surface-400 mb-6 leading-relaxed">
+            {{ t('dashboard.jobs.list.createFirstDescription') }}
+          </p>
+          <NuxtLink
+            :to="localePath('/dashboard/jobs/new')"
+            class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors no-underline"
+          >
+            <Plus class="size-4" />
+            {{ t('dashboard.jobs.list.createFirst') }}
+          </NuxtLink>
+        </template>
       </div>
     </div>
 
@@ -417,7 +451,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
           <input
             v-model="search"
             type="search"
-            placeholder="Search jobs by title, location, or description"
+            :placeholder="t('dashboard.jobs.list.searchPlaceholder')"
             class="w-full rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 pl-9 pr-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
           />
         </div>
@@ -442,7 +476,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
             :class="viewMode === 'gallery'
               ? 'bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-surface-100'
               : 'text-surface-500 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800'"
-            title="Gallery view"
+            :title="t('dashboard.jobs.list.galleryView')"
             @click="viewMode = 'gallery'"
           >
             <LayoutGrid class="size-4" />
@@ -453,7 +487,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
             :class="viewMode === 'list'
               ? 'bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-surface-100'
               : 'text-surface-500 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800'"
-            title="List view"
+            :title="t('dashboard.jobs.list.listView')"
             @click="viewMode = 'list'"
           >
             <List class="size-4" />
@@ -464,7 +498,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
             :class="viewMode === 'table'
               ? 'bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-surface-100'
               : 'text-surface-500 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800'"
-            title="Table view"
+            :title="t('dashboard.jobs.list.tableView')"
             @click="viewMode = 'table'"
           >
             <Table2 class="size-4" />
@@ -481,7 +515,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
           @click="drawerOpen = true"
         >
           <SlidersHorizontal class="size-4" />
-          Filters
+          {{ t('dashboard.jobs.list.filterJobs') }}
           <span
             v-if="activeFilterCount > 0"
             class="inline-flex items-center justify-center size-4 rounded-full bg-surface-700 dark:bg-surface-300 text-white dark:text-surface-900 text-xs font-semibold"
@@ -495,25 +529,25 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
           @click="clearFilters"
         >
           <X class="size-3" />
-          Clear
+          {{ t('common.actions.clear') }}
         </button>
       </div>
 
       <!-- ─── Filter Drawer ─── -->
       <FilterDrawer
         v-model="drawerOpen"
-        title="Filter jobs"
-        description="Customize your view, then save it for quick access."
+        :title="t('dashboard.jobs.list.filterJobs')"
+        :description="t('dashboard.jobs.list.filterDescription')"
         :active-count="activeFilterCount"
         saveable
-        :default-save-name="`View ${views.length + 1}`"
+        :default-save-name="t('savedViews.numberedView', { n: views.length + 1 })"
         @reset="applySettings(defaultSettings)"
         @save-view="onSaveView"
       >
         <div class="space-y-6">
           <!-- Status -->
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">Status</label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">{{ t('dashboard.jobs.list.status') }}</label>
             <div class="flex flex-wrap gap-1.5">
               <button
                 v-for="opt in statusOptions"
@@ -532,7 +566,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
 
           <!-- Employment type -->
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">Employment type</label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">{{ t('dashboard.jobs.list.employmentType') }}</label>
             <div class="flex flex-wrap gap-1.5">
               <button
                 v-for="opt in typeOptions"
@@ -551,7 +585,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
 
           <!-- Experience level -->
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">Experience level</label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">{{ t('dashboard.jobs.list.experienceLevel') }}</label>
             <div class="flex flex-wrap gap-1.5">
               <button
                 v-for="opt in experienceOptions"
@@ -570,7 +604,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
 
           <!-- Work arrangement -->
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">Work arrangement</label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">{{ t('dashboard.jobs.list.workArrangement') }}</label>
             <div class="flex flex-wrap gap-1.5">
               <button
                 v-for="opt in remoteOptions"
@@ -589,26 +623,26 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
 
           <!-- Sort -->
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">Sort by</label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">{{ t('dashboard.jobs.list.sortBy') }}</label>
             <div class="flex gap-2">
               <select
                 v-model="sortKey"
                 class="flex-1 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
               >
-                <option value="created">Date created</option>
-                <option value="title">Title</option>
-                <option value="status">Status</option>
-                <option value="type">Employment type</option>
-                <option value="location">Location</option>
-                <option value="new">New applicants</option>
-                <option value="active">Active candidates</option>
+                <option value="created">{{ t('dashboard.jobs.list.dateCreated') }}</option>
+                <option value="title">{{ t('dashboard.jobs.list.titleColumn') }}</option>
+                <option value="status">{{ t('dashboard.jobs.list.status') }}</option>
+                <option value="type">{{ t('dashboard.jobs.list.employmentType') }}</option>
+                <option value="location">{{ t('dashboard.jobs.list.location') }}</option>
+                <option value="new">{{ t('dashboard.jobs.list.newApplicants') }}</option>
+                <option value="active">{{ t('dashboard.jobs.list.activeCandidates') }}</option>
               </select>
               <select
                 v-model="sortDir"
                 class="w-32 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
               >
-                <option value="asc">Ascending</option>
-                <option value="desc">Descending</option>
+                <option value="asc">{{ t('dashboard.jobs.list.ascending') }}</option>
+                <option value="desc">{{ t('dashboard.jobs.list.descending') }}</option>
               </select>
             </div>
           </div>
@@ -621,8 +655,8 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
         class="rounded-xl border border-dashed border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-10 text-center"
       >
         <Search class="size-8 text-surface-300 dark:text-surface-600 mx-auto mb-3" />
-        <p class="text-sm text-surface-600 dark:text-surface-300 mb-1">No jobs match your search</p>
-        <p class="text-xs text-surface-400 dark:text-surface-500">Try a different keyword or clear your filters.</p>
+        <p class="text-sm text-surface-600 dark:text-surface-300 mb-1">{{ t('dashboard.jobs.list.noMatches') }}</p>
+        <p class="text-xs text-surface-400 dark:text-surface-500">{{ t('dashboard.jobs.list.tryDifferentKeyword') }}</p>
       </div>
 
       <!-- ═══════════════════════════════════
@@ -720,7 +754,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
                     class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize"
                     :class="statusBadgeClasses[j.status] ?? 'bg-surface-100 text-surface-600'"
                   >
-                    {{ j.status }}
+                    {{ jobStatusLabel(j.status) }}
                   </span>
                 </td>
                 <td class="px-4 py-3 text-surface-500 dark:text-surface-400 hidden sm:table-cell whitespace-nowrap">
@@ -783,7 +817,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
                 class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0 capitalize mt-0.5"
                 :class="statusBadgeClasses[j.status] ?? 'bg-surface-100 text-surface-600'"
               >
-                {{ j.status }}
+                {{ jobStatusLabel(j.status) }}
               </span>
             </div>
 
@@ -821,11 +855,11 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
               class="flex items-center justify-between gap-2 -mx-4 -mb-4 px-4 py-2 rounded-b-xl bg-warning-50/60 dark:bg-warning-950/30 border-t border-warning-100 dark:border-warning-900/30"
             >
               <span class="text-xs font-medium text-warning-700 dark:text-warning-400">
-                {{ j.pipeline.new }} new application{{ j.pipeline.new === 1 ? '' : 's' }}
+                {{ t('dashboard.jobs.list.newApplications', j.pipeline.new) }}
               </span>
               <span class="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 font-medium">
                 <Kanban class="size-3" />
-                Review
+                {{ t('dashboard.jobs.list.review') }}
               </span>
             </div>
           </NuxtLink>
@@ -841,10 +875,10 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
           <div class="flex items-center gap-2 mb-3 px-1">
             <Bell class="size-4 text-warning-500" />
             <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">
-              Needs your attention
+              {{ t('dashboard.jobs.list.needsAttention') }}
             </h2>
             <span class="text-xs text-surface-400 dark:text-surface-500">
-              {{ jobsNeedingAttention.length }} job{{ jobsNeedingAttention.length === 1 ? '' : 's' }}
+              {{ t('dashboard.jobs.list.jobCount', jobsNeedingAttention.length) }}
             </span>
           </div>
 
@@ -869,7 +903,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0 capitalize"
                         :class="statusBadgeClasses[j.status]"
                       >
-                        {{ j.status }}
+                        {{ jobStatusLabel(j.status) }}
                       </span>
                     </div>
                     <div class="flex items-center gap-3 text-xs text-surface-400">
@@ -904,14 +938,14 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
               <!-- Action bar -->
               <div class="flex items-center gap-2 px-5 py-3 bg-warning-50/50 dark:bg-warning-950/20 border-t border-warning-100 dark:border-warning-900/30">
                 <span class="text-xs font-medium text-warning-700 dark:text-warning-400 mr-auto">
-                  {{ j.pipeline.new }} new application{{ j.pipeline.new === 1 ? '' : 's' }} to review
+                  {{ t('dashboard.jobs.list.newApplicationsToReview', j.pipeline.new) }}
                 </span>
                 <NuxtLink
                   :to="$localePath(`/dashboard/jobs/${j.id}`)"
                   class="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors no-underline"
                 >
                   <Kanban class="size-3" />
-                  Review in Pipeline
+                  {{ t('dashboard.jobs.list.reviewInPipeline') }}
                 </NuxtLink>
               </div>
             </div>
@@ -923,10 +957,10 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
           <div v-if="jobsNeedingAttention.length > 0" class="flex items-center gap-2 mb-3 px-1">
             <Briefcase class="size-4 text-surface-400" />
             <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">
-              All jobs
+              {{ t('dashboard.jobs.list.allJobsTitle') }}
             </h2>
             <span class="text-xs text-surface-400 dark:text-surface-500">
-              {{ otherJobs.length }} job{{ otherJobs.length === 1 ? '' : 's' }}
+              {{ t('dashboard.jobs.list.jobCount', otherJobs.length) }}
             </span>
           </div>
 
@@ -948,7 +982,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
                   class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0 capitalize"
                   :class="statusBadgeClasses[j.status] ?? 'bg-surface-100 text-surface-600'"
                 >
-                  {{ j.status }}
+                  {{ jobStatusLabel(j.status) }}
                 </span>
               </div>
               <div class="flex items-center gap-3 text-xs text-surface-400 mb-3">
@@ -958,7 +992,7 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
                   {{ j.location }}
                 </span>
                 <span v-if="j.status === 'draft'" class="text-surface-400 italic">
-                  Not published yet
+                  {{ t('dashboard.jobs.list.notPublished') }}
                 </span>
               </div>
 
@@ -987,10 +1021,10 @@ const noResults = computed(() => !isEmpty.value && filteredJobs.value.length ===
       <!-- Total count -->
       <p v-if="!noResults" class="text-xs text-surface-400 pt-4 px-1">
         <template v-if="search || activeFilterCount > 0">
-          Showing {{ filteredJobs.length }} of {{ total }} job{{ total === 1 ? '' : 's' }}
+          {{ t('dashboard.jobs.list.showingJobs', { shown: filteredJobs.length, total }) }}
         </template>
         <template v-else>
-          {{ total }} job{{ total === 1 ? '' : 's' }} total
+          {{ t('dashboard.jobs.list.jobsTotal', total) }}
         </template>
       </p>
     </template>

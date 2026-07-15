@@ -4,9 +4,11 @@ definePageMeta({
 })
 
 const route = useRoute()
+const { t, locale } = useI18n()
+
 const token = computed(() => {
-  const t = route.query.token
-  return typeof t === 'string' ? t : ''
+  const tok = route.query.token
+  return typeof tok === 'string' ? tok : ''
 })
 
 const { data, error: fetchError, status: fetchStatus } = await useFetch('/api/public/interviews/respond', {
@@ -14,11 +16,33 @@ const { data, error: fetchError, status: fetchStatus } = await useFetch('/api/pu
   immediate: !!token.value,
 })
 
-const actionLabels: Record<string, string> = {
-  accepted: 'Accept',
-  declined: 'Decline',
-  tentative: 'Mark as Tentative',
-}
+const actionLabels = computed<Record<string, string>>(() => ({
+  accepted: t('interview.respond.actions.accepted'),
+  declined: t('interview.respond.actions.declined'),
+  tentative: t('interview.respond.actions.tentative'),
+}))
+
+const actionVerbs = computed<Record<string, string>>(() => ({
+  accepted: t('interview.respond.actionVerbs.accepted'),
+  declined: t('interview.respond.actionVerbs.declined'),
+  tentative: t('interview.respond.actionVerbs.tentative'),
+}))
+
+const responseLabels = computed<Record<string, string>>(() => ({
+  accepted: t('interview.respond.responses.accepted'),
+  declined: t('interview.respond.responses.declined'),
+  tentative: t('interview.respond.responses.tentative'),
+  pending: t('interview.respond.responses.pending'),
+}))
+
+const interviewTypeLabels = computed<Record<string, string>>(() => ({
+  video: t('interview.respond.types.video'),
+  phone: t('interview.respond.types.phone'),
+  in_person: t('interview.respond.types.in_person'),
+  technical: t('interview.respond.types.technical'),
+  panel: t('interview.respond.types.panel'),
+  take_home: t('interview.respond.types.take_home'),
+}))
 
 const actionColors: Record<string, string> = {
   accepted: 'bg-green-600 hover:bg-green-700',
@@ -26,25 +50,16 @@ const actionColors: Record<string, string> = {
   tentative: 'bg-yellow-600 hover:bg-yellow-700',
 }
 
-const responseLabels: Record<string, string> = {
-  accepted: 'Accepted',
-  declined: 'Declined',
-  tentative: 'Tentative',
-  pending: 'Pending',
-}
-
-const interviewTypeLabels: Record<string, string> = {
-  video: 'Video Call',
-  phone: 'Phone Call',
-  in_person: 'In Person',
-  technical: 'Technical Interview',
-  panel: 'Panel Interview',
-  take_home: 'Take-Home Assignment',
-}
-
 const confirming = ref(false)
 const confirmed = ref(false)
 const confirmError = ref('')
+
+const interviewStatusTitle = computed(() => {
+  const status = data.value?.interview.status
+  if (status === 'cancelled') return t('interview.respond.cancelledTitle')
+  if (status === 'completed') return t('interview.respond.completedTitle')
+  return t('interview.respond.unavailableTitle')
+})
 
 async function confirmResponse() {
   if (!token.value) return
@@ -62,7 +77,7 @@ async function confirmResponse() {
     const message = err && typeof err === 'object' && 'data' in err
       ? (err as { data?: { statusMessage?: string } }).data?.statusMessage
       : undefined
-    confirmError.value = message || 'Something went wrong. Please try again.'
+    confirmError.value = message || t('interview.respond.confirmError')
   }
   finally {
     confirming.value = false
@@ -70,7 +85,7 @@ async function confirmResponse() {
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return new Date(dateStr).toLocaleDateString(locale.value, {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -79,7 +94,7 @@ function formatDate(dateStr: string) {
 }
 
 function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString('en-US', {
+  return new Date(dateStr).toLocaleTimeString(locale.value, {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -87,7 +102,7 @@ function formatTime(dateStr: string) {
 }
 
 useHead({
-  title: 'Interview Response',
+  title: computed(() => t('interview.respond.seoTitle')),
 })
 </script>
 
@@ -99,10 +114,10 @@ useHead({
         <span class="text-2xl">⚠</span>
       </div>
       <h1 class="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-2">
-        Invalid Link
+        {{ t('interview.respond.invalidLinkTitle') }}
       </h1>
       <p class="text-surface-500">
-        This link is missing required information. Please use the link from your invitation email.
+        {{ t('interview.respond.invalidLinkDescription') }}
       </p>
     </div>
 
@@ -110,7 +125,7 @@ useHead({
     <div v-else-if="fetchStatus === 'pending'" class="text-center py-12">
       <div class="animate-spin inline-block w-8 h-8 border-2 border-surface-300 border-t-blue-600 rounded-full mb-4" />
       <p class="text-surface-500">
-        Loading interview details...
+        {{ t('interview.respond.loading') }}
       </p>
     </div>
 
@@ -120,12 +135,12 @@ useHead({
         <span class="text-2xl">⚠</span>
       </div>
       <h1 class="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-2">
-        {{ fetchError.statusCode === 400 ? 'Link Expired' : 'Something went wrong' }}
+        {{ fetchError.statusCode === 400 ? t('interview.respond.linkExpiredTitle') : t('interview.respond.errorTitle') }}
       </h1>
       <p class="text-surface-500">
         {{ fetchError.statusCode === 400
-          ? 'This response link has expired or is no longer valid. Please contact the hiring team for a new invitation.'
-          : 'We couldn\'t load the interview details. Please try again later.'
+          ? t('interview.respond.linkExpiredDescription')
+          : t('interview.respond.loadFailedDescription')
         }}
       </p>
     </div>
@@ -139,17 +154,17 @@ useHead({
         </span>
       </div>
       <h1 class="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-2">
-        Response Recorded
+        {{ t('interview.respond.responseRecorded') }}
       </h1>
       <p class="text-surface-500 mb-6">
         <template v-if="data?.action === 'accepted'">
-          You've accepted the interview. It should appear in your calendar if you accepted the calendar invite from the email.
+          {{ t('interview.respond.acceptedMessage') }}
         </template>
         <template v-else-if="data?.action === 'declined'">
-          You've declined the interview. The hiring team has been notified.
+          {{ t('interview.respond.declinedMessage') }}
         </template>
         <template v-else>
-          You've marked this as tentative. The hiring team has been notified.
+          {{ t('interview.respond.tentativeMessage') }}
         </template>
       </p>
     </div>
@@ -162,11 +177,12 @@ useHead({
           <span class="text-2xl">ℹ</span>
         </div>
         <h1 class="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-2">
-          Already Responded
+          {{ t('interview.respond.alreadyRespondedTitle') }}
         </h1>
         <p class="text-surface-500">
-          You previously {{ responseLabels[data.interview.candidateResponse]?.toLowerCase() ?? 'responded to' }} this interview.
-          If you need to change your response, please contact the hiring team directly.
+          {{ t('interview.respond.alreadyRespondedDescription', {
+            response: responseLabels[data.interview.candidateResponse]?.toLowerCase() ?? t('interview.respond.respondedFallback'),
+          }) }}
         </p>
       </div>
 
@@ -176,17 +192,17 @@ useHead({
           <span class="text-2xl">ℹ</span>
         </div>
         <h1 class="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-2">
-          Interview {{ data.interview.status === 'cancelled' ? 'Cancelled' : data.interview.status === 'completed' ? 'Completed' : 'No Longer Available' }}
+          {{ interviewStatusTitle }}
         </h1>
         <p class="text-surface-500">
-          This interview is no longer accepting responses. Please contact the hiring team if you have questions.
+          {{ t('interview.respond.unavailableDescription') }}
         </p>
       </div>
 
       <!-- Ready to respond -->
       <div v-else>
         <h1 class="text-xl font-semibold text-surface-900 dark:text-surface-100 mb-6 text-center">
-          Interview Invitation
+          {{ t('interview.respond.invitationTitle') }}
         </h1>
 
         <!-- Interview details card -->
@@ -198,7 +214,7 @@ useHead({
           <dl class="space-y-3 text-sm">
             <div v-if="data.organizationName" class="flex justify-between">
               <dt class="text-surface-500">
-                Organization
+                {{ t('interview.respond.organization') }}
               </dt>
               <dd class="text-surface-900 dark:text-surface-100 font-medium">
                 {{ data.organizationName }}
@@ -206,7 +222,7 @@ useHead({
             </div>
             <div v-if="data.jobTitle" class="flex justify-between">
               <dt class="text-surface-500">
-                Position
+                {{ t('interview.respond.position') }}
               </dt>
               <dd class="text-surface-900 dark:text-surface-100 font-medium">
                 {{ data.jobTitle }}
@@ -214,7 +230,7 @@ useHead({
             </div>
             <div class="flex justify-between">
               <dt class="text-surface-500">
-                Date
+                {{ t('interview.respond.date') }}
               </dt>
               <dd class="text-surface-900 dark:text-surface-100 font-medium">
                 {{ formatDate(data.interview.scheduledAt) }}
@@ -222,7 +238,7 @@ useHead({
             </div>
             <div class="flex justify-between">
               <dt class="text-surface-500">
-                Time
+                {{ t('interview.respond.time') }}
               </dt>
               <dd class="text-surface-900 dark:text-surface-100 font-medium">
                 {{ formatTime(data.interview.scheduledAt) }}
@@ -230,15 +246,15 @@ useHead({
             </div>
             <div class="flex justify-between">
               <dt class="text-surface-500">
-                Duration
+                {{ t('interview.respond.duration') }}
               </dt>
               <dd class="text-surface-900 dark:text-surface-100 font-medium">
-                {{ data.interview.duration }} minutes
+                {{ t('interview.respond.durationMinutes', { count: data.interview.duration }) }}
               </dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-surface-500">
-                Type
+                {{ t('interview.respond.type') }}
               </dt>
               <dd class="text-surface-900 dark:text-surface-100 font-medium">
                 {{ interviewTypeLabels[data.interview.type] ?? data.interview.type }}
@@ -246,7 +262,7 @@ useHead({
             </div>
             <div v-if="data.interview.location" class="flex justify-between">
               <dt class="text-surface-500">
-                Location
+                {{ t('interview.respond.location') }}
               </dt>
               <dd class="text-surface-900 dark:text-surface-100 font-medium break-all">
                 {{ data.interview.location }}
@@ -258,7 +274,7 @@ useHead({
         <!-- Confirm action -->
         <div class="text-center">
           <p class="text-sm text-surface-500 mb-4">
-            You are about to <strong>{{ actionLabels[data.action]?.toLowerCase() }}</strong> this interview.
+            {{ t('interview.respond.aboutToAction', { action: actionVerbs[data.action] ?? data.action }) }}
           </p>
 
           <div v-if="confirmError" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
@@ -271,12 +287,12 @@ useHead({
             class="w-full text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             @click="confirmResponse"
           >
-            <span v-if="confirming">Processing...</span>
-            <span v-else>{{ actionLabels[data.action] }} Interview</span>
+            <span v-if="confirming">{{ t('interview.respond.processing') }}</span>
+            <span v-else>{{ t('interview.respond.confirmAction', { action: actionLabels[data.action] }) }}</span>
           </button>
 
           <p class="text-xs text-surface-400 mt-4">
-            Clicking this button will record your response and notify the hiring team.
+            {{ t('interview.respond.confirmHint') }}
           </p>
         </div>
       </div>

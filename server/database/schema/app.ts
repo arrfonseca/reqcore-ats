@@ -18,7 +18,20 @@ import { organization, user } from './auth'
 // ─────────────────────────────────────────────
 
 export const jobStatusEnum = pgEnum('job_status', ['draft', 'open', 'closed', 'archived'])
-export const jobTypeEnum = pgEnum('job_type', ['full_time', 'part_time', 'contract', 'internship'])
+export const jobTypeEnum = pgEnum('job_type', [
+  'prazo_indeterminado',
+  'prazo_determinado',
+  'contrato_experiencia',
+  'trabalho_intermitente',
+  'teletrabalho',
+  'trabalho_temporario',
+  'aprendizagem',
+  'contrato_pj',
+  'full_time',
+  'part_time',
+  'contract',
+  'internship',
+])
 export const applicationStatusEnum = pgEnum('application_status', [
   'new', 'screening', 'interview', 'offer', 'hired', 'rejected',
 ])
@@ -36,6 +49,7 @@ export const genderEnum = pgEnum('gender', ['male', 'female', 'other', 'prefer_n
 export const experienceLevelEnum = pgEnum('experience_level', ['junior', 'mid', 'senior', 'lead'])
 export const nameDisplayFormatEnum = pgEnum('name_display_format', ['first_last', 'last_first'])
 export const dateFormatEnum = pgEnum('date_format', ['mdy', 'dmy', 'ymd'])
+export const customDomainStatusEnum = pgEnum('custom_domain_status', ['pending', 'verified', 'disabled'])
 
 // ─────────────────────────────────────────────
 // ATS Domain Tables — ALL scoped by organizationId
@@ -51,7 +65,7 @@ export const job = pgTable('job', {
   slug: text('slug').notNull().unique(),
   description: text('description'),
   location: text('location'),
-  type: jobTypeEnum('type').notNull().default('full_time'),
+  type: jobTypeEnum('type').notNull().default('prazo_indeterminado'),
   status: jobStatusEnum('status').notNull().default('draft'),
   // ── SEO / Rich Results fields ──
   salaryMin: integer('salary_min'),
@@ -63,6 +77,8 @@ export const job = pgTable('job', {
   validThrough: timestamp('valid_through'),
   /** Experience level required for this role */
   experienceLevel: experienceLevelEnum('experience_level'),
+  /** Internal ISCO-style occupation category — not exposed on public job listings */
+  iscoCategoryId: text('isco_category_id'),
   // ── Application form settings ──
   requireResume: boolean('require_resume').notNull().default(false),
   requireCoverLetter: boolean('require_cover_letter').notNull().default(false),
@@ -266,10 +282,36 @@ export const orgSettings = pgTable('org_settings', {
   nameDisplayFormat: nameDisplayFormatEnum('name_display_format').notNull().default('first_last'),
   /** Controls the date display format across the app */
   dateFormat: dateFormatEnum('date_format').notNull().default('mdy'),
+  /** Public company website used on candidate-facing pages (e.g. "Back to home") */
+  companyWebsiteUrl: text('company_website_url'),
+  /** S3 object key for light-mode org logo */
+  logoLightKey: text('logo_light_key'),
+  /** S3 object key for dark-mode org logo */
+  logoDarkKey: text('logo_dark_key'),
+  /** Short tagline shown on login and public org-branded surfaces */
+  brandSubtitle: text('brand_subtitle'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => ([
   uniqueIndex('org_settings_organization_id_idx').on(t.organizationId),
+]))
+
+/**
+ * Verified custom hostname for org public careers + admin (subdomain only).
+ */
+export const organizationCustomDomain = pgTable('organization_custom_domain', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  hostname: text('hostname').notNull(),
+  status: customDomainStatusEnum('status').notNull().default('pending'),
+  verificationToken: text('verification_token').notNull(),
+  verifiedAt: timestamp('verified_at'),
+  createdById: text('created_by_id').references(() => user.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => ([
+  uniqueIndex('organization_custom_domain_hostname_idx').on(t.hostname),
+  index('organization_custom_domain_organization_id_idx').on(t.organizationId),
 ]))
 
 // ─────────────────────────────────────────────
@@ -513,7 +555,8 @@ export const sourceChannelEnum = pgEnum('source_channel', [
   'linkedin', 'indeed', 'glassdoor', 'ziprecruiter', 'monster',
   'handshake', 'angellist', 'wellfound', 'dice', 'stackoverflow',
   'weworkremotely', 'remoteok', 'builtin', 'hired', 'lever',
-  'greenhouse_board', 'google_jobs', 'facebook', 'twitter', 'instagram',
+  'greenhouse_board', 'google_jobs', 'vagas_com', 'catho', 'infojobs',
+  'adecco', 'manpower', 'facebook', 'twitter', 'instagram',
   'tiktok', 'reddit', 'referral', 'career_site', 'email',
   'event', 'agency', 'direct', 'other', 'custom',
 ])
@@ -832,6 +875,11 @@ export const applicationSourceRelations = relations(applicationSource, ({ one })
 
 export const orgSettingsRelations = relations(orgSettings, ({ one }) => ({
   organization: one(organization, { fields: [orgSettings.organizationId], references: [organization.id] }),
+}))
+
+export const organizationCustomDomainRelations = relations(organizationCustomDomain, ({ one }) => ({
+  organization: one(organization, { fields: [organizationCustomDomain.organizationId], references: [organization.id] }),
+  createdBy: one(user, { fields: [organizationCustomDomain.createdById], references: [user.id] }),
 }))
 
 // ─────────────────────────────────────────────

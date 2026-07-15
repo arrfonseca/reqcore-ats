@@ -34,6 +34,7 @@ export default defineEventHandler(async (event) => {
   const updates: Record<string, unknown> = { ...body, updatedAt: new Date() }
   delete (updates as any).slug // remove raw slug from spread — we set it explicitly below
   if (body.title || body.slug) {
+    assertJobSlugAllowed(body.slug)
     updates.slug = generateJobSlug(body.title ?? existing.title, id, body.slug)
   }
 
@@ -59,6 +60,7 @@ export default defineEventHandler(async (event) => {
       requireCoverLetter: job.requireCoverLetter,
       autoScoreOnApply: job.autoScoreOnApply,
       experienceLevel: job.experienceLevel,
+      iscoCategoryId: job.iscoCategoryId,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     })

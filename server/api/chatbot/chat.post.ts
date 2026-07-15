@@ -10,13 +10,15 @@ import {
   createLanguageModel,
   type SupportedProvider,
 } from '../../utils/ai/provider'
-import { loadAiConfig } from '../../utils/ai/loadConfig'
+import { loadEffectiveAiConfig } from '../../utils/ai/loadConfig'
+import { getTenantAiPolicy } from '../../utils/ai/tenantAiPolicy'
 import { buildChatbotTools } from '../../utils/ai/chatTools'
 import { getChatbotAttachments } from '../../utils/chatbotAttachments'
 import { requireChatbotAccess } from '../../utils/chatbotAccess'
 import { extractChatbotSources } from '../../utils/chatbotSources'
 import { createRateLimiter } from '../../utils/rateLimit'
 import { trackEvent } from '../../utils/trackEvent'
+import { APP_BRAND_NAME } from '~~/shared/brand'
 import {
   CHATBOT_MAX_ATTACHMENTS_PER_MESSAGE,
   CHATBOT_MAX_MESSAGES,
@@ -72,7 +74,7 @@ const bodySchema = z.object({
 })
 
 const BASE_SYSTEM_PROMPT = [
-  'You are Reqcore Assistant, an AI copilot embedded in an applicant tracking system.',
+  `You are the ${APP_BRAND_NAME} assistant, an AI copilot embedded in an applicant tracking system.`,
   'You help recruiters and hiring managers analyse candidates, jobs, and applications.',
   '',
   'Tooling:',
@@ -128,10 +130,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Conversation not found.' })
   }
 
-  // ── Load AI config (override → conversation pin → org chatbot default) ──
-  const preferredAiConfigId =
-    body.aiConfigId !== undefined ? body.aiConfigId : conversation.aiConfigId
-  const config = await loadAiConfig(orgId, {
+  // ── Load AI config (override → conversation pin → org/platform chatbot default) ──
+  const { allowOwnLlm } = await getTenantAiPolicy(orgId)
+  const preferredAiConfigId = allowOwnLlm
+    ? (body.aiConfigId !== undefined ? body.aiConfigId : conversation.aiConfigId)
+    : null
+  const config = await loadEffectiveAiConfig(orgId, {
     purpose: 'chatbot',
     preferId: preferredAiConfigId,
   })
@@ -220,7 +224,7 @@ export default defineEventHandler(async (event) => {
     updatedAt: new Date(),
   }
   if (body.agentId !== undefined) conversationUpdates.agentId = body.agentId
-  if (body.aiConfigId !== undefined) conversationUpdates.aiConfigId = body.aiConfigId
+  if (allowOwnLlm && body.aiConfigId !== undefined) conversationUpdates.aiConfigId = body.aiConfigId
   if (body.scope) conversationUpdates.scope = body.scope
   if (isFirstMessage && conversation.title === 'New chat') {
     updatedTitle = autoTitleFromMessage(lastUser.content)

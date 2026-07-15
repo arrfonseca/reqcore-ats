@@ -28,6 +28,8 @@ const emit = defineEmits<{
   (e: 'update', value: unknown): void
 }>()
 
+const { t } = useI18n()
+
 type Cfg = {
   options?: { id: string; label: string; color: keyof typeof PROPERTY_COLOR_CLASSES }[]
   format?: 'plain' | 'percent' | 'currency'
@@ -215,7 +217,7 @@ const isPopoverType = computed(
         :value="draft as string"
         :type="definition.type === 'email' ? 'email' : definition.type === 'url' ? 'url' : 'text'"
         class="w-full min-w-0 rounded border border-brand-500 bg-white dark:bg-surface-900 px-2 py-1 text-sm text-surface-900 dark:text-surface-50 outline-none ring-2 ring-brand-500/20"
-        :placeholder="definition.type === 'url' ? 'https://…' : ''"
+        :placeholder="definition.type === 'url' ? t('properties.values.urlPlaceholder') : ''"
         @input="(e) => { draft = (e.target as HTMLInputElement).value }"
         @keydown="onKey"
         @blur="commit()"
@@ -284,10 +286,10 @@ const isPopoverType = computed(
               class="flex w-full cursor-pointer items-center gap-2 border-t border-surface-100 dark:border-surface-800 px-3 py-1.5 text-left text-xs text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800"
               @click="commit(null)"
             >
-              <X class="size-3.5" /> Clear
+              <X class="size-3.5" /> {{ t('properties.values.clear') }}
             </button>
             <div v-if="(config?.options ?? []).length === 0" class="px-3 py-2 text-xs text-surface-400">
-              No options yet — add some in the schema editor.
+              {{ t('properties.values.noOptionsYet') }}
             </div>
           </div>
         </div>
@@ -314,19 +316,19 @@ const isPopoverType = computed(
               <Check v-if="(draft as string[] | null)?.includes(opt.id)" class="ml-auto size-3.5 text-brand-600" />
             </button>
             <div v-if="(config?.options ?? []).length === 0" class="px-3 py-2 text-xs text-surface-400">
-              No options yet — add some in the schema editor.
+              {{ t('properties.values.noOptionsYet') }}
             </div>
           </div>
           <div class="flex items-center justify-end gap-2 border-t border-surface-100 dark:border-surface-800 px-2 py-1.5">
-            <button type="button" class="text-xs text-surface-500 hover:text-surface-700 cursor-pointer" @click="cancel">Cancel</button>
-            <button type="button" class="rounded bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 cursor-pointer" @click="commit()">Done</button>
+            <button type="button" class="text-xs text-surface-500 hover:text-surface-700 cursor-pointer" @click="cancel">{{ t('common.actions.cancel') }}</button>
+            <button type="button" class="rounded bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 cursor-pointer" @click="commit()">{{ t('properties.values.done') }}</button>
           </div>
         </div>
       </Teleport>
 
       <!-- File: not editable inline (use Documents flow) -->
       <div v-else-if="definition.type === 'file'" class="text-xs text-surface-400 italic px-2 py-1">
-        File properties are managed via Documents.
+        {{ t('properties.values.fileViaDocuments') }}
       </div>
     </template>
   </div>

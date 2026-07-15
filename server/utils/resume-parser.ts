@@ -10,6 +10,9 @@
  *   - DOC — via word-extractor (OLE2 compound documents)
  */
 import mammoth from 'mammoth'
+import { createRequire } from 'node:module'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 // @ts-ignore — word-extractor has no bundled type declarations
 import WordExtractor from 'word-extractor'
 
@@ -38,6 +41,29 @@ function ensurePdfjsPolyfills() {
 }
 
 const PARSER_VERSION = '1.0'
+
+let pdfWorkerConfigured = false
+
+/**
+ * Nitro traces a partial pdfjs-dist into .output/server/node_modules (pdf.mjs only).
+ * Point pdf-parse at the full worker shipped in the app root node_modules.
+ */
+async function configurePdfWorker(PDFParse: { setWorker: (src?: string) => string }) {
+  if (pdfWorkerConfigured) return
+  try {
+    const requireFromRoot = createRequire(path.join(process.cwd(), 'package.json'))
+    const workerPath = requireFromRoot.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
+    PDFParse.setWorker(pathToFileURL(workerPath).href)
+  }
+  catch (error) {
+    logWarn('resume_parser.worker_config_failed', {
+      error_message: error instanceof Error ? error.message : String(error),
+    })
+  }
+  finally {
+    pdfWorkerConfigured = true
+  }
+}
 
 export interface ParsedResume {
   /** Full extracted text content */
@@ -104,6 +130,7 @@ async function parsePdf(buffer: Buffer): Promise<ParsedResume | null> {
   // Polyfill browser globals before pdfjs-dist evaluates its module-level code
   ensurePdfjsPolyfills()
   const { PDFParse } = await import('pdf-parse')
+  await configurePdfWorker(PDFParse)
 
   const parser = new PDFParse({ data: buffer })
   const result = await parser.getText()

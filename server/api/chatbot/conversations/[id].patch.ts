@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { aiConfig, chatbotAgent, chatbotConversation, chatbotFolder, job } from '../../../database/schema'
 import { requireChatbotAccess } from '../../../utils/chatbotAccess'
+import { getTenantAiPolicy } from '../../../utils/ai/tenantAiPolicy'
 import type { ChatbotConversationSummary, ChatbotScope } from '../../../../shared/chatbot'
 
 const bodySchema = z.object({
@@ -30,6 +31,8 @@ export default defineEventHandler(async (event): Promise<{ conversation: Chatbot
 
   const body = await readValidatedBody(event, bodySchema.parse)
 
+  const { allowOwnLlm } = await getTenantAiPolicy(orgId)
+
   if (body.folderId) {
     const f = await db.query.chatbotFolder.findFirst({
       where: and(
@@ -52,7 +55,7 @@ export default defineEventHandler(async (event): Promise<{ conversation: Chatbot
     })
     if (!a) throw createError({ statusCode: 404, statusMessage: 'Agent not found.' })
   }
-  if (body.aiConfigId) {
+  if (allowOwnLlm && body.aiConfigId) {
     const c = await db.query.aiConfig.findFirst({
       where: and(eq(aiConfig.id, body.aiConfigId), eq(aiConfig.organizationId, orgId)),
       columns: { id: true },
@@ -74,7 +77,7 @@ export default defineEventHandler(async (event): Promise<{ conversation: Chatbot
   if (body.title !== undefined) updates.title = body.title
   if (body.folderId !== undefined) updates.folderId = body.folderId
   if (body.agentId !== undefined) updates.agentId = body.agentId
-  if (body.aiConfigId !== undefined) updates.aiConfigId = body.aiConfigId
+  if (allowOwnLlm && body.aiConfigId !== undefined) updates.aiConfigId = body.aiConfigId
   if (body.scope !== undefined) updates.scope = body.scope
   if (body.thinking !== undefined) updates.thinking = body.thinking
   if (body.pinned !== undefined) updates.pinned = body.pinned

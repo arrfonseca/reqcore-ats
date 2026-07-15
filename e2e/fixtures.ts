@@ -81,7 +81,7 @@ export const test = base.extend<Fixtures>({
         page.getByRole('button', { name: 'Sign in' }).click(),
       ])
 
-      // Sign-in navigates to /dashboard, then require-org middleware
+      // Sign-in navigates to /{orgSlug}/admin
       // redirects to /onboarding/create-org (user has no org yet)
       await page.waitForURL('**/onboarding/**', { waitUntil: 'commit', timeout: 30_000 })
     }
@@ -92,7 +92,7 @@ export const test = base.extend<Fixtures>({
     await page.getByRole('button', { name: 'Create organization' }).click()
 
     // Wait for redirect to dashboard (use 'commit' for SPA navigation)
-    await page.waitForURL('**/dashboard**', { waitUntil: 'commit' })
+    await page.waitForURL('**/admin**', { waitUntil: 'commit' })
 
     await use(page)
   },

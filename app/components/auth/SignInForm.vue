@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const { tenantPath, publicJobPath, platformPath } = useTenantPaths()
 const email = ref("");
 const password = ref("");
 const error = ref("");
@@ -7,6 +8,7 @@ const socialLoading = ref<string | null>(null);
 const route = useRoute();
 const config = useRuntimeConfig();
 const localePath = useLocalePath();
+const { t } = useI18n();
 const { track } = useTrack();
 
 const { data: authProviders } = await useFetch('/api/auth/providers');
@@ -30,7 +32,7 @@ async function handleSignIn() {
     error.value = "";
 
     if (!email.value || !password.value) {
-        error.value = "Email and password are required.";
+        error.value = t("auth.signIn.errors.required");
         return;
     }
 
@@ -44,7 +46,7 @@ async function handleSignIn() {
         });
     } catch (e: unknown) {
         error.value =
-            e instanceof Error ? e.message : "Sign-in failed. Please try again.";
+            e instanceof Error ? e.message : t("auth.signIn.errors.failed");
         isLoading.value = false;
         return;
     }
@@ -54,11 +56,11 @@ async function handleSignIn() {
             error.value =
                 result.error.message && result.error.message !== "Server Error"
                     ? result.error.message
-                    : 'Sign-in failed due to a server error. If you are self-hosting, make sure the BETTER_AUTH_URL environment variable is set to your deployment domain (e.g. "https://your-app.up.railway.app") and redeploy.';
+                    : t("auth.signIn.errors.server");
         } else {
             error.value =
                 result.error.message ??
-                "Invalid credentials. Please try again.";
+                t("auth.signIn.errors.invalid");
         }
         isLoading.value = false;
         return;
@@ -74,7 +76,7 @@ async function handleSignIn() {
             localePath(`/auth/accept-invitation/${pendingInvitation}`),
         );
     } else {
-        await navigateTo(localePath("/dashboard"));
+        await navigateTo(await resolveDashboardEntryPath(localePath));
     }
 }
 
@@ -84,7 +86,7 @@ async function handleSocialSignIn(providerId: string) {
     const pendingInvitation = route.query.invitation as string | undefined;
     const callbackURL = pendingInvitation
         ? localePath(`/auth/accept-invitation/${pendingInvitation}`)
-        : localePath("/dashboard");
+        : tenantPath('');
     try {
         await authClient.signIn.social({
             provider: providerId as "google" | "github" | "microsoft",
@@ -94,7 +96,7 @@ async function handleSocialSignIn(providerId: string) {
         error.value =
             e instanceof Error
                 ? e.message
-                : "Social sign-in failed. Please try again.";
+                : t("auth.signIn.errors.socialFailed");
         socialLoading.value = null;
     }
 }
@@ -105,7 +107,7 @@ async function handleSocialSignIn(providerId: string) {
         <h2
             class="text-xl font-semibold text-center text-surface-900 dark:text-surface-100 mb-2"
         >
-            Sign in to your account
+            {{ t("auth.signIn.title") }}
         </h2>
 
         <div
@@ -127,7 +129,7 @@ async function handleSocialSignIn(providerId: string) {
                 >
                     <template v-if="socialLoading === provider.id">
                         <svg class="animate-spin size-4 text-surface-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
-                        Redirecting…
+                        {{ t("auth.common.redirecting") }}
                     </template>
                     <template v-else>
                         <svg v-if="provider.id === 'google'" class="size-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -145,7 +147,7 @@ async function handleSocialSignIn(providerId: string) {
                             <rect x="1" y="12" width="10" height="10" fill="#00A4EF"/>
                             <rect x="12" y="12" width="10" height="10" fill="#FFB900"/>
                         </svg>
-                        Continue with {{ provider.name }}
+                        {{ t("auth.signIn.continueWith", { provider: provider.name }) }}
                     </template>
                 </button>
             </div>
@@ -155,7 +157,7 @@ async function handleSocialSignIn(providerId: string) {
                     <div class="w-full border-t border-surface-200 dark:border-surface-700" />
                 </div>
                 <div class="relative flex justify-center text-xs">
-                    <span class="bg-white dark:bg-surface-900 px-2 text-surface-400">or continue with email</span>
+                    <span class="bg-white dark:bg-surface-900 px-2 text-surface-400">{{ t("auth.signIn.orContinueWithEmail") }}</span>
                 </div>
             </div>
         </template>
@@ -163,7 +165,7 @@ async function handleSocialSignIn(providerId: string) {
         <label
             class="flex flex-col gap-1 text-sm font-medium text-surface-700 dark:text-surface-300"
         >
-            <span>Email</span>
+            <span>{{ t("common.fields.email") }}</span>
             <input
                 v-model="email"
                 type="email"
@@ -176,7 +178,7 @@ async function handleSocialSignIn(providerId: string) {
         <label
             class="flex flex-col gap-1 text-sm font-medium text-surface-700 dark:text-surface-300"
         >
-            <span>Password</span>
+            <span>{{ t("common.fields.password") }}</span>
             <input
                 v-model="password"
                 type="password"
@@ -191,7 +193,7 @@ async function handleSocialSignIn(providerId: string) {
                 :to="$localePath('/auth/forgot-password')"
                 class="text-sm text-brand-600 dark:text-brand-400 hover:underline"
             >
-                Forgot password?
+                {{ t("auth.signIn.forgotPassword") }}
             </NuxtLink>
         </div>
 
@@ -200,11 +202,11 @@ async function handleSocialSignIn(providerId: string) {
             :disabled="isLoading"
             class="mt-2 px-4 py-2.5 bg-brand-600 text-white rounded-md text-sm font-medium cursor-pointer hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
         >
-            {{ isLoading ? "Signing in…" : "Sign in" }}
+            {{ isLoading ? t("auth.signIn.submitting") : t("auth.signIn.submit") }}
         </button>
 
         <p class="text-center text-sm text-surface-500 dark:text-surface-400">
-            Don't have an account?
+            {{ t("auth.signIn.noAccount") }}
             <NuxtLink
                 :to="
                     route.query.invitation
@@ -215,7 +217,7 @@ async function handleSocialSignIn(providerId: string) {
                         : $localePath('/auth/sign-up')
                 "
                 class="text-brand-600 dark:text-brand-400 hover:underline"
-                >Sign up</NuxtLink
+                >{{ t("auth.signIn.signUp") }}</NuxtLink
             >
         </p>
     </form>

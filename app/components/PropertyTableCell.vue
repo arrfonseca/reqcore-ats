@@ -17,6 +17,7 @@ const props = defineProps<{
 }>()
 
 const toast = useToast()
+const { t } = useI18n()
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 
 // Local single-entry ref for useEntityPropertyMutations
@@ -46,7 +47,7 @@ async function handleUpdate(value: unknown) {
     await setValue(props.definition.id, value)
   } catch (err: unknown) {
     if (handlePreviewReadOnlyError(err)) return
-    const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? 'Failed to save'
+    const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? t('common.errors.failedToSave')
     toast.error(message)
   } finally {
     savingId.value = null

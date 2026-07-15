@@ -9,7 +9,7 @@ import { resolve } from 'node:path'
  * Requires authentication.
  */
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  await requireSaasAdmin(event)
 
   const { version: currentVersion } = await readFile(
     resolve(process.cwd(), 'package.json'),

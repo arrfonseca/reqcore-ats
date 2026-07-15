@@ -20,7 +20,7 @@ interface BackupResult {
  * Requires authentication (owner only).
  */
 export default defineEventHandler(async (event) => {
-  await requirePermission(event, { organization: ['delete'] })
+  await requireSaasAdmin(event)
 
   const { mkdir, writeFile, unlink } = await import('node:fs/promises')
   const { join } = await import('node:path')

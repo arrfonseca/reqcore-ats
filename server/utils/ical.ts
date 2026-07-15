@@ -6,6 +6,10 @@
  * and Apple Mail — adding the event to the candidate's calendar on accept.
  */
 
+import { APP_BRAND_NAME } from '~~/shared/brand'
+
+const ICAL_PRODID = `-//${APP_BRAND_NAME}//Interview Scheduling//PT`
+
 export interface ICalEvent {
   /** Interview UUID — used to build the UID for update/cancel sync */
   interviewId: string
@@ -98,7 +102,7 @@ export function generateInterviewICS(event: ICalEvent): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Reqcore//Interview Scheduling//EN',
+    'PRODID:' + ICAL_PRODID,
     'CALSCALE:GREGORIAN',
     'METHOD:REQUEST',
     'BEGIN:VEVENT',
@@ -138,7 +142,7 @@ export function generateCancellationICS(event: Pick<ICalEvent, 'interviewId' | '
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Reqcore//Interview Scheduling//EN',
+    'PRODID:' + ICAL_PRODID,
     'CALSCALE:GREGORIAN',
     'METHOD:CANCEL',
     'BEGIN:VEVENT',

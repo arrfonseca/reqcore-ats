@@ -1,8 +1,10 @@
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { aiConfig } from '../../../database/schema'
-import { generateStructuredOutput, type SupportedProvider } from '../../../utils/ai/provider'
+import { probeModelConnection } from '../../../utils/ai/probeModel'
+import type { SupportedProvider } from '../../../utils/ai/provider'
 import { createRateLimiter } from '../../../utils/rateLimit'
+import { requireTenantOwnLlm } from '../../../utils/ai/tenantAiPolicy'
 
 const limiter = createRateLimiter({
   windowMs: 60_000,
@@ -11,18 +13,18 @@ const limiter = createRateLimiter({
 })
 
 const paramsSchema = z.object({ id: z.string().min(1) })
-const testSchema = z.object({ ok: z.boolean() })
 
 /**
  * POST /api/ai-config/:id/test-connection
  *
- * Sends a tiny structured prompt to the provider behind this configuration
+ * Sends a tiny prompt to the provider behind this configuration
  * to confirm the key, model and base URL all work end-to-end.
  */
 export default defineEventHandler(async (event) => {
   await limiter(event)
   const session = await requirePermission(event, { scoring: ['read'] })
   const orgId = session.session.activeOrganizationId
+  await requireTenantOwnLlm(orgId)
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
 
   const config = await db.query.aiConfig.findFirst({
@@ -31,21 +33,13 @@ export default defineEventHandler(async (event) => {
   if (!config) throw createError({ statusCode: 404, statusMessage: 'AI configuration not found.' })
 
   try {
-    await generateStructuredOutput(
-      {
-        provider: config.provider as SupportedProvider,
-        model: config.model,
-        apiKeyEncrypted: config.apiKeyEncrypted,
-        baseUrl: config.baseUrl,
-        maxTokens: 20,
-      },
-      {
-        system: 'Respond with ok: true',
-        prompt: 'Test connection',
-        schema: testSchema,
-        schemaName: 'TestConnection',
-      },
-    )
+    await probeModelConnection({
+      provider: config.provider as SupportedProvider,
+      model: config.model,
+      apiKeyEncrypted: config.apiKeyEncrypted,
+      baseUrl: config.baseUrl,
+      maxTokens: 10,
+    })
     return { success: true }
   }
   catch (err: any) {

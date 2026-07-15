@@ -8,9 +8,11 @@ definePageMeta({
   middleware: ['auth', 'require-org'],
 })
 
+const { t } = useI18n()
+
 useSeoMeta({
-  title: 'New Template — Email Templates — Reqcore',
-  description: 'Create a new interview invitation email template',
+  title: t('dashboard.interviews.templates.new.seoTitle'),
+  description: t('dashboard.interviews.templates.new.seoDescription'),
   robots: 'noindex, nofollow',
 })
 
@@ -36,30 +38,30 @@ const canSave = computed(() =>
 )
 
 // ─── Preview ─────────────────────────────────────────────────────
-const sampleVariables: Record<string, string> = {
-  candidateName: 'Alex Johnson',
-  candidateFirstName: 'Alex',
-  candidateLastName: 'Johnson',
-  candidateEmail: 'alex@example.com',
-  jobTitle: 'Senior Frontend Engineer',
-  interviewTitle: 'Technical Interview — Round 2',
-  interviewDate: 'Monday, March 16, 2026',
-  interviewTime: '2:00 PM',
-  interviewDuration: '60',
-  interviewType: 'Video Call',
-  interviewLocation: 'https://meet.google.com/abc-defg-hij',
-  interviewers: 'Sarah Chen, Michael Park',
-  organizationName: 'Acme Corp',
-}
+const sampleVariables = computed<Record<string, string>>(() => ({
+  candidateName: t('dashboard.interviews.templates.new.samplePreview.candidateName'),
+  candidateFirstName: t('dashboard.interviews.templates.new.samplePreview.candidateFirstName'),
+  candidateLastName: t('dashboard.interviews.templates.new.samplePreview.candidateLastName'),
+  candidateEmail: t('dashboard.interviews.templates.new.samplePreview.candidateEmail'),
+  jobTitle: t('dashboard.interviews.templates.new.samplePreview.jobTitle'),
+  interviewTitle: t('dashboard.interviews.templates.new.samplePreview.interviewTitle'),
+  interviewDate: t('dashboard.interviews.templates.new.samplePreview.interviewDate'),
+  interviewTime: t('dashboard.interviews.templates.new.samplePreview.interviewTime'),
+  interviewDuration: t('dashboard.interviews.templates.new.samplePreview.interviewDuration'),
+  interviewType: t('dashboard.interviews.templates.new.samplePreview.interviewType'),
+  interviewLocation: t('dashboard.interviews.templates.new.samplePreview.interviewLocation'),
+  interviewers: t('dashboard.interviews.templates.new.samplePreview.interviewers'),
+  organizationName: t('dashboard.interviews.templates.new.samplePreview.organizationName'),
+}))
 
-const previewSubject = computed(() => renderTemplatePreview(form.subject, sampleVariables))
-const previewBody = computed(() => renderTemplatePreview(form.body, sampleVariables))
+const previewSubject = computed(() => renderTemplatePreview(form.subject, sampleVariables.value))
+const previewBody = computed(() => renderTemplatePreview(form.body, sampleVariables.value))
 
 // ─── Save ────────────────────────────────────────────────────────
 async function handleCreate() {
   saveError.value = ''
   if (!canSave.value) {
-    saveError.value = 'All fields are required'
+    saveError.value = t('dashboard.interviews.templates.new.errors.allFieldsRequired')
     return
   }
 
@@ -73,7 +75,7 @@ async function handleCreate() {
     await navigateTo(localePath(`/dashboard/interviews/templates/${(created as any).id}`))
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    saveError.value = err?.data?.statusMessage ?? 'Failed to create template'
+    saveError.value = err?.data?.statusMessage ?? t('dashboard.interviews.templates.new.errors.createFailed')
   } finally {
     isSaving.value = false
   }
@@ -88,7 +90,7 @@ async function handleCreate() {
       class="mb-6 inline-flex items-center gap-1 rounded-full border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-1.5 text-sm text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors no-underline"
     >
       <ArrowLeft class="size-4" />
-      All Templates
+      {{ t('dashboard.interviews.templates.new.allTemplates') }}
     </NuxtLink>
 
     <!-- Page header -->
@@ -99,10 +101,10 @@ async function handleCreate() {
         </div>
         <div>
           <h1 class="text-xl font-bold text-surface-900 dark:text-surface-50 tracking-tight">
-            New Template
+            {{ t('dashboard.interviews.templates.new.title') }}
           </h1>
           <p class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
-            Create a reusable email template for interview invitations.
+            {{ t('dashboard.interviews.templates.new.creationHint') }}
           </p>
         </div>
       </div>
@@ -112,7 +114,7 @@ async function handleCreate() {
           @click="showPreview = !showPreview"
         >
           <component :is="showPreview ? EyeOff : Eye" class="size-4" />
-          {{ showPreview ? 'Hide Preview' : 'Preview' }}
+          {{ showPreview ? t('dashboard.interviews.templates.new.hidePreview') : t('dashboard.interviews.templates.new.preview') }}
         </button>
         <button
           :disabled="!canSave || isSaving"
@@ -120,7 +122,7 @@ async function handleCreate() {
           @click="handleCreate"
         >
           <Save class="size-4" />
-          {{ isSaving ? 'Creating…' : 'Create Template' }}
+          {{ isSaving ? t('dashboard.interviews.templates.new.creating') : t('dashboard.interviews.templates.new.createTemplate') }}
         </button>
       </div>
     </div>
@@ -137,13 +139,13 @@ async function handleCreate() {
         <!-- Name -->
         <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <label for="template-name" class="block text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-2">
-            Template Name
+            {{ t('dashboard.interviews.templates.new.templateName') }}
           </label>
           <input
             id="template-name"
             v-model="form.name"
             type="text"
-            placeholder="e.g., Welcome Interview, Phone Screen"
+            :placeholder="t('dashboard.interviews.emailModal.templateName')"
             class="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all"
           />
         </div>
@@ -151,13 +153,13 @@ async function handleCreate() {
         <!-- Subject -->
         <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <label for="template-subject" class="block text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-2">
-            Subject Line
+            {{ t('dashboard.interviews.templates.new.subjectLine') }}
           </label>
           <input
             id="template-subject"
             v-model="form.subject"
             type="text"
-            placeholder="e.g., Interview Invitation: {{jobTitle}} at {{organizationName}}"
+            :placeholder="t('dashboard.interviews.emailModal.subjectLinePlaceholder')"
             class="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all font-mono text-[13px]"
           />
         </div>
@@ -165,13 +167,13 @@ async function handleCreate() {
         <!-- Body -->
         <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <label for="template-body" class="block text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-2">
-            Email Body
+            {{ t('dashboard.interviews.templates.new.emailBody') }}
           </label>
           <textarea
             id="template-body"
             v-model="form.body"
             rows="18"
-            placeholder="Write your invitation email here. Use {{variables}} for dynamic content…"
+            :placeholder="t('dashboard.interviews.emailModal.emailBodyPlaceholder')"
             class="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3.5 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 transition-all resize-none font-mono text-[13px] leading-relaxed"
           />
         </div>
@@ -192,26 +194,26 @@ async function handleCreate() {
             <div class="border-b border-brand-100 dark:border-brand-900/40 bg-brand-50/50 dark:bg-brand-950/20 px-5 py-3">
               <div class="flex items-center gap-2">
                 <Mail class="size-4 text-brand-500 dark:text-brand-400" />
-                <span class="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">Live Preview</span>
+                <span class="text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">{{ t('dashboard.interviews.templates.new.livePreview') }}</span>
               </div>
             </div>
             <div class="p-5 space-y-4">
               <div>
-                <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 block mb-1">Subject</span>
+                <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 block mb-1">{{ t('dashboard.interviews.templates.new.subject') }}</span>
                 <p class="text-sm font-semibold text-surface-800 dark:text-surface-200">
-                  {{ previewSubject || 'Enter a subject line…' }}
+                  {{ previewSubject || t('dashboard.interviews.templates.new.subjectPlaceholder') }}
                 </p>
               </div>
               <div class="border-t border-surface-100 dark:border-surface-800 pt-4">
-                <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 block mb-2">Body</span>
+                <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 block mb-2">{{ t('dashboard.interviews.templates.new.body') }}</span>
                 <div class="text-sm text-surface-700 dark:text-surface-300 whitespace-pre-wrap leading-relaxed">
-                  {{ previewBody || 'Start writing to see a preview…' }}
+                  {{ previewBody || t('dashboard.interviews.templates.new.bodyPlaceholder') }}
                 </div>
               </div>
             </div>
             <div class="border-t border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-950/30 px-5 py-2.5">
               <p class="text-[11px] text-surface-400 dark:text-surface-500 italic">
-                Preview uses sample data. Actual values are populated when sending.
+                {{ t('dashboard.interviews.templates.new.previewHelper') }}
               </p>
             </div>
           </div>
@@ -220,10 +222,10 @@ async function handleCreate() {
         <!-- Variable reference -->
         <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 mb-3">
-            Available Variables
+            {{ t('dashboard.interviews.templates.new.availableVariables') }}
           </h3>
           <p class="text-xs text-surface-400 dark:text-surface-500 mb-3">
-            Use these placeholders in your subject and body. They'll be replaced with real data when the email is sent.
+            {{ t('dashboard.interviews.templates.new.variablesHelper') }}
           </p>
           <div class="space-y-1.5">
             <div

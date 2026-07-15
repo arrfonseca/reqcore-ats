@@ -1,5 +1,3 @@
-const DEFAULT_PREVIEW_MESSAGE = 'This is a read-only demo so you can explore the interface. Editing is disabled here, but it\'s fully unlocked when you self-host.'
-
 type PreviewReadOnlyErrorData = {
   code?: string
   message?: string
@@ -39,11 +37,13 @@ function getPreviewReadOnlyMessage(error: PreviewReadOnlyError): string | undefi
 }
 
 export function usePreviewReadOnly() {
+  const { t } = useI18n()
   const isUpsellOpen = useState('preview-read-only-upsell-open', () => false)
-  const message = useState('preview-read-only-upsell-message', () => DEFAULT_PREVIEW_MESSAGE)
+  const defaultPreviewMessage = computed(() => t('previewReadOnly.defaultMessage'))
+  const message = useState('preview-read-only-upsell-message', () => defaultPreviewMessage.value)
 
   function openUpsell(nextMessage?: string) {
-    message.value = nextMessage || DEFAULT_PREVIEW_MESSAGE
+    message.value = nextMessage || defaultPreviewMessage.value
     isUpsellOpen.value = true
   }
 

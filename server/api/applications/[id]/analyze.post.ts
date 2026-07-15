@@ -6,8 +6,9 @@ import {
 import { scoreApplication, computeCompositeScore } from '../../../utils/ai/scoring'
 import type { CriterionDefinition } from '../../../utils/ai/scoring'
 import type { SupportedProvider } from '../../../utils/ai/provider'
-import { loadAiConfig } from '../../../utils/ai/loadConfig'
+import { loadEffectiveAiConfig } from '../../../utils/ai/loadConfig'
 import { extractResumeText } from '../../../utils/resume-parser'
+import { ensureDocumentParsed } from '../../../utils/ensureDocumentParsed'
 import { createRateLimiter } from '../../../utils/rateLimit'
 import { z } from 'zod'
 
@@ -50,7 +51,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Fetch AI config (override → analysis default → 422)
-  const config = await loadAiConfig(orgId, {
+  const config = await loadEffectiveAiConfig(orgId, {
     purpose: 'analysis',
     preferId: parsedBody?.aiConfigId ?? null,
   })
@@ -74,6 +75,8 @@ export default defineEventHandler(async (event) => {
     id: document.id,
     parsedContent: document.parsedContent,
     type: document.type,
+    storageKey: document.storageKey,
+    mimeType: document.mimeType,
   })
     .from(document)
     .where(and(
@@ -82,7 +85,16 @@ export default defineEventHandler(async (event) => {
     ))
 
   const resumeDoc = docs.find(d => d.type === 'resume')
-  const resumeText = extractResumeText(resumeDoc?.parsedContent)
+  let resumeText = extractResumeText(resumeDoc?.parsedContent)
+
+  if (!resumeText && resumeDoc) {
+    resumeText = await ensureDocumentParsed({
+      id: resumeDoc.id,
+      organizationId: orgId,
+      storageKey: resumeDoc.storageKey,
+      mimeType: resumeDoc.mimeType,
+    })
+  }
 
   if (!resumeText) {
     // Resume document exists but parsing failed or was incomplete

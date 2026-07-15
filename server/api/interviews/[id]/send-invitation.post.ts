@@ -1,19 +1,12 @@
 import { and, eq } from 'drizzle-orm'
 import { interview, application, candidate, job, emailTemplate, organization } from '../../../database/schema'
 import { interviewIdParamSchema } from '../../../utils/schemas/interview'
-import { sendInterviewInvitationSchema, SYSTEM_TEMPLATES } from '../../../utils/schemas/emailTemplate'
+import { sendInterviewInvitationSchema, getSystemTemplates } from '../../../utils/schemas/emailTemplate'
 import { sendInterviewInvitationEmail, renderTemplate, getFromEmail, type InterviewEmailData } from '../../../utils/email'
 import { generateInterviewICS } from '../../../utils/ical'
 import { buildResponseUrls } from '../../../utils/interview-token'
-
-const interviewTypeLabels: Record<string, string> = {
-  video: 'Video Call',
-  phone: 'Phone Call',
-  in_person: 'In Person',
-  technical: 'Technical Interview',
-  panel: 'Panel Interview',
-  take_home: 'Take-Home Assignment',
-}
+import { resolveOrgLocaleSettings } from '../../../utils/resolveOrgLocale'
+import { getEmailMessages, resolveEmailLocale } from '~~/shared/emails'
 
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { interview: ['update'] })
@@ -70,13 +63,19 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Organization not found' })
   }
 
+  const orgLocale = await resolveOrgLocaleSettings(orgId)
+  const emailLocale = resolveEmailLocale(orgLocale.defaultLanguage)
+  const messages = getEmailMessages(emailLocale)
+  const interviewTypeLabels = messages.interviewTypes
+  const systemTemplates = getSystemTemplates(emailLocale)
+
   // Resolve template subject and body
   let emailSubject: string
   let emailBody: string
 
   if (body.templateId) {
     // Check system templates first
-    const systemTemplate = SYSTEM_TEMPLATES.find(t => t.id === body.templateId)
+    const systemTemplate = systemTemplates.find(t => t.id === body.templateId)
     if (systemTemplate) {
       emailSubject = systemTemplate.subject
       emailBody = systemTemplate.body
@@ -116,6 +115,8 @@ export default defineEventHandler(async (event) => {
   // Generate signed response URLs (accept / decline / tentative)
   const responseUrls = buildResponseUrls(baseUrl, interviewRecord.id, env.BETTER_AUTH_SECRET)
 
+  const interviewTypeLabel = interviewTypeLabels[interviewRecord.type] ?? interviewRecord.type
+
   // Generate iCalendar (.ics) attachment
   const renderedSubjectForIcs = renderTemplate(emailSubject, {
     candidateName,
@@ -127,11 +128,11 @@ export default defineEventHandler(async (event) => {
     interviewDate: '',
     interviewTime: '',
     interviewDuration: interviewRecord.duration,
-    interviewType: interviewTypeLabels[interviewRecord.type] ?? interviewRecord.type,
+    interviewType: interviewTypeLabel,
     interviewLocation: interviewRecord.location,
     interviewers: interviewRecord.interviewers as string[] | null,
     organizationName: org.name,
-  })
+  }, emailLocale)
 
   const icsContent = generateInterviewICS({
     interviewId: interviewRecord.id,
@@ -140,7 +141,7 @@ export default defineEventHandler(async (event) => {
       `Interview: ${interviewRecord.title}`,
       `Position: ${app.job.title}`,
       `Candidate: ${candidateName}`,
-      `Type: ${interviewTypeLabels[interviewRecord.type] ?? interviewRecord.type}`,
+      `Type: ${interviewTypeLabel}`,
       `Duration: ${interviewRecord.duration} minutes`,
       ...(interviewRecord.location ? [`Location: ${interviewRecord.location}`] : []),
       '',
@@ -162,21 +163,21 @@ export default defineEventHandler(async (event) => {
     candidateEmail: app.candidate.email,
     jobTitle: app.job.title,
     interviewTitle: interviewRecord.title,
-    interviewDate: scheduledAt.toLocaleDateString('en-US', {
+    interviewDate: scheduledAt.toLocaleDateString(emailLocale, {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
       year: 'numeric',
       timeZone: interviewRecord.timezone ?? 'UTC',
     }),
-    interviewTime: scheduledAt.toLocaleTimeString('en-US', {
+    interviewTime: scheduledAt.toLocaleTimeString(emailLocale, {
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true,
+      hour12: emailLocale.startsWith('en'),
       timeZone: interviewRecord.timezone ?? 'UTC',
     }),
     interviewDuration: interviewRecord.duration,
-    interviewType: interviewTypeLabels[interviewRecord.type] ?? interviewRecord.type,
+    interviewType: interviewTypeLabel,
     interviewLocation: interviewRecord.location,
     interviewers: interviewRecord.interviewers as string[] | null,
     organizationName: org.name,
@@ -189,6 +190,7 @@ export default defineEventHandler(async (event) => {
     subject: emailSubject,
     body: emailBody,
     data: emailData,
+    locale: emailLocale,
   })
 
   // Mark the interview as invitation sent

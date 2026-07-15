@@ -12,9 +12,11 @@ definePageMeta({
   middleware: ['auth', 'require-org'],
 })
 
+const { t, locale } = useI18n()
+
 useSeoMeta({
-  title: 'Interviews — Reqcore',
-  description: 'Manage all scheduled interviews',
+  title: t('dashboard.interviews.list.seoTitle'),
+  description: t('dashboard.interviews.list.seoDescription'),
   robots: 'noindex, nofollow',
 })
 
@@ -66,7 +68,7 @@ const filteredInterviews = computed(() => {
 const groupedByDate = computed(() => {
   const groups = new Map<string, typeof filteredInterviews.value>()
   for (const interview of filteredInterviews.value) {
-    const dateKey = new Date(interview.scheduledAt).toLocaleDateString('en-US', {
+    const dateKey = new Date(interview.scheduledAt).toLocaleDateString(locale.value, {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
@@ -79,32 +81,57 @@ const groupedByDate = computed(() => {
 })
 
 // ─── Status styling ──────────────────────────────────────────────
-const statusConfig: Record<InterviewStatus, { label: string; icon: any; class: string; dot: string }> = {
+const statusConfig = computed<Record<InterviewStatus, { label: string; icon: any; class: string; dot: string }>>(() => ({
   scheduled: {
-    label: 'Scheduled',
+    label: t('dashboard.interviews.shared.status.scheduled'),
     icon: Calendar,
     class: 'bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-950/50 dark:text-brand-300 dark:ring-brand-800',
     dot: 'bg-brand-500',
   },
   completed: {
-    label: 'Completed',
+    label: t('dashboard.interviews.shared.status.completed'),
     icon: CheckCircle2,
     class: 'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/50 dark:text-success-300 dark:ring-success-800',
     dot: 'bg-success-500',
   },
   cancelled: {
-    label: 'Cancelled',
+    label: t('dashboard.interviews.shared.status.cancelled'),
     icon: XCircle,
     class: 'bg-surface-100 text-surface-500 ring-surface-200 dark:bg-surface-800/50 dark:text-surface-400 dark:ring-surface-700',
     dot: 'bg-surface-400',
   },
   no_show: {
-    label: 'No Show',
+    label: t('dashboard.interviews.shared.status.no_show'),
     icon: AlertTriangle,
     class: 'bg-danger-50 text-danger-700 ring-danger-200 dark:bg-danger-950/50 dark:text-danger-300 dark:ring-danger-800',
     dot: 'bg-danger-500',
   },
-}
+}))
+
+type CandidateResponse = 'pending' | 'accepted' | 'declined' | 'tentative'
+
+const candidateResponseConfig = computed<Record<CandidateResponse, { label: string; class: string; dot: string }>>(() => ({
+  pending: {
+    label: t('dashboard.interviews.shared.candidateResponse.pending'),
+    class: 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-800',
+    dot: 'bg-amber-500',
+  },
+  accepted: {
+    label: t('dashboard.interviews.shared.candidateResponse.accepted'),
+    class: 'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/50 dark:text-success-300 dark:ring-success-800',
+    dot: 'bg-success-500',
+  },
+  declined: {
+    label: t('dashboard.interviews.shared.candidateResponse.declined'),
+    class: 'bg-danger-50 text-danger-700 ring-danger-200 dark:bg-danger-950/50 dark:text-danger-300 dark:ring-danger-800',
+    dot: 'bg-danger-500',
+  },
+  tentative: {
+    label: t('dashboard.interviews.shared.candidateResponse.tentative'),
+    class: 'bg-warning-50 text-warning-800 ring-warning-200 dark:bg-warning-950/50 dark:text-warning-300 dark:ring-warning-800',
+    dot: 'bg-warning-500',
+  },
+}))
 
 const typeIcons: Record<string, any> = {
   video: Video,
@@ -115,25 +142,24 @@ const typeIcons: Record<string, any> = {
   take_home: FileText,
 }
 
-const typeLabels: Record<string, string> = {
-  video: 'Video',
-  phone: 'Phone',
-  in_person: 'In Person',
-  technical: 'Technical',
-  panel: 'Panel',
-  take_home: 'Take Home',
-}
+const typeLabels = computed<Record<string, string>>(() => ({
+  video: t('dashboard.interviews.shared.types.video'),
+  phone: t('dashboard.interviews.shared.types.phone'),
+  in_person: t('dashboard.interviews.shared.types.in_person'),
+  technical: t('dashboard.interviews.shared.types.technical'),
+  panel: t('dashboard.interviews.shared.types.panel'),
+  take_home: t('dashboard.interviews.shared.types.take_home'),
+}))
 
 function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString('en-US', {
+  return new Date(dateStr).toLocaleTimeString(locale.value, {
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true,
   })
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return new Date(dateStr).toLocaleDateString(locale.value, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -146,13 +172,17 @@ function formatDateShort(dateStr: string) {
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
-  if (d.toDateString() === today.toDateString()) return 'Today'
-  if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  if (d.toDateString() === today.toDateString()) return t('dashboard.interviews.list.today')
+  if (d.toDateString() === tomorrow.toDateString()) return t('dashboard.interviews.list.tomorrow')
+  return d.toLocaleDateString(locale.value, { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
 function isUpcoming(dateStr: string) {
   return new Date(dateStr) > new Date()
+}
+
+function formatInterviewsTotal(count: number) {
+  return t('dashboard.interviews.list.interviewsTotal', count, { count })
 }
 
 function getCandidateInitials(firstName?: string, lastName?: string) {
@@ -203,9 +233,9 @@ function cancelEdit() {
 async function handleSaveEdit() {
   editErrors.value = {}
 
-  if (!editForm.title.trim()) editErrors.value.title = 'Title is required'
-  if (!editForm.date) editErrors.value.date = 'Date is required'
-  if (!editForm.time) editErrors.value.time = 'Time is required'
+  if (!editForm.title.trim()) editErrors.value.title = t('dashboard.interviews.errors.titleRequired')
+  if (!editForm.date) editErrors.value.date = t('dashboard.interviews.errors.dateRequired')
+  if (!editForm.time) editErrors.value.time = t('dashboard.interviews.errors.timeRequired')
   if (Object.keys(editErrors.value).length > 0) return
 
   const scheduledAt = new Date(`${editForm.date}T${editForm.time}`).toISOString()
@@ -227,7 +257,7 @@ async function handleSaveEdit() {
     editingInterview.value = null
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    editErrors.value.submit = err?.data?.statusMessage ?? 'Failed to update interview'
+    editErrors.value.submit = err?.data?.statusMessage ?? t('dashboard.interviews.errors.updateFailed')
   } finally {
     isSaving.value = false
   }
@@ -252,7 +282,7 @@ async function handleDelete() {
     deletingInterview.value = null
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to delete interview', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
+    toast.error(t('dashboard.interviews.errors.deleteFailed'), { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
   } finally {
     isDeleting.value = false
   }
@@ -270,7 +300,7 @@ async function quickStatusChange(interviewItem: typeof interviews.value[number],
     await updateInterview(interviewItem.id, { status: newStatus })
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to update status', { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
+    toast.error(t('dashboard.interviews.errors.updateStatusFailed'), { message: err?.data?.statusMessage, statusCode: err?.data?.statusCode })
   }
 }
 
@@ -306,9 +336,9 @@ const statusCounts = computed(() => {
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">Interviews</h1>
+        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">{{ t('dashboard.interviews.list.title') }}</h1>
         <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
-          Manage all scheduled interviews across your jobs
+          {{ t('dashboard.interviews.list.seoDescription') }}
         </p>
       </div>
       <NuxtLink
@@ -316,7 +346,7 @@ const statusCounts = computed(() => {
         class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors no-underline"
       >
         <Mail class="size-4" />
-        Email Templates
+        {{ t('dashboard.interviews.list.emailTemplates') }}
       </NuxtLink>
     </div>
 
@@ -328,7 +358,7 @@ const statusCounts = computed(() => {
         <input
           v-model="searchInput"
           type="text"
-          placeholder="Search interviews, candidates, jobs…"
+          :placeholder="t('dashboard.interviews.list.searchPlaceholder')"
           class="w-full rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 py-2 pl-10 pr-9 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors"
         />
         <button
@@ -366,7 +396,7 @@ const statusCounts = computed(() => {
             : 'bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-700'"
           @click="activeView = 'list'"
         >
-          List
+          {{ t('dashboard.interviews.list.list') }}
         </button>
         <button
           class="px-3 py-1.5 text-xs font-medium transition-all cursor-pointer"
@@ -376,7 +406,7 @@ const statusCounts = computed(() => {
           @click="activeView = 'calendar'"
         >
           <CalendarDays class="inline size-3.5 mr-1 -mt-0.5" />
-          Timeline
+          {{ t('dashboard.interviews.list.timeline') }}
         </button>
       </div>
     </div>
@@ -406,8 +436,8 @@ const statusCounts = computed(() => {
       v-else-if="error"
       class="rounded-lg border border-danger-200 dark:border-danger-900 bg-danger-50 dark:bg-danger-950 p-4 text-sm text-danger-700 dark:text-danger-400"
     >
-      Failed to load interviews.
-      <button class="underline ml-1 cursor-pointer" @click="refresh()">Retry</button>
+      {{ t('dashboard.interviews.errors.loadFailed') }}
+      <button class="underline ml-1 cursor-pointer" @click="refresh()">{{ t('common.actions.retry') }}</button>
     </div>
 
     <!-- Empty state -->
@@ -417,19 +447,20 @@ const statusCounts = computed(() => {
     >
       <Calendar class="size-10 text-surface-300 dark:text-surface-600 mx-auto mb-3" />
       <h3 class="text-base font-semibold text-surface-700 dark:text-surface-200 mb-1">
-        {{ searchInput || activeStatus ? 'No matching interviews' : 'No interviews yet' }}
+        {{ searchInput || activeStatus ? t('dashboard.interviews.list.noMatches') : t('dashboard.interviews.list.empty') }}
       </h3>
-      <p class="text-sm text-surface-500 dark:text-surface-400 mb-4 max-w-xs mx-auto">
-        {{ searchInput || activeStatus
-          ? 'Try adjusting your filters.'
-          : 'Interviews will appear here when you schedule them from the pipeline.' }}
+      <p
+        v-if="searchInput || activeStatus"
+        class="text-sm text-surface-500 dark:text-surface-400 mb-4 max-w-xs mx-auto"
+      >
+        {{ t('dashboard.interviews.list.tryFilters') }}
       </p>
       <button
         v-if="activeStatus || searchInput"
         class="cursor-pointer rounded-lg border border-surface-200 dark:border-surface-700 px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
         @click="activeStatus = undefined; searchInput = ''"
       >
-        Clear filters
+        {{ t('common.actions.clearFilters') }}
       </button>
     </div>
 
@@ -470,6 +501,13 @@ const statusCounts = computed(() => {
                     <span class="size-1.5 rounded-full" :class="statusConfig[interviewItem.status]?.dot" />
                     {{ statusConfig[interviewItem.status]?.label }}
                   </span>
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset"
+                    :class="candidateResponseConfig[interviewItem.candidateResponse as CandidateResponse]?.class"
+                  >
+                    <span class="size-1.5 rounded-full" :class="candidateResponseConfig[interviewItem.candidateResponse as CandidateResponse]?.dot" />
+                    {{ candidateResponseConfig[interviewItem.candidateResponse as CandidateResponse]?.label }}
+                  </span>
                 </div>
 
                 <!-- Candidate + Job -->
@@ -492,7 +530,7 @@ const statusCounts = computed(() => {
                   </TimelineDateLink>
                   <span class="inline-flex items-center gap-1">
                     <Clock class="size-3.5" />
-                    {{ formatTime(interviewItem.scheduledAt) }} · {{ interviewItem.duration }}min
+                    {{ formatTime(interviewItem.scheduledAt) }} · {{ t('dashboard.chatbot.relativeTime.minutes', { count: interviewItem.duration }) }}
                   </span>
                   <span class="inline-flex items-center gap-1">
                     <component :is="typeIcons[interviewItem.type] || Video" class="size-3.5" />
@@ -515,12 +553,12 @@ const statusCounts = computed(() => {
                     @click.stop
                   >
                     <Calendar class="size-3" />
-                    Google Calendar
+                    {{ t('dashboard.interviews.list.googleCalendar') }}
                     <ExternalLink class="size-2.5" />
                   </a>
                   <span v-else-if="interviewItem.googleCalendarEventId" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
                     <Calendar class="size-3" />
-                    Google Calendar
+                    {{ t('dashboard.interviews.list.googleCalendar') }}
                   </span>
                 </div>
               </div>
@@ -534,7 +572,7 @@ const statusCounts = computed(() => {
                 class="cursor-pointer rounded-lg bg-success-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-success-700 transition-all shadow-sm"
                 @click="quickStatusChange(interviewItem, 'completed')"
               >
-                Complete
+                {{ t('dashboard.interviews.list.complete') }}
               </button>
 
               <!-- More menu -->
@@ -563,7 +601,7 @@ const statusCounts = computed(() => {
                       @click="openEdit(interviewItem); openMenuId = null"
                     >
                       <Pencil class="size-3.5 text-surface-400" />
-                      Edit
+                      {{ t('dashboard.interviews.list.edit') }}
                     </button>
                     <template v-for="nextStatus in getAllowedTransitions(interviewItem.status)" :key="nextStatus">
                       <button
@@ -571,7 +609,7 @@ const statusCounts = computed(() => {
                         @click="quickStatusChange(interviewItem, nextStatus); openMenuId = null"
                       >
                         <component :is="statusConfig[nextStatus]?.icon || Calendar" class="size-3.5 text-surface-400" />
-                        Mark as {{ statusConfig[nextStatus]?.label }}
+                        {{ statusConfig[nextStatus]?.label }}
                       </button>
                     </template>
                     <div class="border-t border-surface-100 dark:border-surface-800 my-1.5 mx-2" />
@@ -580,7 +618,7 @@ const statusCounts = computed(() => {
                       @click="confirmDelete(interviewItem); openMenuId = null"
                     >
                       <Trash2 class="size-3.5" />
-                      Delete
+                      {{ t('common.actions.delete') }}
                     </button>
                   </div>
                 </Transition>
@@ -592,7 +630,7 @@ const statusCounts = computed(() => {
 
       <!-- Total count -->
       <p class="text-xs text-surface-400 pt-3 px-1">
-        {{ total }} interview{{ total === 1 ? '' : 's' }} total
+        {{ formatInterviewsTotal(total) }}
       </p>
     </template>
 
@@ -605,7 +643,7 @@ const statusCounts = computed(() => {
               <CalendarDays class="size-3.5 text-brand-600 dark:text-brand-400" />
             </div>
             <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ dateLabel }}</h3>
-            <span class="text-xs text-surface-400 dark:text-surface-500">{{ dateInterviews.length }} interview{{ dateInterviews.length === 1 ? '' : 's' }}</span>
+            <span class="text-xs text-surface-400 dark:text-surface-500">{{ formatInterviewsTotal(dateInterviews.length) }}</span>
           </div>
 
           <div class="ml-3.5 border-l-2 border-surface-200 dark:border-surface-700/60 pl-6 space-y-3">
@@ -626,12 +664,18 @@ const statusCounts = computed(() => {
                     <span class="text-sm font-semibold text-brand-600 dark:text-brand-400">
                       {{ formatTime(interviewItem.scheduledAt) }}
                     </span>
-                    <span class="text-xs text-surface-400">{{ interviewItem.duration }}min</span>
+                    <span class="text-xs text-surface-400">{{ t('dashboard.chatbot.relativeTime.minutes', { count: interviewItem.duration }) }}</span>
                     <span
                       class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset"
                       :class="statusConfig[interviewItem.status]?.class"
                     >
                       {{ statusConfig[interviewItem.status]?.label }}
+                    </span>
+                    <span
+                      class="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset"
+                      :class="candidateResponseConfig[interviewItem.candidateResponse as CandidateResponse]?.class"
+                    >
+                      {{ candidateResponseConfig[interviewItem.candidateResponse as CandidateResponse]?.label }}
                     </span>
                   </div>
                   <p class="mt-1 text-sm font-medium">
@@ -664,12 +708,12 @@ const statusCounts = computed(() => {
                       @click.stop
                     >
                       <Calendar class="size-2.5" />
-                      Synced
+                      {{ t('dashboard.interviews.list.synced') }}
                       <ExternalLink class="size-2" />
                     </a>
                     <span v-else-if="interviewItem.googleCalendarEventId" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
                       <Calendar class="size-2.5" />
-                      Synced
+                      {{ t('dashboard.interviews.list.synced') }}
                     </span>
                   </div>
                 </div>
@@ -685,7 +729,7 @@ const statusCounts = computed(() => {
                     class="cursor-pointer rounded-lg bg-success-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-success-700 transition-all shadow-sm"
                     @click="quickStatusChange(interviewItem, 'completed')"
                   >
-                    Complete
+                    {{ t('dashboard.interviews.list.complete') }}
                   </button>
                 </div>
               </div>
@@ -696,7 +740,7 @@ const statusCounts = computed(() => {
 
       <!-- Total count -->
       <p class="text-xs text-surface-400 pt-3 px-1">
-        {{ total }} interview{{ total === 1 ? '' : 's' }} total
+        {{ formatInterviewsTotal(total) }}
       </p>
     </template>
 
@@ -707,7 +751,7 @@ const statusCounts = computed(() => {
       <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="cancelEdit" />
         <div class="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl shadow-surface-900/10 dark:shadow-black/30 ring-1 ring-surface-200/80 dark:ring-surface-700/60 p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-5">Edit Interview</h3>
+          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-5">{{ t('dashboard.interviews.edit.title') }}</h3>
 
           <div v-if="editErrors.submit" class="mb-4 rounded-lg border border-danger-200 bg-danger-50 p-3 text-sm text-danger-700 dark:border-danger-800 dark:bg-danger-950/40 dark:text-danger-300">
             {{ editErrors.submit }}
@@ -716,7 +760,7 @@ const statusCounts = computed(() => {
           <form class="space-y-4" @submit.prevent="handleSaveEdit">
             <div>
               <label for="edit-interview-title" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                Title <span class="text-danger-500">*</span>
+                {{ t('dashboard.interviews.edit.fieldTitle') }} <span class="text-danger-500">*</span>
               </label>
               <input
                 id="edit-interview-title"
@@ -730,22 +774,17 @@ const statusCounts = computed(() => {
 
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label for="edit-interview-type" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Type</label>
+                <label for="edit-interview-type" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.edit.type') }}</label>
                 <select
                   id="edit-interview-type"
                   v-model="editForm.type"
                   class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
                 >
-                  <option value="video">Video</option>
-                  <option value="phone">Phone</option>
-                  <option value="in_person">In Person</option>
-                  <option value="technical">Technical</option>
-                  <option value="panel">Panel</option>
-                  <option value="take_home">Take Home</option>
+                  <option v-for="(label, key) in typeLabels" :key="key" :value="key">{{ label }}</option>
                 </select>
               </div>
               <div>
-                <label for="edit-interview-status" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Status</label>
+                <label for="edit-interview-status" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.edit.status') }}</label>
                 <select
                   id="edit-interview-status"
                   v-model="editForm.status"
@@ -758,7 +797,7 @@ const statusCounts = computed(() => {
 
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label for="edit-interview-date" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Date</label>
+                <label for="edit-interview-date" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.edit.date') }}</label>
                 <input
                   id="edit-interview-date"
                   v-model="editForm.date"
@@ -767,7 +806,7 @@ const statusCounts = computed(() => {
                 />
               </div>
               <div>
-                <label for="edit-interview-time" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Time</label>
+                <label for="edit-interview-time" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.edit.time') }}</label>
                 <input
                   id="edit-interview-time"
                   v-model="editForm.time"
@@ -778,7 +817,7 @@ const statusCounts = computed(() => {
             </div>
 
             <div>
-              <label for="edit-interview-duration" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Duration (minutes)</label>
+              <label for="edit-interview-duration" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.edit.durationMinutes') }}</label>
               <input
                 id="edit-interview-duration"
                 v-model.number="editForm.duration"
@@ -790,23 +829,23 @@ const statusCounts = computed(() => {
             </div>
 
             <div>
-              <label for="edit-interview-location" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Location / Link</label>
+              <label for="edit-interview-location" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.edit.locationLink') }}</label>
               <input
                 id="edit-interview-location"
                 v-model="editForm.location"
                 type="text"
-                placeholder="Zoom link, office address…"
+                :placeholder="t('dashboard.interviews.edit.locationPlaceholder')"
                 class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
               />
             </div>
 
             <div>
-              <label for="edit-interview-notes" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Notes</label>
+              <label for="edit-interview-notes" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.edit.notes') }}</label>
               <textarea
                 id="edit-interview-notes"
                 v-model="editForm.notes"
                 rows="3"
-                placeholder="Topics to cover…"
+                :placeholder="t('dashboard.interviews.edit.notesPlaceholder')"
                 class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors resize-none"
               />
             </div>
@@ -817,14 +856,14 @@ const statusCounts = computed(() => {
                 class="cursor-pointer rounded-lg border border-surface-300 dark:border-surface-700 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                 @click="cancelEdit"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="submit"
                 :disabled="isSaving"
                 class="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {{ isSaving ? 'Saving…' : 'Save Changes' }}
+                {{ isSaving ? t('common.actions.saving') : t('common.actions.saveChanges') }}
               </button>
             </div>
           </form>
@@ -837,9 +876,10 @@ const statusCounts = computed(() => {
       <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showDeleteConfirm = false" />
         <div class="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl shadow-surface-900/10 dark:shadow-black/30 ring-1 ring-surface-200/80 dark:ring-surface-700/60 p-6 max-w-sm w-full mx-4">
-          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">Delete Interview</h3>
+          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">{{ t('dashboard.interviews.edit.deleteInterview') }}</h3>
           <p class="text-sm text-surface-600 dark:text-surface-400 mb-4">
-            Are you sure you want to delete <strong>{{ deletingInterview?.title }}</strong>? This action cannot be undone.
+            {{ t('dashboard.interviews.edit.deleteConfirm') }}
+            <strong v-if="deletingInterview?.title" class="block mt-1">{{ deletingInterview.title }}</strong>
           </p>
           <div class="flex justify-end gap-2">
             <button
@@ -847,14 +887,14 @@ const statusCounts = computed(() => {
               class="cursor-pointer rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
               @click="showDeleteConfirm = false"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
             <button
               :disabled="isDeleting"
               class="cursor-pointer rounded-lg bg-danger-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               @click="handleDelete"
             >
-              {{ isDeleting ? 'Deleting…' : 'Delete' }}
+              {{ isDeleting ? t('common.actions.deleting') : t('common.actions.delete') }}
             </button>
           </div>
         </div>

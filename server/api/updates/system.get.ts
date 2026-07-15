@@ -12,7 +12,7 @@ import { HeadBucketCommand } from '@aws-sdk/client-s3'
  * Requires authentication.
  */
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  await requireSaasAdmin(event)
 
   const { version } = await readFile(
     resolve(process.cwd(), 'package.json'),

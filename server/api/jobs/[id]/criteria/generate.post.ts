@@ -1,8 +1,9 @@
 import { eq, and } from 'drizzle-orm'
-import { aiConfig, job } from '../../../../database/schema'
+import { job } from '../../../../database/schema'
 import { generateCriteriaSchema } from '../../../../utils/schemas/scoring'
 import { generateCriteriaFromDescription, PREMADE_CRITERIA } from '../../../../utils/ai/scoring'
 import type { SupportedProvider } from '../../../../utils/ai/provider'
+import { loadEffectiveAiConfig } from '../../../../utils/ai/loadConfig'
 import { createRateLimiter } from '../../../../utils/rateLimit'
 import { z } from 'zod'
 
@@ -47,15 +48,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const config = await db.query.aiConfig.findFirst({
-    where: eq(aiConfig.organizationId, orgId),
-  })
-  if (!config) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'AI provider not configured. Set up your AI provider in Settings first.',
-    })
-  }
+  const config = await loadEffectiveAiConfig(orgId, { purpose: 'analysis' })
 
   const criteria = await generateCriteriaFromDescription(
     {

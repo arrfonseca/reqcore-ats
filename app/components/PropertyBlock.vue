@@ -37,6 +37,7 @@ const emit = defineEmits<{
   (e: 'refresh'): void
 }>()
 
+const { t } = useI18n()
 const toast = useToast()
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 
@@ -64,7 +65,7 @@ async function handleUpdate(propertyDefinitionId: string, value: unknown) {
     await persistValue(propertyDefinitionId, value)
   } catch (err: unknown) {
     if (handlePreviewReadOnlyError(err)) return
-    const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? 'Failed to save'
+    const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? t('properties.block.saveFailed')
     toast.error(message)
   } finally {
     savingId.value = null
@@ -109,7 +110,7 @@ function openEditor(scope: 'org' | 'job') {
         <div class="flex items-center gap-1.5 pt-1 text-sm text-surface-500 dark:text-surface-400 min-w-0">
           <component :is="iconFor(entry.definition) as never" class="size-3.5 shrink-0" />
           <span class="truncate">{{ entry.definition.name }}</span>
-          <span class="ml-1 rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-surface-500">Form</span>
+          <span class="ml-1 rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-surface-500">{{ t('properties.block.formBadge') }}</span>
         </div>
         <div class="min-w-0 px-2 py-1">
           <PropertyValueDisplay :definition="entry.definition" :value="entry.value" />
@@ -130,8 +131,8 @@ function openEditor(scope: 'org' | 'job') {
         <span
           v-if="entry.definition.jobId"
           class="ml-1 rounded bg-brand-50 dark:bg-brand-950/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand-600 dark:text-brand-300"
-          title="Defined for this job only"
-        >Job</span>
+          :title="t('properties.block.jobBadgeTitle')"
+        >{{ t('properties.block.jobBadge') }}</span>
       </div>
       <div class="min-w-0">
         <PropertyValueEditor
@@ -150,7 +151,7 @@ function openEditor(scope: 'org' | 'job') {
         class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-surface-500 hover:text-surface-800 dark:hover:text-surface-100 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer"
         @click="openEditor('org')"
       >
-        <Plus class="size-3.5" /> Add org-wide property
+        <Plus class="size-3.5" /> {{ t('properties.block.addOrgWideProperty') }}
       </button>
       <button
         v-if="jobId && entityType === 'application'"
@@ -158,7 +159,7 @@ function openEditor(scope: 'org' | 'job') {
         class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-surface-500 hover:text-surface-800 dark:hover:text-surface-100 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer"
         @click="openEditor('job')"
       >
-        <Settings2 class="size-3.5" /> Manage job-specific properties
+        <Settings2 class="size-3.5" /> {{ t('properties.block.manageJobSpecificProperties') }}
       </button>
     </div>
 

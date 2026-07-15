@@ -32,11 +32,23 @@ import {
   Users,
   BarChart3,
   Hash,
-  Megaphone,
   Building2,
   Search,
+  Instagram,
 } from 'lucide-vue-next'
 import { z } from 'zod'
+import { ISCO_CATEGORY_IDS } from '~~/shared/scoring-criteria-templates'
+import { DEFAULT_JOB_TYPE, JOB_CONTRACT_TYPE_IDS } from '~~/shared/job-types'
+import {
+  hasJobDraft,
+  readJobDraft,
+  writeJobDraft,
+  clearJobDraftStorage,
+  refreshJobDraftState,
+} from '~/composables/useJobDraft'
+
+const { t } = useI18n()
+const { activeOrg } = useCurrentOrg()
 
 definePageMeta({
   layout: 'dashboard',
@@ -44,8 +56,8 @@ definePageMeta({
 })
 
 useSeoMeta({
-  title: 'Create Job — Reqcore',
-  description: 'Create a new job posting',
+  title: t('dashboard.jobs.create.seoTitle'),
+  description: t('dashboard.jobs.create.seoDescription'),
 })
 
 const localePath = useLocalePath()
@@ -75,21 +87,22 @@ type DraftQuestion = {
 
 // Wizard state
 const currentStep = ref<1 | 2 | 3 | 4>(1)
-const steps = [
-  { id: 1, title: 'Job details', description: 'Tell applicants about this role.' },
-  { id: 2, title: 'Application form', description: 'Design the application form.' },
-  { id: 3, title: 'AI scoring criteria', description: 'Define how AI evaluates candidates.' },
-  { id: 4, title: 'Publish & distribute', description: 'Go live and share across job boards.' },
-]
+const steps = computed(() => [
+  { id: 1, title: t('dashboard.jobs.create.steps.details.title'), description: t('dashboard.jobs.create.steps.details.description') },
+  { id: 2, title: t('dashboard.jobs.create.steps.applicationForm.title'), description: t('dashboard.jobs.create.steps.applicationForm.description') },
+  { id: 3, title: t('dashboard.jobs.create.steps.aiScoring.title'), description: t('dashboard.jobs.create.steps.aiScoring.description') },
+  { id: 4, title: t('dashboard.jobs.create.steps.publish.title'), description: t('dashboard.jobs.create.steps.publish.description') },
+])
 
 // Step 1: Job details (API-supported fields)
 const form = ref({
   title: '',
+  iscoCategoryId: '' as '' | (typeof ISCO_CATEGORY_IDS)[number],
   description: '',
   location: '',
-  type: 'full_time' as 'full_time' | 'part_time' | 'contract' | 'internship',
+  type: DEFAULT_JOB_TYPE,
   experienceLevel: 'mid' as 'junior' | 'mid' | 'senior' | 'lead',
-  remoteStatus: undefined as 'remote' | 'hybrid' | 'onsite' | undefined,
+  remoteStatus: '' as '' | 'remote' | 'hybrid' | 'onsite',
 })
 
 // Step 2: Application form (client-only for now)
@@ -111,7 +124,24 @@ type ScoringCriterionDraft = {
 const scoringCriteria = ref<ScoringCriterionDraft[]>([])
 const scoringMode = ref<'none' | 'premade' | 'ai' | 'custom'>('none')
 const selectedTemplateId = ref<string | null>(null)
-const { getCriteria: getTemplateCriteria } = useScoringCriteriaTemplates()
+const { getCriteria: getTemplateCriteria, iscoCategories, isPremadeCriterionKey, resolveCriterionDisplay } = useScoringCriteriaTemplates()
+const { contractTypeOptions } = useJobTypes()
+const {
+  isDisabled: isRemoteModelDisabled,
+  settingsOptions: remoteOptions,
+  syncRemoteStatusForSettings,
+} = useJobRemoteModel(computed(() => form.value.type))
+
+function normalizeFormDefaults() {
+  if (!(JOB_CONTRACT_TYPE_IDS as readonly string[]).includes(form.value.type as typeof JOB_CONTRACT_TYPE_IDS[number])) {
+    form.value.type = DEFAULT_JOB_TYPE
+  }
+  form.value.remoteStatus = syncRemoteStatusForSettings(form.value.remoteStatus)
+}
+
+watch(() => form.value.type, () => {
+  form.value.remoteStatus = syncRemoteStatusForSettings(form.value.remoteStatus)
+}, { immediate: true })
 const isGeneratingCriteria = ref(false)
 const showCustomForm = ref(false)
 const editingCriterion = ref<ScoringCriterionDraft | null>(null)
@@ -126,14 +156,14 @@ const customCriterionForm = ref({
   weight: 50,
 })
 
-const categoryLabels: Record<string, string> = {
-  technical: 'Qualifications',
-  experience: 'Experience',
-  soft_skills: 'Soft Skills',
-  education: 'Education',
-  culture: 'Culture',
-  custom: 'Custom',
-}
+const categoryLabels = computed<Record<string, string>>(() => ({
+  technical: t('dashboard.jobs.shared.categories.technical'),
+  experience: t('dashboard.jobs.shared.categories.experience'),
+  soft_skills: t('dashboard.jobs.shared.categories.soft_skills'),
+  education: t('dashboard.jobs.shared.categories.education'),
+  culture: t('dashboard.jobs.shared.categories.culture'),
+  custom: t('dashboard.jobs.shared.categories.custom'),
+}))
 
 const categoryColorClasses: Record<string, string> = {
   technical: 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:ring-blue-800',
@@ -147,7 +177,7 @@ const categoryColorClasses: Record<string, string> = {
 function loadPremadeCriteria(templateId: string) {
   const criteria = getTemplateCriteria(templateId)
   if (criteria.length === 0) {
-    toast.error('Failed to load template', { message: 'Unknown or empty template.' })
+    toast.error(t('dashboard.jobs.create.errors.loadTemplateFailed'), { message: t('dashboard.jobs.create.errors.unknownTemplate') })
     return
   }
   selectedTemplateId.value = templateId
@@ -157,11 +187,11 @@ function loadPremadeCriteria(templateId: string) {
 
 async function generateAiCriteria() {
   if (!form.value.title) {
-    toast.warning('Job title required', 'Add a job title in Step 1 first so AI can generate relevant criteria.')
+    toast.warning(t('dashboard.jobs.create.errors.jobTitleRequired'), t('dashboard.jobs.create.errors.jobTitleRequiredHint'))
     return
   }
   if (!form.value.description) {
-    toast.warning('Job description required', 'Add a job description in Step 1 first so AI can generate relevant criteria.')
+    toast.warning(t('dashboard.jobs.create.errors.jobDescriptionRequired'), t('dashboard.jobs.create.errors.jobDescriptionRequiredHint'))
     return
   }
   isGeneratingCriteria.value = true
@@ -182,22 +212,22 @@ async function generateAiCriteria() {
       weight: c.weight ?? 50,
     }))
     scoringMode.value = 'ai'
-    toast.success('Criteria generated', `${scoringCriteria.value.length} scoring criteria created from job description.`)
+    toast.success(t('dashboard.jobs.create.errors.criteriaGenerated'), t('dashboard.jobs.create.errors.criteriaGeneratedHint', scoringCriteria.value.length))
   } catch (err: any) {
     const statusCode = err?.data?.statusCode ?? err?.statusCode
     const statusMessage = err?.data?.statusMessage ?? ''
     if (statusCode === 422 && statusMessage.includes('AI provider not configured')) {
       toast.add({
         type: 'warning',
-        title: 'AI provider not configured',
-        message: 'Set up your AI provider and model before generating criteria.',
-        link: { label: 'Go to AI Settings', href: '/dashboard/settings/ai' },
+        title: t('dashboard.jobs.create.errors.aiNotConfigured'),
+        message: t('dashboard.jobs.create.errors.aiNotConfiguredHint'),
+        link: { label: aiSettingsLinkLabel.value, href: aiSettingsPath.value },
         duration: 10000,
       })
     } else {
-      toast.error('Failed to generate criteria', {
-        message: 'Could not generate criteria. Make sure your AI provider is configured in Settings → AI, then try again.',
-        details: statusMessage || `${statusCode ?? 'Unknown'} error — no additional details from server.`,
+      toast.error(t('dashboard.jobs.create.errors.generateCriteriaFailed'), {
+        message: t('dashboard.jobs.create.errors.generateCriteriaFailedHint'),
+        details: statusMessage || t('common.errors.serverErrorDetails', { code: statusCode ?? t('dashboard.chatbot.errors.unknownError') }),
         statusCode,
       })
     }
@@ -212,7 +242,7 @@ function addCustomCriterion() {
 
   const keyExists = scoringCriteria.value.some(c => c.key === f.key)
   if (keyExists) {
-    toast.warning('Duplicate criterion', `A criterion with key "${f.key}" already exists.`)
+    toast.warning(t('dashboard.jobs.create.errors.duplicateCriterion'), t('dashboard.jobs.create.errors.duplicateCriterionHint', { key: f.key }))
     return
   }
 
@@ -248,54 +278,98 @@ const linkCopied = ref(false)
 const questionActionError = ref<string | null>(null)
 const nextQuestionId = ref(1)
 
-// Check if at least one AI provider is configured with a valid API key.
-// /api/ai-config returns an array of configurations now (multi-config era).
-interface AiConfigCheckRow { hasApiKey: boolean }
-const { data: aiConfigData } = useFetch<AiConfigCheckRow[]>('/api/ai-config', { key: 'ai-config-check', headers: useRequestHeaders(['cookie']) })
-const isAiConfigured = computed(() => {
-  return Array.isArray(aiConfigData.value) && aiConfigData.value.some((c) => c.hasApiKey)
-})
+// Check if AI analysis is available (tenant configs or platform-managed effective config).
+const { isAiConfigured, aiSettingsPath, aiSettingsLinkLabel } = useEffectiveAi()
 
-// Auto-save to localStorage
-const AUTO_SAVE_KEY = 'reqcore-job-draft'
+function draftOrgId(): string | null {
+  return activeOrg.value?.id ?? null
+}
 
+// Auto-save wizard progress to localStorage (restored when returning to /jobs/new)
 function saveFormToStorage() {
   if (!import.meta.client) return
-  try {
-    const data = {
-      form: form.value,
-      applicationForm: applicationForm.value,
-      scoringCriteria: scoringCriteria.value,
-      scoringMode: scoringMode.value,
-      autoScoreOnApply: autoScoreOnApply.value,
-      currentStep: currentStep.value,
-    }
-    localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(data))
-  } catch { /* storage full or unavailable */ }
+  const orgId = draftOrgId()
+  if (!orgId) return
+  writeJobDraft({
+    form: { ...form.value },
+    applicationForm: {
+      requireResume: applicationForm.value.requireResume,
+      requireCoverLetter: applicationForm.value.requireCoverLetter,
+      questions: [...applicationForm.value.questions],
+    },
+    scoringCriteria: [...scoringCriteria.value],
+    scoringMode: scoringMode.value,
+    autoScoreOnApply: autoScoreOnApply.value,
+    currentStep: currentStep.value,
+  }, orgId)
 }
 
 function restoreFormFromStorage() {
   if (!import.meta.client) return
+  const orgId = draftOrgId()
+  if (!orgId) return
   try {
-    const raw = localStorage.getItem(AUTO_SAVE_KEY)
-    if (!raw) return
-    const data = JSON.parse(raw)
-    if (data.form) Object.assign(form.value, data.form)
+    const data = readJobDraft(orgId)
+    if (!data) return
+    if (data.form) {
+      Object.assign(form.value, data.form)
+      form.value.iscoCategoryId = form.value.iscoCategoryId ?? ''
+    }
     if (data.applicationForm) Object.assign(applicationForm.value, data.applicationForm)
     if (data.scoringCriteria) scoringCriteria.value = data.scoringCriteria
     if (data.scoringMode) scoringMode.value = data.scoringMode
     if (data.autoScoreOnApply != null) autoScoreOnApply.value = data.autoScoreOnApply
     if (data.currentStep) currentStep.value = data.currentStep
+    normalizeFormDefaults()
   } catch { /* corrupted data, ignore */ }
 }
 
 function clearFormStorage() {
-  if (!import.meta.client) return
-  try { localStorage.removeItem(AUTO_SAVE_KEY) } catch { /* ignore */ }
+  clearJobDraftStorage(draftOrgId())
 }
 
-onMounted(() => {
-  restoreFormFromStorage()
+function isJobWizardPath(path: string) {
+  return /\/jobs\/new(?:\?|$|\/)/.test(path)
+}
+
+const route = useRoute()
+const router = useRouter()
+const hasInitializedWizard = ref(false)
+
+function initWizardFromStorage() {
+  if (!import.meta.client || hasInitializedWizard.value) return
+  const orgId = draftOrgId()
+  if (!orgId) return
+
+  hasInitializedWizard.value = true
+
+  if (route.query.fresh === '1') {
+    resetState()
+    router.replace(localePath('/dashboard/jobs/new'))
+    return
+  }
+
+  if (hasJobDraft(orgId)) {
+    restoreFormFromStorage()
+  }
+
+  refreshJobDraftState(orgId)
+}
+
+watch(activeOrg, (org) => {
+  if (!org?.id) return
+  initWizardFromStorage()
+  saveFormToStorage()
+}, { immediate: true })
+
+onBeforeRouteLeave((to) => {
+  if (!isJobWizardPath(to.path)) {
+    saveFormToStorage()
+  }
+})
+
+onBeforeUnmount(() => {
+  saveFormToStorage()
 })
 
 // Reset all wizard state to initial values (called when user clicks "New Job" again)
@@ -303,12 +377,14 @@ function resetState() {
   currentStep.value = 1
   form.value = {
     title: '',
+    iscoCategoryId: '',
     description: '',
     location: '',
-    type: 'full_time',
+    type: DEFAULT_JOB_TYPE,
     experienceLevel: 'mid',
-    remoteStatus: undefined,
+    remoteStatus: '',
   }
+  normalizeFormDefaults()
   applicationForm.value = {
     requireResume: true,
     requireCoverLetter: false,
@@ -327,7 +403,7 @@ function resetState() {
   clearFormStorage()
 }
 
-// Shared signal incremented by AppTopBar when the user is already on this page
+// Explicit fresh start when already on the wizard (header "Nova Vaga" while on /new)
 const newJobResetSignal = useState('new-job-reset-signal', () => 0)
 watch(newJobResetSignal, (next, prev) => {
   if (next > prev) resetState()
@@ -343,9 +419,9 @@ watch(currentStep, (step) => {
   if (step === 3 && !isAiConfigured.value) {
     toast.add({
       type: 'warning',
-      title: 'AI integration not set up',
-      message: 'To use AI-powered candidate scoring, configure your AI provider in Settings → AI. You can still add criteria manually.',
-      link: { label: 'Go to AI Settings', href: '/dashboard/settings/ai' },
+      title: t('dashboard.jobs.create.errors.aiIntegrationNotSetup'),
+      message: t('dashboard.jobs.create.errors.aiIntegrationNotSetupHint'),
+      link: { label: aiSettingsLinkLabel.value, href: aiSettingsPath.value },
       duration: 10000,
     })
   }
@@ -360,30 +436,43 @@ const finalApplicationLink = ref('')
 const linkCopiedFinal = ref(false)
 
 // Distribution channels for quick tracking link creation
-const distributionChannels = [
-  { channel: 'linkedin', name: 'LinkedIn', description: 'Post on LinkedIn Jobs or share in your feed', category: 'job_board' },
-  { channel: 'indeed', name: 'Indeed', description: 'List on the Indeed job board', category: 'job_board' },
-  { channel: 'glassdoor', name: 'Glassdoor', description: 'Publish on Glassdoor listings', category: 'job_board' },
-  { channel: 'ziprecruiter', name: 'ZipRecruiter', description: 'Post on ZipRecruiter', category: 'job_board' },
-  { channel: 'email', name: 'Email campaign', description: 'Send to candidates or mailing list', category: 'outreach' },
-  { channel: 'referral', name: 'Employee referral', description: 'Share internally with your team', category: 'outreach' },
-  { channel: 'career_site', name: 'Career site', description: 'Embed on your company website', category: 'outreach' },
-  { channel: 'twitter', name: 'X (Twitter)', description: 'Share on your X timeline', category: 'social' },
-  { channel: 'facebook', name: 'Facebook', description: 'Post on Facebook page or groups', category: 'social' },
-  { channel: 'reddit', name: 'Reddit', description: 'Share in relevant subreddits', category: 'social' },
-] as const
+const distributionChannels = computed(() => {
+  const channelName = (channel: string) =>
+    t(`dashboard.jobs.create.publish.channelNames.${channel}`, t(`sourceTracking.channels.${channel}`))
+
+  return [
+    { channel: 'linkedin', name: channelName('linkedin'), description: t('dashboard.jobs.create.publish.channelDescriptions.linkedin'), category: 'job_board' as const },
+    { channel: 'indeed', name: channelName('indeed'), description: t('dashboard.jobs.create.publish.channelDescriptions.indeed'), category: 'job_board' as const },
+    { channel: 'glassdoor', name: channelName('glassdoor'), description: t('dashboard.jobs.create.publish.channelDescriptions.glassdoor'), category: 'job_board' as const },
+    { channel: 'vagas_com', name: channelName('vagas_com'), description: t('dashboard.jobs.create.publish.channelDescriptions.vagas_com'), category: 'job_board' as const },
+    { channel: 'catho', name: channelName('catho'), description: t('dashboard.jobs.create.publish.channelDescriptions.catho'), category: 'job_board' as const },
+    { channel: 'infojobs', name: channelName('infojobs'), description: t('dashboard.jobs.create.publish.channelDescriptions.infojobs'), category: 'job_board' as const },
+    { channel: 'adecco', name: channelName('adecco'), description: t('dashboard.jobs.create.publish.channelDescriptions.adecco'), category: 'job_board' as const },
+    { channel: 'manpower', name: channelName('manpower'), description: t('dashboard.jobs.create.publish.channelDescriptions.manpower'), category: 'job_board' as const },
+    { channel: 'email', name: channelName('email'), description: t('dashboard.jobs.create.publish.channelDescriptions.email'), category: 'outreach' as const },
+    { channel: 'referral', name: channelName('referral'), description: t('dashboard.jobs.create.publish.channelDescriptions.referral'), category: 'outreach' as const },
+    { channel: 'career_site', name: channelName('career_site'), description: t('dashboard.jobs.create.publish.channelDescriptions.career_site'), category: 'outreach' as const },
+    { channel: 'twitter', name: channelName('twitter'), description: t('dashboard.jobs.create.publish.channelDescriptions.twitter'), category: 'social' as const },
+    { channel: 'facebook', name: channelName('facebook'), description: t('dashboard.jobs.create.publish.channelDescriptions.facebook'), category: 'social' as const },
+    { channel: 'instagram', name: channelName('instagram'), description: t('dashboard.jobs.create.publish.channelDescriptions.instagram'), category: 'social' as const },
+  ]
+})
 
 const channelIcons: Record<string, any> = {
   linkedin: Briefcase,
   indeed: Search,
   glassdoor: Building2,
-  ziprecruiter: Megaphone,
+  vagas_com: Globe,
+  catho: Building2,
+  infojobs: Briefcase,
+  adecco: Users,
+  manpower: Users,
   email: Mail,
   referral: Users,
   career_site: Globe,
   twitter: Hash,
   facebook: Users,
-  reddit: MessageSquare,
+  instagram: Instagram,
 }
 
 // Track created distribution links: channel → { code, url, loading, copied }
@@ -407,7 +496,7 @@ async function createChannelLink(channel: string, channelName: string) {
     track('tracking_link_created', { channel, source: 'job_wizard' })
   } catch {
     delete createdLinks.value[channel]
-    toast.error(`Failed to create tracking link for ${channelName}`)
+    toast.error(t('dashboard.jobs.create.errors.trackingLinkFailed', { channel: channelName }))
   }
 }
 
@@ -440,7 +529,7 @@ async function createCustomBoardLink() {
 
   // Prevent duplicates
   if (customBoardLinks.value.some(l => l.channel === dedupeKey)) {
-    toast.warning('Duplicate board', `A custom link for "${name}" already exists.`)
+    toast.warning(t('dashboard.jobs.create.errors.duplicateBoard'), t('dashboard.jobs.create.errors.duplicateBoardHint', { name }))
     return
   }
 
@@ -460,7 +549,7 @@ async function createCustomBoardLink() {
     customBoardName.value = ''
     track('tracking_link_created', { channel: 'custom', customName: name, source: 'job_wizard_custom' })
   } catch {
-    toast.error(`Failed to create tracking link for "${name}"`)
+    toast.error(t('dashboard.jobs.create.errors.trackingLinkFailed', { channel: name }))
   } finally {
     isCreatingCustomBoard.value = false
   }
@@ -479,18 +568,29 @@ async function copyCustomBoardLink(index: number) {
 }
 
 // Validation (only Step 1 is required to submit)
-const formSchema = z.object({
+const iscoCategoryRequiredMessage = () => t('dashboard.jobs.create.errors.iscoCategoryRequired')
+
+function isValidIscoCategoryId(val: unknown): val is (typeof ISCO_CATEGORY_IDS)[number] {
+  return typeof val === 'string'
+    && val.length > 0
+    && (ISCO_CATEGORY_IDS as readonly string[]).includes(val)
+}
+
+const formSchema = computed(() => z.object({
   title: z
     .string()
-    .min(1, 'Title is required')
-    .max(200, 'Title must be 200 characters or less'),
+    .min(1, t('dashboard.jobs.create.errors.titleRequired'))
+    .max(200, t('dashboard.jobs.create.errors.titleMax')),
+  iscoCategoryId: z
+    .unknown()
+    .refine(isValidIscoCategoryId, { message: iscoCategoryRequiredMessage() }),
   description: z.string().optional(),
   location: z.string().optional(),
-  type: z.enum(['full_time', 'part_time', 'contract', 'internship']),
-})
+  type: z.enum(JOB_CONTRACT_TYPE_IDS),
+}))
 
 function validateStep1(): boolean {
-  const result = formSchema.safeParse(form.value)
+  const result = formSchema.value.safeParse(form.value)
   if (!result.success) {
     errors.value = {}
     for (const issue of result.error.issues) {
@@ -504,7 +604,7 @@ function validateStep1(): boolean {
 }
 
 // Pure check with no side-effects so it never populates errors on its own
-const isStep1Valid = computed(() => formSchema.safeParse(form.value).success)
+const isStep1Valid = computed(() => formSchema.value.safeParse(form.value).success)
 
 const canGoNext = computed(() => {
   if (currentStep.value === 1) return isStep1Valid.value
@@ -633,6 +733,7 @@ async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
   try {
     const created = await createJob({
       title: form.value.title,
+      iscoCategoryId: form.value.iscoCategoryId,
       description: form.value.description || undefined,
       location: form.value.location || undefined,
       type: form.value.type,
@@ -717,9 +818,9 @@ async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
     }
     clearFormStorage()
   } catch (err: any) {
-    const statusMessage = err?.data?.statusMessage ?? 'Something went wrong while creating the job.'
-    toast.error('Failed to create job', {
-      message: statusMessage,
+    const statusMessage = err?.data?.statusMessage ?? t('dashboard.jobs.create.errors.createJobFailedHint')
+    toast.error(t('dashboard.jobs.create.errors.createJobFailed'), {
+      message: statusMessage || t('dashboard.jobs.create.errors.createJobFailedHint'),
       statusCode: err?.data?.statusCode,
     })
   } finally {
@@ -738,24 +839,26 @@ async function copyFinalLink() {
   }
 }
 
-const typeOptions = [
-  { value: 'full_time', label: 'Full-time' },
-  { value: 'part_time', label: 'Part-time' },
-  { value: 'contract', label: 'Contract' },
-  { value: 'internship', label: 'Internship' },
-]
+const typeOptions = contractTypeOptions
 
-const questionTypeLabels: Record<QuestionType, string> = {
-  short_text: 'Short Text',
-  long_text: 'Long Text',
-  single_select: 'Single Select',
-  multi_select: 'Multi Select',
-  number: 'Number',
-  date: 'Date',
-  url: 'URL',
-  checkbox: 'Checkbox',
-  file_upload: 'File Upload',
-}
+const experienceOptions = computed(() => [
+  { value: 'junior', label: t('dashboard.jobs.shared.experience.junior') },
+  { value: 'mid', label: t('dashboard.jobs.shared.experience.mid') },
+  { value: 'senior', label: t('dashboard.jobs.shared.experience.senior') },
+  { value: 'lead', label: t('dashboard.jobs.shared.experience.lead') },
+])
+
+const questionTypeLabels = computed<Record<string, string>>(() => ({
+  short_text: t('dashboard.jobs.shared.questionTypes.short_text'),
+  long_text: t('dashboard.jobs.shared.questionTypes.long_text'),
+  single_select: t('dashboard.jobs.shared.questionTypes.single_select'),
+  multi_select: t('dashboard.jobs.shared.questionTypes.multi_select'),
+  number: t('dashboard.jobs.shared.questionTypes.number'),
+  date: t('dashboard.jobs.shared.questionTypes.date'),
+  url: t('dashboard.jobs.shared.questionTypes.url'),
+  checkbox: t('dashboard.jobs.shared.questionTypes.checkbox'),
+  file_upload: t('dashboard.jobs.shared.questionTypes.file_upload'),
+}))
 </script>
 
 <template>
@@ -768,9 +871,9 @@ const questionTypeLabels: Record<QuestionType, string> = {
           class="inline-flex items-center gap-1 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 mb-2 transition-colors"
         >
           <ArrowLeft class="size-4" />
-          Back to Jobs
+          {{ t('common.actions.backToJobs') }}
         </NuxtLink>
-        <h1 class="text-3xl font-bold text-surface-900 dark:text-surface-100">New Job</h1>
+        <h1 class="text-3xl font-bold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.title') }}</h1>
       </div>
       <div v-if="!isPublished" class="flex items-center gap-3">
         <button
@@ -779,7 +882,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
           @click="handleSubmit('draft')"
           :disabled="isSubmitting"
         >
-          Save draft
+          {{ t('dashboard.jobs.create.actions.saveDraft') }}
         </button>
         <button
           v-if="currentStep < 4"
@@ -788,7 +891,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
           @click="nextStep"
           class="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
         >
-          Save & continue
+          {{ t('dashboard.jobs.create.actions.saveContinue') }}
         </button>
       </div>
     </div>
@@ -844,44 +947,62 @@ const questionTypeLabels: Record<QuestionType, string> = {
               <!-- Section: Job title and department -->
               <div class="space-y-6">
                 <div>
-                  <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-6 pb-2 border-b border-surface-100 dark:border-surface-800">Job title and department</h2>
+                  <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-6 pb-2 border-b border-surface-100 dark:border-surface-800">{{ t('dashboard.jobs.create.sections.jobTitleDepartment') }}</h2>
                   <label for="title" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-                    Job title <span class="text-danger-500">*</span>
+                    {{ t('dashboard.jobs.create.fields.jobTitle') }} <span class="text-danger-500">*</span>
                   </label>
                   <input
                     id="title"
                     v-model="form.title"
                     type="text"
-                    placeholder="e.g. Senior Frontend Engineer"
+                    :placeholder="t('dashboard.jobs.create.placeholders.jobTitle')"
                     class="w-full rounded-lg border px-3 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
                     :class="errors.title ? 'border-danger-300 ring-1 ring-danger-100' : 'border-surface-300 dark:border-surface-700'"
                     @blur="validateStep1"
                   />
                   <p v-if="errors.title" class="mt-1.5 text-xs text-danger-600 dark:text-danger-400 font-medium">{{ errors.title }}</p>
-                  <p v-else class="mt-1.5 text-xs text-surface-500">80 characters left. No special characters.</p>
+                  <p v-else class="mt-1.5 text-xs text-surface-500">{{ t('dashboard.jobs.create.helpers.charactersLeft') }}</p>
+                </div>
+
+                <div>
+                  <label for="iscoCategoryId" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                    {{ t('dashboard.jobs.create.fields.iscoCategory') }} <span class="text-danger-500">*</span>
+                  </label>
+                  <select
+                    id="iscoCategoryId"
+                    v-model="form.iscoCategoryId"
+                    class="w-full rounded-lg border px-3 py-2.5 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors bg-white dark:bg-surface-900"
+                    :class="errors.iscoCategoryId ? 'border-danger-300 ring-1 ring-danger-100' : 'border-surface-300 dark:border-surface-700'"
+                    @blur="validateStep1"
+                  >
+                    <option value="" disabled>{{ t('dashboard.jobs.create.fields.iscoCategoryPlaceholder') }}</option>
+                    <option v-for="cat in iscoCategories" :key="cat.id" :value="cat.id">
+                      {{ cat.label }}
+                    </option>
+                  </select>
+                  <p v-if="errors.iscoCategoryId" class="mt-1.5 text-xs text-danger-600 dark:text-danger-400 font-medium">{{ errors.iscoCategoryId }}</p>
+                  <p v-else class="mt-1.5 text-xs text-surface-500">{{ t('dashboard.jobs.create.helpers.iscoCategoryInternal') }}</p>
                 </div>
               </div>
 
               <!-- Section: Location -->
               <div class="space-y-6">
-                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-6 pb-2 border-b border-surface-100 dark:border-surface-800">Location</h2>
+                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-6 pb-2 border-b border-surface-100 dark:border-surface-800">{{ t('dashboard.jobs.create.sections.location') }}</h2>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label for="location" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-                      Office location
+                      {{ t('dashboard.jobs.create.fields.officeLocation') }}
                     </label>
-                    <input
+                    <LocationAutocomplete
                       id="location"
                       v-model="form.location"
-                      type="text"
-                      placeholder="e.g. New York, NY 10019, United States"
-                      class="w-full rounded-lg border px-3 py-2.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors border-surface-300 dark:border-surface-700"
+                      :placeholder="t('dashboard.jobs.create.placeholders.location')"
                     />
                   </div>
                   <div>
                     <label for="type" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-                      Workplace type
+                      {{ t('dashboard.jobs.create.fields.contractType') }}
                     </label>
                     <select
                       id="type"
@@ -898,32 +1019,41 @@ const questionTypeLabels: Record<QuestionType, string> = {
 
               <!-- Section: Experience & Remote -->
               <div class="space-y-6">
-                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-6 pb-2 border-b border-surface-100 dark:border-surface-800">Details</h2>
+                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-6 pb-2 border-b border-surface-100 dark:border-surface-800">{{ t('dashboard.jobs.create.sections.details') }}</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label for="experienceLevel" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Experience level</label>
+                    <label for="experienceLevel" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">{{ t('dashboard.jobs.create.fields.experienceLevel') }}</label>
                     <select
                       id="experienceLevel"
                       v-model="form.experienceLevel"
                       class="w-full rounded-lg border px-3 py-2.5 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 border-surface-300 dark:border-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
                     >
-                      <option value="junior">Junior</option>
-                      <option value="mid">Mid-level</option>
-                      <option value="senior">Senior</option>
-                      <option value="lead">Lead</option>
+                      <option v-for="opt in experienceOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                     </select>
                   </div>
                   <div>
-                    <label for="remoteStatus" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Remote status</label>
+                    <label
+                      for="remoteStatus"
+                      class="block text-sm font-medium mb-1.5"
+                      :class="isRemoteModelDisabled ? 'text-surface-400 dark:text-surface-500' : 'text-surface-700 dark:text-surface-300'"
+                    >
+                      {{ t('dashboard.jobs.create.fields.remoteModel') }}
+                    </label>
                     <select
                       id="remoteStatus"
                       v-model="form.remoteStatus"
-                      class="w-full rounded-lg border px-3 py-2.5 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 border-surface-300 dark:border-surface-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+                      :disabled="isRemoteModelDisabled"
+                      class="w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition-colors bg-white dark:bg-surface-900 border-surface-300 dark:border-surface-700"
+                      :class="isRemoteModelDisabled
+                        ? 'opacity-50 cursor-not-allowed bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500 focus:ring-0'
+                        : 'text-surface-900 dark:text-surface-100 focus:ring-brand-500 focus:border-brand-500'"
                     >
-                      <option :value="undefined">Not specified</option>
-                      <option value="remote">Remote</option>
-                      <option value="hybrid">Hybrid</option>
-                      <option value="onsite">On-site</option>
+                      <option v-if="isRemoteModelDisabled" value="">
+                        {{ t('dashboard.jobs.shared.notSpecified') }}
+                      </option>
+                      <option v-for="opt in remoteOptions" :key="String(opt.value)" :value="opt.value">
+                        {{ opt.label }}
+                      </option>
                     </select>
                   </div>
                 </div>
@@ -931,19 +1061,19 @@ const questionTypeLabels: Record<QuestionType, string> = {
 
               <!-- Section: Description -->
               <div class="space-y-6">
-                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-6 pb-2 border-b border-surface-100 dark:border-surface-800">Description</h2>
+                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-6 pb-2 border-b border-surface-100 dark:border-surface-800">{{ t('dashboard.jobs.create.sections.description') }}</h2>
                 <div>
                   <label for="description" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-                    About the role
+                    {{ t('dashboard.jobs.create.fields.aboutTheRole') }}
                   </label>
                   <textarea
                     id="description"
                     v-model="form.description"
                     rows="10"
-                    placeholder="Describe the role, responsibilities, and requirements…"
+                    :placeholder="t('dashboard.jobs.create.placeholders.description')"
                     class="w-full rounded-lg border px-4 py-3 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors border-surface-300 dark:border-surface-700"
                   />
-                  <p class="mt-2 text-xs text-surface-500">Minimum 700 characters recommended.</p>
+                  <p class="mt-2 text-xs text-surface-500">{{ t('dashboard.jobs.create.helpers.minCharacters') }}</p>
                 </div>
               </div>
             </section>
@@ -951,50 +1081,50 @@ const questionTypeLabels: Record<QuestionType, string> = {
             <!-- Step 2: Application form -->
             <section v-else-if="currentStep === 2" class="space-y-8">
               <div>
-                <p class="text-xs font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-3">Customize your application form</p>
+                <p class="text-xs font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-3">{{ t('dashboard.jobs.create.applicationForm.customizeTitle') }}</p>
                 <p class="text-sm text-surface-500 dark:text-surface-400 leading-relaxed">
-                  Configure which fields candidates see when they apply. Locked fields are always collected and cannot be turned off.
+                  {{ t('dashboard.jobs.create.applicationForm.customizeHint') }}
                 </p>
               </div>
 
               <!-- Personal information -->
               <div>
-                <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 pb-3 border-b border-surface-100 dark:border-surface-800">Personal information</h2>
+                <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 pb-3 border-b border-surface-100 dark:border-surface-800">{{ t('dashboard.jobs.create.applicationForm.personalInformation') }}</h2>
                 <div class="divide-y divide-surface-100 dark:divide-surface-800">
                   <div class="flex items-center justify-between py-3.5 px-1">
                     <div class="flex items-center gap-2.5">
-                      <span class="text-sm text-surface-900 dark:text-surface-100">First name</span>
+                      <span class="text-sm text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.applicationForm.firstName') }}</span>
                       <Lock class="size-3 text-surface-300 dark:text-surface-600" />
                     </div>
                     <span class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800">
-                      Mandatory
+                      {{ t('dashboard.jobs.create.applicationForm.mandatory') }}
                     </span>
                   </div>
                   <div class="flex items-center justify-between py-3.5 px-1">
                     <div class="flex items-center gap-2.5">
-                      <span class="text-sm text-surface-900 dark:text-surface-100">Last name</span>
+                      <span class="text-sm text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.applicationForm.lastName') }}</span>
                       <Lock class="size-3 text-surface-300 dark:text-surface-600" />
                     </div>
                     <span class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800">
-                      Mandatory
+                      {{ t('dashboard.jobs.create.applicationForm.mandatory') }}
                     </span>
                   </div>
                   <div class="flex items-center justify-between py-3.5 px-1">
                     <div class="flex items-center gap-2.5">
-                      <span class="text-sm text-surface-900 dark:text-surface-100">Email</span>
+                      <span class="text-sm text-surface-900 dark:text-surface-100">{{ t('common.fields.email') }}</span>
                       <Lock class="size-3 text-surface-300 dark:text-surface-600" />
                     </div>
                     <span class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800">
-                      Mandatory
+                      {{ t('dashboard.jobs.create.applicationForm.mandatory') }}
                     </span>
                   </div>
                   <div class="flex items-center justify-between py-3.5 px-1">
                     <div class="flex items-center gap-2.5">
-                      <span class="text-sm text-surface-900 dark:text-surface-100">Phone</span>
+                      <span class="text-sm text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.applicationForm.phone') }}</span>
                       <Lock class="size-3 text-surface-300 dark:text-surface-600" />
                     </div>
-                    <span class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2.5 py-1 text-xs font-medium text-surface-600 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700">
-                      Optional
+                    <span class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800">
+                      {{ t('dashboard.jobs.create.applicationForm.mandatory') }}
                     </span>
                   </div>
                 </div>
@@ -1002,18 +1132,18 @@ const questionTypeLabels: Record<QuestionType, string> = {
 
               <!-- Documents -->
               <div>
-                <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 pb-3 border-b border-surface-100 dark:border-surface-800">Documents</h2>
+                <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100 pb-3 border-b border-surface-100 dark:border-surface-800">{{ t('dashboard.jobs.create.applicationForm.documents') }}</h2>
                 <div class="divide-y divide-surface-100 dark:divide-surface-800">
                   <!-- Resume -->
                   <div class="flex items-center justify-between py-4 px-1">
                     <div>
                       <div class="flex items-center gap-2">
                         <Upload class="size-4 text-surface-400 dark:text-surface-500" />
-                        <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Resume / CV</span>
+                        <span class="text-sm font-medium text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.applicationForm.resumeCv') }}</span>
                       </div>
-                      <p class="text-xs text-surface-400 dark:text-surface-500 mt-1 ml-6">PDF, DOC, or DOCX up to 10 MB</p>
+                      <p class="text-xs text-surface-400 dark:text-surface-500 mt-1 ml-6">{{ t('dashboard.jobs.create.applicationForm.resumeFormats') }}</p>
                     </div>
-                    <div class="inline-flex items-center rounded-lg bg-surface-100 dark:bg-surface-800 p-0.5" role="radiogroup" aria-label="Resume requirement">
+                    <div class="inline-flex items-center rounded-lg bg-surface-100 dark:bg-surface-800 p-0.5" role="radiogroup" :aria-label="t('dashboard.jobs.create.applicationForm.resumeRequirementAria')">
                       <button
                         type="button"
                         role="radio"
@@ -1024,7 +1154,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                           ? 'bg-brand-600 text-white shadow-sm'
                           : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
                       >
-                        Required
+                        {{ t('dashboard.jobs.create.applicationForm.required') }}
                       </button>
                       <button
                         type="button"
@@ -1036,7 +1166,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                           ? 'bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-300 shadow-sm'
                           : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
                       >
-                        Off
+                        {{ t('dashboard.jobs.create.applicationForm.off') }}
                       </button>
                     </div>
                   </div>
@@ -1045,11 +1175,11 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     <div>
                       <div class="flex items-center gap-2">
                         <FileText class="size-4 text-surface-400 dark:text-surface-500" />
-                        <span class="text-sm font-medium text-surface-900 dark:text-surface-100">Cover letter</span>
+                        <span class="text-sm font-medium text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.applicationForm.coverLetter') }}</span>
                       </div>
-                      <p class="text-xs text-surface-400 dark:text-surface-500 mt-1 ml-6">Free-text field, max 10,000 characters</p>
+                      <p class="text-xs text-surface-400 dark:text-surface-500 mt-1 ml-6">{{ t('dashboard.jobs.create.applicationForm.coverLetterFormats') }}</p>
                     </div>
-                    <div class="inline-flex items-center rounded-lg bg-surface-100 dark:bg-surface-800 p-0.5" role="radiogroup" aria-label="Cover letter requirement">
+                    <div class="inline-flex items-center rounded-lg bg-surface-100 dark:bg-surface-800 p-0.5" role="radiogroup" :aria-label="t('dashboard.jobs.create.applicationForm.coverLetterRequirementAria')">
                       <button
                         type="button"
                         role="radio"
@@ -1060,7 +1190,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                           ? 'bg-brand-600 text-white shadow-sm'
                           : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
                       >
-                        Required
+                        {{ t('dashboard.jobs.create.applicationForm.required') }}
                       </button>
                       <button
                         type="button"
@@ -1072,7 +1202,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                           ? 'bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-300 shadow-sm'
                           : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
                       >
-                        Off
+                        {{ t('dashboard.jobs.create.applicationForm.off') }}
                       </button>
                     </div>
                   </div>
@@ -1082,9 +1212,9 @@ const questionTypeLabels: Record<QuestionType, string> = {
               <!-- Screening questions -->
               <div>
                 <div class="flex items-center justify-between pb-3 border-b border-surface-100 dark:border-surface-800">
-                  <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Screening questions</h2>
+                  <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.applicationForm.screeningQuestions') }}</h2>
                   <span v-if="applicationForm.questions.length > 0" class="text-xs font-medium text-surface-400 dark:text-surface-500 tabular-nums">
-                    {{ applicationForm.questions.length }} {{ applicationForm.questions.length === 1 ? 'question' : 'questions' }} added
+                    {{ t('dashboard.jobs.create.applicationForm.questionsAdded', applicationForm.questions.length) }}
                   </span>
                 </div>
 
@@ -1093,7 +1223,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                   class="rounded-lg border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-950 p-3 text-sm text-danger-700 dark:text-danger-400 mt-4"
                 >
                   {{ questionActionError }}
-                  <button class="ml-2 underline" @click="questionActionError = null">Dismiss</button>
+                  <button class="ml-2 underline" @click="questionActionError = null">{{ t('common.actions.dismiss') }}</button>
                 </div>
 
                 <div v-if="applicationForm.questions.length > 0" class="divide-y divide-surface-100 dark:divide-surface-800">
@@ -1112,13 +1242,13 @@ const questionTypeLabels: Record<QuestionType, string> = {
                           v-if="q.required"
                           class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-950/50 px-2 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-300 ring-1 ring-inset ring-brand-200 dark:ring-brand-800"
                         >
-                          Required
+                          {{ t('dashboard.jobs.create.applicationForm.required') }}
                         </span>
                         <span
                           v-else
                           class="inline-flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-medium text-surface-500 dark:text-surface-400 ring-1 ring-inset ring-surface-200 dark:ring-surface-700"
                         >
-                          Optional
+                          {{ t('dashboard.jobs.create.applicationForm.optional') }}
                         </span>
                       </div>
                       <div class="flex items-center gap-1.5 mt-0.5 ml-0">
@@ -1130,7 +1260,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                           v-if="(q.type === 'single_select' || q.type === 'multi_select') && q.options"
                           class="text-xs text-surface-400 dark:text-surface-500"
                         >
-                          &middot; {{ q.options.length }} options
+                          &middot; {{ t('dashboard.jobs.create.applicationForm.optionsCount', q.options.length) }}
                         </span>
                       </div>
                     </div>
@@ -1139,7 +1269,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                         type="button"
                         :disabled="index === 0"
                         class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-30"
-                        title="Move up"
+:title="t('dashboard.jobs.create.applicationForm.moveUp')"
                         @click="moveQuestion(index, 'up')"
                       >
                         <ChevronUp class="size-4" />
@@ -1148,7 +1278,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                         type="button"
                         :disabled="index === applicationForm.questions.length - 1"
                         class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors disabled:opacity-30"
-                        title="Move down"
+:title="t('dashboard.jobs.create.applicationForm.moveDown')"
                         @click="moveQuestion(index, 'down')"
                       >
                         <ChevronDown class="size-4" />
@@ -1156,7 +1286,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                       <button
                         type="button"
                         class="rounded p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                        title="Edit"
+:title="t('common.actions.edit')"
                         @click="editingQuestion = q; showAddForm = false"
                       >
                         <Pencil class="size-4" />
@@ -1164,7 +1294,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                       <button
                         type="button"
                         class="rounded p-1.5 text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors"
-                        title="Delete"
+:title="t('common.actions.delete')"
                         @click="handleDeleteQuestion(q.id)"
                       >
                         <Trash2 class="size-4" />
@@ -1174,7 +1304,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                 </div>
 
                 <p v-else class="text-sm text-surface-400 dark:text-surface-500 py-6 text-center">
-                  No screening questions added yet.
+                  {{ t('dashboard.jobs.create.applicationForm.noScreeningQuestions') }}
                 </p>
 
                 <QuestionForm
@@ -1200,7 +1330,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     @click="showAddForm = true"
                   >
                     <Plus class="size-4" />
-                    Add a question
+                    {{ t('dashboard.jobs.create.applicationForm.addQuestion') }}
                   </button>
                 </div>
               </div>
@@ -1210,10 +1340,10 @@ const questionTypeLabels: Record<QuestionType, string> = {
             <section v-else-if="currentStep === 3" class="space-y-8">
               <div>
                 <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2 pb-2 border-b border-surface-100 dark:border-surface-800">
-                  AI Candidate Scoring
+                  {{ t('dashboard.jobs.create.ai.title') }}
                 </h2>
                 <p class="text-sm text-surface-500 dark:text-surface-400 mb-6">
-                  Define the criteria that AI will use to evaluate and rank candidates. Adjust weights to prioritize what matters most.
+                  {{ t('dashboard.jobs.create.ai.intro') }}
                 </p>
               </div>
 
@@ -1222,16 +1352,16 @@ const questionTypeLabels: Record<QuestionType, string> = {
                 <div class="flex items-start gap-3">
                   <Sparkles class="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">AI provider not configured</p>
+                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">{{ t('dashboard.jobs.create.errors.aiNotConfigured') }}</p>
                     <p class="text-xs text-amber-700 dark:text-amber-300 mt-1 leading-relaxed">
-                      To use AI-powered scoring, you need to configure an AI provider first. You can still define criteria manually and set up AI later.
+                      {{ t('dashboard.jobs.create.ai.notConfiguredHint') }}
                     </p>
                     <NuxtLink
-                      :to="$localePath('/dashboard/settings/ai')"
+                      :to="localePath(aiSettingsPath)"
                       class="inline-flex items-center gap-1.5 mt-3 text-xs font-medium text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 underline underline-offset-2"
                     >
                       <ExternalLink class="size-3" />
-                      Go to AI settings
+                      {{ t('dashboard.jobs.create.ai.goToAiSettingsLink') }}
                     </NuxtLink>
                   </div>
                 </div>
@@ -1252,9 +1382,9 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     <Brain class="size-5 text-brand-600 dark:text-brand-400" />
                   </div>
                   <div>
-                    <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">Pre-made templates</span>
+                    <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.ai.premadeTemplates') }}</span>
                     <span class="text-xs text-surface-500 dark:text-surface-400 mt-1 block leading-relaxed">
-                      Choose from expert-designed scoring rubrics for common role types.
+                      {{ t('dashboard.jobs.create.ai.premadeHint') }}
                     </span>
                   </div>
                 </button>
@@ -1273,12 +1403,12 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     <Sparkles class="size-5 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
-                    <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">Generate from job description</span>
+                    <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.ai.generateFromDescription') }}</span>
                     <span class="text-xs text-surface-500 dark:text-surface-400 mt-1 block leading-relaxed">
-                      AI analyzes your job description and creates tailored criteria.
+                      {{ t('dashboard.jobs.create.ai.generateHint') }}
                     </span>
                     <span v-if="!isAiConfigured" class="text-[10px] text-amber-600 dark:text-amber-400 mt-1 block">
-                      Requires AI provider setup
+                      {{ t('dashboard.jobs.create.ai.requiresAiSetup') }}
                     </span>
                   </div>
                   <span v-if="isGeneratingCriteria" class="absolute top-3 right-3">
@@ -1299,9 +1429,9 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     <SlidersHorizontal class="size-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
-                    <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">Write your own</span>
+                    <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.ai.writeYourOwn') }}</span>
                     <span class="text-xs text-surface-500 dark:text-surface-400 mt-1 block leading-relaxed">
-                      Create custom scoring criteria tailored to your exact needs.
+                      {{ t('dashboard.jobs.create.ai.writeHint') }}
                     </span>
                   </div>
                 </button>
@@ -1316,14 +1446,14 @@ const questionTypeLabels: Record<QuestionType, string> = {
               <div v-if="scoringCriteria.length > 0" class="space-y-4">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">
-                    {{ scoringCriteria.length }} {{ scoringCriteria.length === 1 ? 'criterion' : 'criteria' }} configured
+                    {{ t('dashboard.jobs.create.ai.criteriaConfigured', scoringCriteria.length) }}
                   </h3>
                   <button
                     type="button"
                     class="text-xs text-danger-600 dark:text-danger-400 hover:underline"
                     @click="scoringCriteria = []; scoringMode = 'none'"
                   >
-                    Clear all
+                    {{ t('dashboard.jobs.create.ai.clearAll') }}
                   </button>
                 </div>
 
@@ -1336,7 +1466,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     <div class="flex items-start justify-between gap-3 mb-3">
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-1">
-                          <span class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ criterion.name }}</span>
+                          <span class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ resolveCriterionDisplay(criterion).name }}</span>
                           <span
                             class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset"
                             :class="categoryColorClasses[criterion.category] ?? categoryColorClasses.custom"
@@ -1344,14 +1474,14 @@ const questionTypeLabels: Record<QuestionType, string> = {
                             {{ categoryLabels[criterion.category] ?? criterion.category }}
                           </span>
                         </div>
-                        <p v-if="criterion.description" class="text-xs text-surface-500 dark:text-surface-400 leading-relaxed">
-                          {{ criterion.description }}
+                        <p v-if="resolveCriterionDisplay(criterion).description" class="text-xs text-surface-500 dark:text-surface-400 leading-relaxed">
+                          {{ resolveCriterionDisplay(criterion).description }}
                         </p>
                       </div>
                       <button
                         type="button"
                         class="rounded p-1 text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors shrink-0"
-                        title="Remove"
+:title="t('dashboard.jobs.create.ai.remove')"
                         @click="removeCriterion(criterion.key)"
                       >
                         <Trash2 class="size-4" />
@@ -1360,7 +1490,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
 
                     <!-- Weight slider -->
                     <div class="flex items-center gap-4">
-                      <label class="text-xs font-medium text-surface-500 dark:text-surface-400 shrink-0 w-12">Weight</label>
+                      <label class="text-xs font-medium text-surface-500 dark:text-surface-400 shrink-0 w-12">{{ t('dashboard.jobs.create.ai.weight') }}</label>
                       <input
                         type="range"
                         :min="0"
@@ -1374,8 +1504,8 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     </div>
 
                     <div class="flex items-center gap-4 mt-2 text-xs text-surface-400">
-                      <span>Max score: {{ criterion.maxScore }}</span>
-                      <span>Key: <code class="rounded bg-surface-100 dark:bg-surface-800 px-1 py-0.5 font-mono text-[10px]">{{ criterion.key }}</code></span>
+                      <span>{{ t('dashboard.jobs.create.ai.maxScoreLabel', { score: criterion.maxScore }) }}</span>
+                      <span v-if="!isPremadeCriterionKey(criterion.key)">{{ t('dashboard.jobs.create.ai.keyLabel') }} <code class="rounded bg-surface-100 dark:bg-surface-800 px-1 py-0.5 font-mono text-[10px]">{{ criterion.key }}</code></span>
                     </div>
                   </div>
                 </div>
@@ -1388,26 +1518,26 @@ const questionTypeLabels: Record<QuestionType, string> = {
                   @click="showCustomForm = true"
                 >
                   <Plus class="size-4" />
-                  Add criterion
+                  {{ t('dashboard.jobs.create.ai.addCriterion') }}
                 </button>
               </div>
 
               <!-- Custom criterion form -->
               <div v-if="showCustomForm" class="rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-900/50 p-5 space-y-4">
-                <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Add custom criterion</h3>
+                <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ t('dashboard.jobs.create.ai.addCustomCriterion') }}</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">Name *</label>
+                    <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.jobs.create.fields.nameRequired') }}</label>
                     <input
                       v-model="customCriterionForm.name"
                       @input="customCriterionForm.key = autoGenerateKey(customCriterionForm.name)"
                       type="text"
-                      placeholder="e.g. React Expertise"
+:placeholder="t('dashboard.jobs.create.ai.criterionNamePlaceholder')"
                       class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">Category</label>
+                    <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('common.fields.category') }}</label>
                     <select
                       v-model="customCriterionForm.category"
                       class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -1417,17 +1547,17 @@ const questionTypeLabels: Record<QuestionType, string> = {
                   </div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">Description</label>
+                  <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('common.fields.description') }}</label>
                   <textarea
                     v-model="customCriterionForm.description"
                     rows="2"
-                    placeholder="Describe what the AI should evaluate for this criterion..."
+:placeholder="t('dashboard.jobs.create.ai.criterionDescPlaceholder')"
                     class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                   <div>
-                    <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">Max Score</label>
+                    <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.jobs.create.ai.maxScore') }}</label>
                     <input
                       v-model.number="customCriterionForm.maxScore"
                       type="number"
@@ -1437,7 +1567,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">Initial Weight (0–100)</label>
+                    <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.jobs.create.ai.initialWeight') }}</label>
                     <input
                       v-model.number="customCriterionForm.weight"
                       type="number"
@@ -1454,14 +1584,14 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     class="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     @click="addCustomCriterion"
                   >
-                    Add criterion
+                    {{ t('dashboard.jobs.create.ai.addCriterion') }}
                   </button>
                   <button
                     type="button"
                     class="px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-lg transition-colors"
                     @click="showCustomForm = false"
                   >
-                    Cancel
+                    {{ t('common.cancel') }}
                   </button>
                 </div>
               </div>
@@ -1477,13 +1607,13 @@ const questionTypeLabels: Record<QuestionType, string> = {
                   />
                   <div>
                     <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">
-                      Automatically score every new applicant
+                      {{ t('dashboard.jobs.create.ai.autoScoreOnApply') }}
                     </span>
                     <span class="text-xs text-surface-500 dark:text-surface-400 mt-0.5 block leading-relaxed">
-                      When a candidate applies, AI will automatically analyze their resume against these criteria and assign a score. Requires an AI provider configured in settings plus a resume upload.
+                      {{ t('dashboard.jobs.create.ai.autoScoreHint') }}
                     </span>
                     <span v-if="!isAiConfigured" class="text-xs text-amber-600 dark:text-amber-400 mt-1 block">
-                      <NuxtLink :to="$localePath('/dashboard/settings/ai')" class="underline underline-offset-2 hover:text-amber-800 dark:hover:text-amber-200">Configure an AI provider</NuxtLink> to enable automatic scoring.
+                      <NuxtLink :to="localePath(aiSettingsPath)" class="underline underline-offset-2 hover:text-amber-800 dark:hover:text-amber-200">{{ t('dashboard.jobs.create.ai.configureAiProvider') }}</NuxtLink> {{ t('dashboard.jobs.create.ai.configureAiProviderHint') }}
                     </span>
                   </div>
                 </label>
@@ -1491,7 +1621,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
 
               <!-- Skip scoring note -->
               <div v-if="scoringCriteria.length === 0 && scoringMode === 'none'" class="text-center py-6 text-sm text-surface-400">
-                <p>Scoring criteria are optional. You can skip this step and add them later from job settings.</p>
+                <p>{{ t('dashboard.jobs.create.ai.optionalStep') }}</p>
               </div>
             </section>
 
@@ -1505,9 +1635,9 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     <PartyPopper class="size-6 text-success-600 dark:text-success-400" />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <h2 class="text-lg font-bold text-surface-900 dark:text-surface-100">Your job is live!</h2>
+                    <h2 class="text-lg font-bold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.publish.liveTitle') }}</h2>
                     <p class="text-sm text-surface-500 dark:text-surface-400">
-                      <strong>{{ form.title }}</strong> is now accepting applications.
+                      {{ t('dashboard.jobs.create.publish.acceptingApplications', { title: form.title }) }}
                     </p>
                   </div>
                   <NuxtLink
@@ -1516,7 +1646,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-brand-700 dark:text-brand-300 bg-brand-100 dark:bg-brand-900/50 rounded-lg hover:bg-brand-200 dark:hover:bg-brand-800 transition-colors shrink-0"
                   >
                     <ExternalLink class="size-3.5" />
-                    Preview
+                    {{ t('dashboard.jobs.create.actions.previewApplication') }}
                   </NuxtLink>
                 </div>
 
@@ -1524,8 +1654,8 @@ const questionTypeLabels: Record<QuestionType, string> = {
                 <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-900/50 p-5">
                   <div class="flex items-center gap-2 mb-3">
                     <Link2 class="size-4 text-surface-500 dark:text-surface-400" />
-                    <span class="text-sm font-semibold text-surface-700 dark:text-surface-300">Direct application link</span>
-                    <span class="text-xs text-surface-400 dark:text-surface-500">(no tracking)</span>
+                    <span class="text-sm font-semibold text-surface-700 dark:text-surface-300">{{ t('dashboard.jobs.create.publish.directApplicationLink') }}</span>
+                    <span class="text-xs text-surface-400 dark:text-surface-500">{{ t('dashboard.jobs.create.publish.noTracking') }}</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <input
@@ -1540,7 +1670,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                       @click="copyFinalLink"
                     >
                       <Copy class="size-3.5" />
-                      {{ linkCopiedFinal ? 'Copied!' : 'Copy' }}
+                      {{ linkCopiedFinal ? t('dashboard.jobs.create.actions.copied') : t('common.actions.copy') }}
                     </button>
                   </div>
                 </div>
@@ -1549,15 +1679,15 @@ const questionTypeLabels: Record<QuestionType, string> = {
                 <div>
                   <div class="flex items-center gap-3 mb-2">
                     <Share2 class="size-5 text-brand-600 dark:text-brand-400" />
-                    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100">Distribute to job boards</h3>
+                    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.publish.distributeTitle') }}</h3>
                   </div>
                   <p class="text-sm text-surface-500 dark:text-surface-400 mb-6">
-                    Create tracked links for each platform. This lets you see exactly where your applicants come from.
+                    {{ t('dashboard.jobs.create.publish.distributionHubHint') }}
                   </p>
 
                   <!-- Job boards -->
                   <div class="mb-6">
-                    <h4 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">Job boards</h4>
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">{{ t('dashboard.jobs.create.publish.jobBoards') }}</h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div
                         v-for="ch in distributionChannels.filter(c => c.category === 'job_board')"
@@ -1583,14 +1713,14 @@ const questionTypeLabels: Record<QuestionType, string> = {
                             @click="createChannelLink(ch.channel, ch.name)"
                           >
                             <Plus class="size-3.5" />
-                            Create tracking link
+                            {{ t('dashboard.jobs.create.actions.createTrackingLink') }}
                           </button>
                         </div>
 
                         <!-- Loading -->
                         <div v-else-if="createdLinks[ch.channel]?.loading" class="mt-3 flex items-center justify-center gap-2 py-2">
                           <Loader2 class="size-3.5 text-brand-600 animate-spin" />
-                          <span class="text-xs text-surface-500">Creating...</span>
+                          <span class="text-xs text-surface-500">{{ t('dashboard.jobs.create.publish.creating') }}</span>
                         </div>
 
                         <!-- Created - show URL -->
@@ -1612,12 +1742,12 @@ const questionTypeLabels: Record<QuestionType, string> = {
                             >
                               <Check v-if="createdLinks[ch.channel]?.copied" class="size-3" />
                               <Copy v-else class="size-3" />
-                              {{ createdLinks[ch.channel]?.copied ? 'Copied!' : 'Copy' }}
+                              {{ createdLinks[ch.channel]?.copied ? t('dashboard.jobs.create.actions.copied') : t('common.actions.copy') }}
                             </button>
                           </div>
                           <p class="flex items-center gap-1 text-[11px] text-success-600 dark:text-success-400">
                             <Check class="size-3" />
-                            Clicks and applications from this link will be tracked
+                            {{ t('dashboard.jobs.create.publish.linkTrackingHint') }}
                           </p>
                         </div>
                       </div>
@@ -1626,7 +1756,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
 
                   <!-- Outreach -->
                   <div class="mb-6">
-                    <h4 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">Direct outreach</h4>
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">{{ t('dashboard.jobs.create.publish.directOutreach') }}</h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div
                         v-for="ch in distributionChannels.filter(c => c.category === 'outreach')"
@@ -1650,12 +1780,12 @@ const questionTypeLabels: Record<QuestionType, string> = {
                             @click="createChannelLink(ch.channel, ch.name)"
                           >
                             <Plus class="size-3.5" />
-                            Create tracking link
+                            {{ t('dashboard.jobs.create.actions.createTrackingLink') }}
                           </button>
                         </div>
                         <div v-else-if="createdLinks[ch.channel]?.loading" class="mt-3 flex items-center justify-center gap-2 py-2">
                           <Loader2 class="size-3.5 text-brand-600 animate-spin" />
-                          <span class="text-xs text-surface-500">Creating...</span>
+                          <span class="text-xs text-surface-500">{{ t('dashboard.jobs.create.publish.creating') }}</span>
                         </div>
                         <div v-else class="mt-3 space-y-2">
                           <div class="flex items-center gap-1.5">
@@ -1675,12 +1805,12 @@ const questionTypeLabels: Record<QuestionType, string> = {
                             >
                               <Check v-if="createdLinks[ch.channel]?.copied" class="size-3" />
                               <Copy v-else class="size-3" />
-                              {{ createdLinks[ch.channel]?.copied ? 'Copied!' : 'Copy' }}
+                              {{ createdLinks[ch.channel]?.copied ? t('dashboard.jobs.create.actions.copied') : t('common.actions.copy') }}
                             </button>
                           </div>
                           <p class="flex items-center gap-1 text-[11px] text-success-600 dark:text-success-400">
                             <Check class="size-3" />
-                            Clicks and applications from this link will be tracked
+                            {{ t('dashboard.jobs.create.publish.linkTrackingHint') }}
                           </p>
                         </div>
                       </div>
@@ -1689,7 +1819,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
 
                   <!-- Social media -->
                   <div class="mb-6">
-                    <h4 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">Social media</h4>
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">{{ t('dashboard.jobs.create.publish.social') }}</h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div
                         v-for="ch in distributionChannels.filter(c => c.category === 'social')"
@@ -1713,12 +1843,12 @@ const questionTypeLabels: Record<QuestionType, string> = {
                             @click="createChannelLink(ch.channel, ch.name)"
                           >
                             <Plus class="size-3.5" />
-                            Create tracking link
+                            {{ t('dashboard.jobs.create.actions.createTrackingLink') }}
                           </button>
                         </div>
                         <div v-else-if="createdLinks[ch.channel]?.loading" class="mt-3 flex items-center justify-center gap-2 py-2">
                           <Loader2 class="size-3.5 text-brand-600 animate-spin" />
-                          <span class="text-xs text-surface-500">Creating...</span>
+                          <span class="text-xs text-surface-500">{{ t('dashboard.jobs.create.publish.creating') }}</span>
                         </div>
                         <div v-else class="mt-3 space-y-2">
                           <div class="flex items-center gap-1.5">
@@ -1738,12 +1868,12 @@ const questionTypeLabels: Record<QuestionType, string> = {
                             >
                               <Check v-if="createdLinks[ch.channel]?.copied" class="size-3" />
                               <Copy v-else class="size-3" />
-                              {{ createdLinks[ch.channel]?.copied ? 'Copied!' : 'Copy' }}
+                              {{ createdLinks[ch.channel]?.copied ? t('dashboard.jobs.create.actions.copied') : t('common.actions.copy') }}
                             </button>
                           </div>
                           <p class="flex items-center gap-1 text-[11px] text-success-600 dark:text-success-400">
                             <Check class="size-3" />
-                            Clicks and applications from this link will be tracked
+                            {{ t('dashboard.jobs.create.publish.linkTrackingHint') }}
                           </p>
                         </div>
                       </div>
@@ -1752,9 +1882,9 @@ const questionTypeLabels: Record<QuestionType, string> = {
 
                   <!-- Custom job board -->
                   <div class="mb-6">
-                    <h4 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">Custom job board</h4>
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">{{ t('dashboard.jobs.create.publish.customJobBoard') }}</h4>
                     <p class="text-sm text-surface-500 dark:text-surface-400 mb-3">
-                      Create a tracked link for any platform not listed above.
+                      {{ t('dashboard.jobs.create.publish.customBoardHint') }}
                     </p>
 
                     <!-- Add custom board form -->
@@ -1774,7 +1904,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                       >
                         <Loader2 v-if="isCreatingCustomBoard" class="size-3.5 animate-spin" />
                         <Plus v-else class="size-3.5" />
-                        Create link
+                        {{ t('dashboard.jobs.create.publish.createCustomLink') }}
                       </button>
                     </div>
 
@@ -1791,7 +1921,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                           </div>
                           <div class="flex-1 min-w-0">
                             <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">{{ cbl.name }}</span>
-                            <span class="text-xs text-surface-400 dark:text-surface-500">Custom job board</span>
+                            <span class="text-xs text-surface-400 dark:text-surface-500">{{ t('dashboard.jobs.create.publish.customJobBoard') }}</span>
                           </div>
                         </div>
                         <div class="mt-3 space-y-2">
@@ -1812,12 +1942,12 @@ const questionTypeLabels: Record<QuestionType, string> = {
                             >
                               <Check v-if="cbl.copied" class="size-3" />
                               <Copy v-else class="size-3" />
-                              {{ cbl.copied ? 'Copied!' : 'Copy' }}
+                              {{ cbl.copied ? t('dashboard.jobs.create.actions.copied') : t('common.actions.copy') }}
                             </button>
                           </div>
                           <p class="flex items-center gap-1 text-[11px] text-success-600 dark:text-success-400">
                             <Check class="size-3" />
-                            Clicks and applications from this link will be tracked
+                            {{ t('dashboard.jobs.create.publish.linkTrackingHint') }}
                           </p>
                         </div>
                       </div>
@@ -1831,10 +1961,10 @@ const questionTypeLabels: Record<QuestionType, string> = {
                       <div class="flex-1">
                         <p class="text-sm text-surface-700 dark:text-surface-300">
                           <span v-if="createdLinkCount > 0">
-                            {{ createdLinkCount }} tracking {{ createdLinkCount === 1 ? 'link' : 'links' }} created.
+                            {{ t('dashboard.jobs.create.publish.trackingLinksCount', createdLinkCount) }}
                           </span>
-                          View all analytics and manage links in the
-                          <NuxtLink :to="$localePath('/dashboard/source-tracking')" class="text-brand-600 dark:text-brand-400 font-medium underline underline-offset-2">Source Tracking dashboard</NuxtLink>.
+                          {{ t('dashboard.jobs.create.publish.trackingLinksManagePrefix') }}
+                          <NuxtLink :to="$localePath('/dashboard/source-tracking')" class="text-brand-600 dark:text-brand-400 font-medium underline underline-offset-2">{{ t('dashboard.jobs.create.publish.sourceTrackingLink') }}</NuxtLink>.
                         </p>
                       </div>
                     </div>
@@ -1848,22 +1978,22 @@ const questionTypeLabels: Record<QuestionType, string> = {
                     class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-surface-700 dark:text-surface-300 bg-white dark:bg-surface-900 border border-surface-300 dark:border-surface-700 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                   >
                     <Eye class="size-4" />
-                    View job
+                    {{ t('dashboard.jobs.create.actions.viewJob') }}
                   </NuxtLink>
                   <NuxtLink
                     :to="$localePath('/dashboard')"
                     class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors shadow-sm"
                   >
-                    Go to dashboard
+                    {{ t('common.goToDashboard') }}
                   </NuxtLink>
                 </div>
               </div>
 
               <!-- Pre-publish state: choose publish or draft -->
               <div v-else>
-                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2 pb-2 border-b border-surface-100 dark:border-surface-800">Ready to go?</h2>
+                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2 pb-2 border-b border-surface-100 dark:border-surface-800">{{ t('dashboard.jobs.create.publish.readyTitle') }}</h2>
                 <p class="text-sm text-surface-500 dark:text-surface-400 mb-6">
-                  Publish your job to start receiving applications. After publishing, you'll be able to create tracked links for each platform where you share it.
+                  {{ t('dashboard.jobs.create.publish.intro') }}
                 </p>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
@@ -1886,9 +2016,9 @@ const questionTypeLabels: Record<QuestionType, string> = {
                       <Rocket class="size-5 text-brand-600 dark:text-brand-400" />
                     </div>
                     <div>
-                      <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">Publish now</span>
+                      <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.publish.publishNow') }}</span>
                       <span class="text-xs text-surface-500 dark:text-surface-400 mt-1 block leading-relaxed">
-                        Your job goes live immediately. The application link will be copied to your clipboard so you can share it right away.
+                        {{ t('dashboard.jobs.create.publish.publishNowDetail') }}
                       </span>
                     </div>
                   </button>
@@ -1912,9 +2042,9 @@ const questionTypeLabels: Record<QuestionType, string> = {
                       <FileEdit class="size-5 text-surface-500 dark:text-surface-400" />
                     </div>
                     <div>
-                      <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">Save as draft</span>
+                      <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.publish.saveDraft') }}</span>
                       <span class="text-xs text-surface-500 dark:text-surface-400 mt-1 block leading-relaxed">
-                        Save for later review. The job won't be visible to candidates until you publish it.
+                        {{ t('dashboard.jobs.create.publish.saveDraftDetail') }}
                       </span>
                     </div>
                   </button>
@@ -1922,31 +2052,31 @@ const questionTypeLabels: Record<QuestionType, string> = {
 
                 <!-- Summary of what was configured -->
                 <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-900/50 p-5">
-                  <h3 class="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-4">Job summary</h3>
+                  <h3 class="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-4">{{ t('dashboard.jobs.create.publish.jobSummary') }}</h3>
                   <dl class="space-y-3 text-sm">
                     <div class="flex items-start gap-3">
                       <dt class="flex items-center gap-1.5 text-surface-500 dark:text-surface-400 shrink-0 w-32">
-                        <Briefcase class="size-3.5" /> Title
+                        <Briefcase class="size-3.5" /> {{ t('common.fields.title') }}
                       </dt>
                       <dd class="text-surface-900 dark:text-surface-100 font-medium">{{ form.title }}</dd>
                     </div>
                     <div v-if="form.location" class="flex items-start gap-3">
                       <dt class="flex items-center gap-1.5 text-surface-500 dark:text-surface-400 shrink-0 w-32">
-                        <Link2 class="size-3.5" /> Location
+                        <Link2 class="size-3.5" /> {{ t('common.fields.location') }}
                       </dt>
                       <dd class="text-surface-900 dark:text-surface-100">{{ form.location }}</dd>
                     </div>
                     <div class="flex items-start gap-3">
                       <dt class="flex items-center gap-1.5 text-surface-500 dark:text-surface-400 shrink-0 w-32">
-                        <FileText class="size-3.5" /> Resume
+                        <FileText class="size-3.5" /> {{ t('common.documents.resume') }}
                       </dt>
-                      <dd class="text-surface-900 dark:text-surface-100">{{ applicationForm.requireResume ? 'Required' : 'Optional' }}</dd>
+                      <dd class="text-surface-900 dark:text-surface-100">{{ applicationForm.requireResume ? t('dashboard.jobs.create.applicationForm.required') : t('dashboard.jobs.create.applicationForm.optional') }}</dd>
                     </div>
                     <div class="flex items-start gap-3">
                       <dt class="flex items-center gap-1.5 text-surface-500 dark:text-surface-400 shrink-0 w-32">
-                        <MessageSquare class="size-3.5" /> Questions
+                        <MessageSquare class="size-3.5" /> {{ t('dashboard.jobs.create.applicationForm.customQuestions') }}
                       </dt>
-                      <dd class="text-surface-900 dark:text-surface-100">{{ applicationForm.questions.length }} custom {{ applicationForm.questions.length === 1 ? 'question' : 'questions' }}</dd>
+                      <dd class="text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.publish.customQuestionsSummary', applicationForm.questions.length) }}</dd>
                     </div>
                   </dl>
                 </div>
@@ -1956,7 +2086,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                   <div class="flex items-start gap-3">
                     <Share2 class="size-4 text-brand-600 dark:text-brand-400 shrink-0 mt-0.5" />
                     <div>
-                      <p class="text-sm font-medium text-brand-800 dark:text-brand-200">After publishing</p>
+                      <p class="text-sm font-medium text-brand-800 dark:text-brand-200">{{ t('dashboard.jobs.create.publish.afterPublishing') }}</p>
                       <p class="text-xs text-brand-700 dark:text-brand-300 mt-0.5 leading-relaxed">
                         You'll get tracked links for LinkedIn, Indeed, and other platforms so you can see exactly where your applicants come from.
                       </p>
@@ -1972,7 +2102,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                 :to="$localePath('/dashboard')"
                 class="px-6 py-2.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </NuxtLink>
 
               <div class="flex items-center gap-3">
@@ -1982,7 +2112,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                   @click="prevStep"
                   class="px-6 py-2.5 text-sm font-medium text-surface-700 dark:text-surface-300 bg-white dark:bg-surface-900 border border-surface-300 dark:border-surface-700 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                 >
-                  Back
+                  {{ t('dashboard.jobs.create.actions.back') }}
                 </button>
                 <button
                   v-if="currentStep < 4"
@@ -1991,7 +2121,7 @@ const questionTypeLabels: Record<QuestionType, string> = {
                   @click="nextStep"
                   class="px-8 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                 >
-                  Save &amp; continue
+                  {{ t('dashboard.jobs.create.actions.saveContinue') }}
                 </button>
                 <button
                   v-else
@@ -2003,8 +2133,8 @@ const questionTypeLabels: Record<QuestionType, string> = {
                   <Rocket v-if="publishChoice === 'publish'" class="size-4" />
                   <FileEdit v-else class="size-4" />
                   {{ isSubmitting
-                    ? (publishChoice === 'publish' ? 'Publishing...' : 'Saving...')
-                    : (publishChoice === 'publish' ? 'Publish & copy link' : 'Save as draft')
+                    ? (publishChoice === 'publish' ? t('dashboard.jobs.create.publish.publishing') : t('dashboard.jobs.create.publish.savingDraft'))
+                    : (publishChoice === 'publish' ? t('dashboard.jobs.create.actions.publishCopyLink') : t('dashboard.jobs.create.actions.saveAsDraft'))
                   }}
                 </button>
               </div>
@@ -2017,59 +2147,59 @@ const questionTypeLabels: Record<QuestionType, string> = {
       <aside class="lg:col-span-4 space-y-6">
         <div class="sticky top-8 space-y-6">
           <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-900/50 p-6">
-            <h3 class="text-sm font-bold text-surface-900 dark:text-surface-100 uppercase tracking-wider mb-4">Tips</h3>
+            <h3 class="text-sm font-bold text-surface-900 dark:text-surface-100 uppercase tracking-wider mb-4">{{ t('dashboard.jobs.create.tips.title') }}</h3>
             <ul class="space-y-4">
               <li v-if="currentStep === 1" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Use common job titles</p>
-                Advertise for just one job e.g. 'Nurse', not 'nurses'.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step1.commonTitles.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step1.commonTitles.body') }}
               </li>
               <li v-if="currentStep === 1" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Office location</p>
-                Use a location to attract the most appropriate candidates. Some job boards require a location.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step1.officeLocation.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step1.officeLocation.body') }}
               </li>
               <li v-if="currentStep === 1" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Format description</p>
-                Format into sections and lists to improve readability.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step1.formatDescription.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step1.formatDescription.body') }}
               </li>
               <li v-if="currentStep === 2" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Keep it short</p>
-                Too many questions can deter candidates. Stick to 3–5 essential questions.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step2.keepShort.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step2.keepShort.body') }}
               </li>
               <li v-if="currentStep === 2" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Resume matters</p>
-                Requiring a resume enables AI scoring and makes it easier to evaluate candidates at scale.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step2.resumeMatters.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step2.resumeMatters.body') }}
               </li>
               <li v-if="currentStep === 2" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Standard fields</p>
-                Name, email, and phone are always collected. Phone is optional for candidates by default.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step2.standardFields.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step2.standardFields.body') }}
               </li>
               <li v-if="currentStep === 3" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Start with a template</p>
-                Pre-made criteria cover the most common evaluation patterns. You can always customize them after.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step3.startTemplate.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step3.startTemplate.body') }}
               </li>
               <li v-if="currentStep === 3" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Adjust weights</p>
-                Use the sliders to prioritize what matters most. Higher weight = more influence on the final score.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step3.adjustWeights.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step3.adjustWeights.body') }}
               </li>
               <li v-if="currentStep === 3" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">AI setup required</p>
-                To use AI-generated criteria or automatic scoring, configure your AI provider in <NuxtLink :to="$localePath('/dashboard/settings/ai')" class="text-brand-600 dark:text-brand-400 underline">settings</NuxtLink>.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step3.aiSetupRequired.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step3.aiSetupRequired.body') }} <NuxtLink :to="localePath(aiSettingsPath)" class="text-brand-600 dark:text-brand-400 underline">{{ t('dashboard.nav.settings') }}</NuxtLink>.
               </li>
               <li v-if="currentStep === 4" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Publish when ready</p>
-                Publishing makes the job visible to candidates. You can unpublish at any time from the job settings.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step4.publishWhenReady.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step4.publishWhenReady.body') }}
               </li>
               <li v-if="currentStep === 4" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Use tracking links</p>
-                Create a unique link for each platform (LinkedIn, Indeed, etc.) to see where your best applicants come from.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step4.useTrackingLinks.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step4.useTrackingLinks.body') }}
               </li>
               <li v-if="currentStep === 4" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">One link per channel</p>
-                Each tracking link counts clicks and applications separately so you can compare which channels work best.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step4.oneLinkPerChannel.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step4.oneLinkPerChannel.body') }}
               </li>
               <li v-if="currentStep === 4" class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">Drafts are private</p>
-                Draft jobs are only visible to your team. Candidates cannot see or apply to draft jobs.
+                <p class="font-medium text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.jobs.create.tips.step4.draftsPrivate.title') }}</p>
+                {{ t('dashboard.jobs.create.tips.step4.draftsPrivate.body') }}
               </li>
             </ul>
           </div>

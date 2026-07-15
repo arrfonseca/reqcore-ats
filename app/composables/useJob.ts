@@ -1,4 +1,5 @@
 import type { MaybeRefOrGetter } from 'vue'
+import type { JobTypeId } from '~~/shared/job-types'
 
 /**
  * Composable for a single job detail with update and delete mutations.
@@ -22,7 +23,7 @@ export function useJob(id: MaybeRefOrGetter<string>) {
     title: string
     description: string | null
     location: string | null
-    type: 'full_time' | 'part_time' | 'contract' | 'internship'
+    type: JobTypeId
     status: 'draft' | 'open' | 'closed' | 'archived'
     salaryMin: number | null
     salaryMax: number | null
@@ -59,7 +60,7 @@ export function useJob(id: MaybeRefOrGetter<string>) {
       throw error
     }
     await refreshNuxtData('jobs')
-    await navigateTo(localePath('/dashboard/jobs'))
+    await navigateTo(tenantPath('jobs'))
   }
 
   return { job, status, error, refresh, updateJob, deleteJob }

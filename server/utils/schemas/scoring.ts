@@ -43,6 +43,46 @@ export const setAiConfigDefaultSchema = z.object({
   purposes: z.array(z.enum(['chatbot', 'analysis'])).min(1),
 })
 
+const aiProviderEnum = z.enum(['openai', 'anthropic', 'google', 'openai_compatible'])
+
+export const listAiModelsSchema = z.object({
+  provider: aiProviderEnum,
+  apiKey: z.string().min(1).max(500).optional(),
+  baseUrl: safeBaseUrl.nullish(),
+  configId: z.string().min(1).optional(),
+  includeHidden: z.boolean().optional(),
+  verify: z.boolean().optional(),
+  forceVerify: z.boolean().optional(),
+  cacheOnly: z.boolean().optional(),
+  ensureModelIds: z.array(z.string().min(1).max(200)).optional(),
+})
+
+export const setHiddenModelSchema = z.object({
+  provider: aiProviderEnum,
+  modelId: z.string().min(1).max(200),
+  hidden: z.boolean(),
+})
+
+export const applyPlatformAiScopesSchema = z.object({
+  provider: aiProviderEnum,
+  apiKey: z.string().min(1).max(500).optional(),
+  baseUrl: safeBaseUrl.nullish(),
+  configId: z.string().min(1).optional(),
+  chatbotModelId: z.string().min(1).max(200).optional(),
+  analysisModelId: z.string().min(1).max(200).optional(),
+  maxTokens: z.number().int().min(256).max(200000).optional().default(16384),
+  inputPricePer1m: z.number().min(0).max(9999).nullish(),
+  outputPricePer1m: z.number().min(0).max(9999).nullish(),
+})
+
+export const testAiConnectionSchema = z.object({
+  provider: aiProviderEnum,
+  model: z.string().min(1).max(200),
+  apiKey: z.string().min(1).max(500).optional(),
+  baseUrl: safeBaseUrl.nullish(),
+  configId: z.string().min(1).optional(),
+})
+
 // ─── Scoring Criterion Schemas ────────────────────────────────────
 
 const criterionCategoryValues = ['technical', 'experience', 'soft_skills', 'education', 'culture', 'custom'] as const

@@ -2205,6 +2205,14 @@ const APPLICATION_SOURCES_DATA: ApplicationSourceSeed[] = [
 // ─────────────────────────────────────────────
 
 async function seed() {
+  console.log('🌱 Reqcore seed…\n')
+
+  if (process.env.SEED_DEMO !== 'true') {
+    console.log('ℹ️  Demo seed disabled (set SEED_DEMO=true to create reqcore-demo data).')
+    await client.end()
+    return
+  }
+
   console.log('🌱 Seeding Reqcore demo data...\n')
 
   // ─────────────────────────────────────────────

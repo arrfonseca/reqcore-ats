@@ -1,75 +1,55 @@
 <script setup lang="ts">
-const { orgs, activeOrg, switchOrg } = useCurrentOrg()
-const isOpen = ref(false)
-const isSwitching = ref(false)
+import { Building2 } from 'lucide-vue-next'
 
-async function handleSwitch(orgId: string) {
-  if (orgId === activeOrg.value?.id) {
-    isOpen.value = false
-    return
-  }
+const { t } = useI18n()
+const localePath = useLocalePath()
+const { activeOrg, canCreateOrg } = useCurrentOrg()
+const { isSaasAdmin, hasOrgContext } = useSaasAdmin()
 
-  isSwitching.value = true
-  try {
-    await switchOrg(orgId)
-  } catch {
-    isSwitching.value = false
-  }
-}
-
-/** Close dropdown on outside click */
-const switcherRef = useTemplateRef<HTMLElement>('switcherRoot')
-
-function onClickOutside(e: MouseEvent) {
-  if (switcherRef.value && !switcherRef.value.contains(e.target as Node)) {
-    isOpen.value = false
-  }
-}
-
-onMounted(() => document.addEventListener('click', onClickOutside))
-onUnmounted(() => document.removeEventListener('click', onClickOutside))
+/** SaaS admins impersonating a tenant should not create orgs from the ATS sidebar. */
+const showCreateOrg = computed(() =>
+  canCreateOrg.value && isSaasAdmin.value && !hasOrgContext.value,
+)
 </script>
 
 <template>
-  <div ref="switcherRoot" class="relative">
-    <button
-      class="flex items-center justify-between w-full px-3 py-2 bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-md cursor-pointer text-[13px] font-medium text-surface-900 dark:text-surface-100 text-left hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
-      @click="isOpen = !isOpen"
-    >
-      <ClientOnly fallback="Select org">
-        <span class="truncate">{{ activeOrg?.name ?? 'Select org' }}</span>
-      </ClientOnly>
-      <span class="text-[10px] text-surface-500 dark:text-surface-400">{{ isOpen ? '▲' : '▼' }}</span>
-    </button>
-
+  <div class="space-y-2">
     <div
-      v-if="isOpen"
-      class="absolute top-[calc(100%+4px)] left-0 min-w-full w-max bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-md shadow-lg z-50 overflow-hidden"
+      v-if="activeOrg"
+      class="rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 px-3 py-2.5"
     >
-      <div v-if="isSwitching" class="px-3 py-3 text-center text-[13px] text-surface-500 dark:text-surface-400">
-        Switching…
+      <div class="flex items-center gap-2 min-w-0">
+        <Building2 class="size-4 shrink-0 text-surface-400" />
+        <div class="min-w-0 flex-1">
+          <div class="text-[13px] font-medium text-surface-900 dark:text-surface-100 truncate">
+            {{ activeOrg.name }}
+          </div>
+          <div class="text-[11px] text-surface-400 truncate">
+            {{ activeOrg.slug }}
+          </div>
+        </div>
       </div>
-      <template v-else>
-        <button
-          v-for="org in orgs"
-          :key="org.id"
-          class="block w-full px-3 py-2 bg-transparent border-0 text-[13px] text-surface-700 dark:text-surface-300 text-left cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
-          :class="org.id === activeOrg?.id
-            ? 'bg-brand-50 dark:bg-brand-950 text-brand-600 dark:text-brand-400 font-medium'
-            : ''"
-          @click="handleSwitch(org.id)"
-        >
-          {{ org.name }}
-        </button>
-
-        <NuxtLink
-          :to="$localePath('/onboarding/create-org')"
-          class="block w-full px-3 py-2 border-t border-surface-200 dark:border-surface-700 text-xs text-surface-500 dark:text-surface-400 text-left cursor-pointer no-underline hover:text-surface-900 dark:hover:text-surface-200 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
-          @click="isOpen = false"
-        >
-          + Create organization
-        </NuxtLink>
-      </template>
+      <p
+        v-if="isSaasAdmin"
+        class="mt-1.5 text-[10px] text-brand-600 dark:text-brand-400"
+      >
+        {{ t('dashboard.topBar.saasAdminContextHint') }}
+      </p>
     </div>
+
+    <p
+      v-else-if="isSaasAdmin"
+      class="text-xs text-surface-500 dark:text-surface-400 px-1"
+    >
+      {{ t('dashboard.topBar.noOrgSelected') }}
+    </p>
+
+    <NuxtLink
+      v-if="showCreateOrg"
+      :to="localePath('/onboarding/create-org')"
+      class="flex items-center justify-center w-full rounded-lg border border-dashed border-surface-300 dark:border-surface-600 px-3 py-2 text-xs font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors no-underline"
+    >
+      {{ t('components.orgSwitcher.createOrg') }}
+    </NuxtLink>
   </div>
 </template>

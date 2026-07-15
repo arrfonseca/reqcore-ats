@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   Brain, Sparkles, TrendingUp, AlertTriangle, CheckCircle2,
-  XCircle, Zap, Clock, BarChart3, Activity, AlertCircle, DollarSign,
+  XCircle, Zap, Clock, BarChart3, Activity, AlertCircle, DollarSign, Briefcase,
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -9,14 +9,34 @@ definePageMeta({
   middleware: ['auth', 'require-org'],
 })
 
+const { t } = useI18n()
+const localePath = useLocalePath()
+const {
+  aiSettingsPath,
+  aiSettingsLinkLabel,
+  allowOwnLlm,
+  isAnalysisConfigured,
+} = useEffectiveAi()
+
 useSeoMeta({
-  title: 'AI Analysis — Reqcore',
+  title: t('dashboard.aiAnalysis.seoTitle'),
   robots: 'noindex, nofollow',
 })
 
 const { data: stats, status: fetchStatus, error, refresh } = useFetch('/api/ai-analysis/stats', {
   key: 'ai-analysis-stats',
   headers: useRequestHeaders(['cookie']),
+})
+
+const emptyDescription = computed(() => {
+  if (isAnalysisConfigured.value) {
+    return allowOwnLlm.value
+      ? t('dashboard.aiAnalysis.empty.descriptionReady')
+      : t('dashboard.aiAnalysis.empty.descriptionPlatformReady')
+  }
+  return allowOwnLlm.value
+    ? t('dashboard.aiAnalysis.empty.descriptionNotConfigured')
+    : t('dashboard.aiAnalysis.empty.descriptionPlatformNotConfigured')
 })
 
 const summary = computed(() => stats.value?.summary ?? {
@@ -69,14 +89,14 @@ function formatNumber(n: number): string {
 }
 
 function formatCost(cost: number | null): string {
-  if (cost == null) return '—'
-  if (cost < 0.01) return '<$0.01'
+  if (cost == null) return t('dashboard.aiAnalysis.cost.unavailable')
+  if (cost < 0.01) return t('dashboard.aiAnalysis.cost.underCent')
   return `$${cost.toFixed(2)}`
 }
 
 function formatCostPrecise(cost: number | null): string {
-  if (cost == null) return '—'
-  if (cost < 0.001) return '<$0.001'
+  if (cost == null) return t('dashboard.aiAnalysis.cost.unavailable')
+  if (cost < 0.001) return t('dashboard.aiAnalysis.cost.underMilli')
   if (cost < 0.01) return `$${cost.toFixed(4)}`
   return `$${cost.toFixed(2)}`
 }
@@ -107,6 +127,11 @@ function scoreBadgeClass(score: number | null): string {
   if (score >= 75) return 'bg-success-50 text-success-700 ring-success-200/60 dark:bg-success-950 dark:text-success-400 dark:ring-success-800/40'
   if (score >= 40) return 'bg-warning-50 text-warning-700 ring-warning-200/60 dark:bg-warning-950 dark:text-warning-400 dark:ring-warning-800/40'
   return 'bg-danger-50 text-danger-700 ring-danger-200/60 dark:bg-danger-950 dark:text-danger-400 dark:ring-danger-800/40'
+}
+
+function statusLabel(status: string): string {
+  const key = `dashboard.aiAnalysis.statuses.${status}` as const
+  return t(key)
 }
 
 function statusBadgeClass(status: string): string {
@@ -154,21 +179,40 @@ function statusBadgeClass(status: string): string {
       class="rounded-2xl border border-danger-200 dark:border-danger-900 bg-danger-50 dark:bg-danger-950/60 p-5 text-sm text-danger-700 dark:text-danger-400 flex items-center gap-3"
     >
       <AlertCircle class="size-5 shrink-0" />
-      <span>Failed to load AI analysis data.</span>
-      <button class="underline ml-auto font-medium cursor-pointer" @click="refresh()">Retry</button>
+      <span>{{ t('dashboard.aiAnalysis.loadFailed') }}</span>
+      <button class="underline ml-auto font-medium cursor-pointer" @click="refresh()">{{ t('common.actions.retry') }}</button>
     </div>
 
     <!-- ─── Empty state (no runs at all) ─── -->
     <div v-else-if="summary.totalRuns === 0" class="flex flex-col items-center justify-center py-24">
-      <div class="rounded-3xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-14 text-center max-w-md shadow-sm">
+      <div class="rounded-3xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-14 text-center max-w-lg shadow-sm">
         <div class="mx-auto mb-8 flex items-center justify-center size-18 rounded-2xl bg-gradient-to-br from-brand-500 to-violet-600 shadow-lg shadow-brand-500/20">
           <Brain class="size-9 text-white" />
         </div>
         <h2 class="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-3 tracking-tight">
-          No AI analysis yet
+          {{ t('dashboard.aiAnalysis.empty.title') }}
         </h2>
-        <p class="text-sm text-surface-500 dark:text-surface-400 mb-4 leading-relaxed max-w-sm mx-auto">
-          Configure your AI provider in Settings and set up scoring criteria on a job to start analyzing candidates.
+        <p class="text-sm text-surface-500 dark:text-surface-400 mb-6 leading-relaxed max-w-md mx-auto">
+          {{ emptyDescription }}
+        </p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <NuxtLink
+            :to="localePath('/dashboard/jobs')"
+            class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors no-underline"
+          >
+            <Briefcase class="size-4" />
+            {{ t('dashboard.aiAnalysis.empty.goToJobs') }}
+          </NuxtLink>
+          <NuxtLink
+            v-if="!isAnalysisConfigured && allowOwnLlm"
+            :to="localePath(aiSettingsPath)"
+            class="inline-flex items-center gap-2 rounded-lg border border-surface-200 dark:border-surface-700 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors no-underline"
+          >
+            {{ aiSettingsLinkLabel }}
+          </NuxtLink>
+        </div>
+        <p v-if="isAnalysisConfigured" class="mt-5 text-xs text-surface-400 dark:text-surface-500 leading-relaxed max-w-sm mx-auto">
+          {{ t('dashboard.aiAnalysis.empty.scoringHint') }}
         </p>
       </div>
     </div>
@@ -178,8 +222,8 @@ function statusBadgeClass(status: string): string {
       <!-- ─── Header ─── -->
       <div class="flex items-center justify-between mb-10">
         <div>
-          <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50 tracking-tight">AI Analysis</h1>
-          <p class="text-sm text-surface-400 dark:text-surface-500 mt-1">Overview of AI scoring runs and token usage</p>
+          <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50 tracking-tight">{{ t('dashboard.aiAnalysis.title') }}</h1>
+          <p class="text-sm text-surface-400 dark:text-surface-500 mt-1">{{ t('dashboard.aiAnalysis.subtitle') }}</p>
         </div>
       </div>
 
@@ -196,7 +240,7 @@ function statusBadgeClass(status: string): string {
               </span>
               <span class="size-1.5 rounded-full bg-brand-500 shrink-0 mb-1" />
             </div>
-            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Total Runs</span>
+            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('dashboard.aiAnalysis.stats.totalRuns') }}</span>
             <div class="mt-1 flex items-center gap-3 text-[11px]">
               <span class="flex items-center gap-1 text-success-600 dark:text-success-400">
                 <CheckCircle2 class="size-3" />
@@ -221,9 +265,9 @@ function statusBadgeClass(status: string): string {
               </span>
               <span class="size-1.5 rounded-full shrink-0 mb-1" :class="successRate >= 90 ? 'bg-success-500' : successRate >= 70 ? 'bg-warning-500' : 'bg-danger-500'" />
             </div>
-            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Success Rate</span>
+            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('dashboard.aiAnalysis.stats.successRate') }}</span>
             <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">
-              {{ summary.completedRuns }} of {{ summary.totalRuns }} successful
+              {{ t('dashboard.aiAnalysis.stats.successSummary', { completed: summary.completedRuns, total: summary.totalRuns }) }}
             </p>
           </div>
         </div>
@@ -239,8 +283,8 @@ function statusBadgeClass(status: string): string {
               </span>
               <span class="size-1.5 rounded-full bg-violet-500 shrink-0 mb-1" />
             </div>
-            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Prompt Tokens</span>
-            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">Input tokens sent</p>
+            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('dashboard.aiAnalysis.stats.promptTokens') }}</span>
+            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ t('dashboard.aiAnalysis.stats.promptTokensHint') }}</p>
           </div>
         </div>
 
@@ -255,8 +299,8 @@ function statusBadgeClass(status: string): string {
               </span>
               <span class="size-1.5 rounded-full bg-amber-500 shrink-0 mb-1" />
             </div>
-            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Completion Tokens</span>
-            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">Output tokens generated</p>
+            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('dashboard.aiAnalysis.stats.completionTokens') }}</span>
+            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ t('dashboard.aiAnalysis.stats.completionTokensHint') }}</p>
           </div>
         </div>
 
@@ -271,11 +315,13 @@ function statusBadgeClass(status: string): string {
               </span>
               <span class="size-1.5 rounded-full shrink-0 mb-1" :class="pricing.configured ? 'bg-emerald-500' : 'bg-surface-300 dark:bg-surface-600'" />
             </div>
-            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Total Cost</span>
+            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('dashboard.aiAnalysis.stats.totalCost') }}</span>
             <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">
-              <template v-if="pricing.configured">Estimated from token usage</template>
+              <template v-if="pricing.configured">{{ t('dashboard.aiAnalysis.stats.costEstimated') }}</template>
               <template v-else>
-                <NuxtLink to="/dashboard/settings/ai" class="text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300 underline underline-offset-2">Set pricing</NuxtLink> to track costs
+                <NuxtLink v-if="allowOwnLlm" :to="localePath(aiSettingsPath)" class="text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300 underline underline-offset-2">{{ t('dashboard.aiAnalysis.stats.setPricing') }}</NuxtLink>
+                <span v-else>{{ t('settings.aiAnalysis.pricingManagedByPlatform') }}</span>
+                {{ t('dashboard.aiAnalysis.stats.setPricingHint') }}
               </template>
             </p>
           </div>
@@ -290,8 +336,8 @@ function statusBadgeClass(status: string): string {
               <BarChart3 class="size-5" />
             </div>
             <div>
-              <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Usage — Last 30 Days</h2>
-              <p class="text-sm text-surface-500 dark:text-surface-400">Daily run counts and token consumption</p>
+              <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.aiAnalysis.usage.title') }}</h2>
+              <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.usage.subtitle') }}</p>
             </div>
           </div>
         </div>
@@ -299,7 +345,7 @@ function statusBadgeClass(status: string): string {
         <div class="px-6 py-5 space-y-6">
           <!-- Runs per day bar chart -->
           <div>
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">Runs per Day</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">{{ t('dashboard.aiAnalysis.usage.runsPerDay') }}</h3>
             <div class="flex items-end gap-1 h-24">
               <div
                 v-for="day in dailyRuns"
@@ -314,8 +360,8 @@ function statusBadgeClass(status: string): string {
                 <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block z-10">
                   <div class="rounded-lg border border-surface-200 bg-white px-2.5 py-1.5 shadow-lg dark:border-surface-700 dark:bg-surface-800 whitespace-nowrap text-[11px]">
                     <p class="font-semibold text-surface-800 dark:text-surface-200">{{ formatDate(day.date) }}</p>
-                    <p class="text-surface-500">{{ day.count }} run{{ day.count !== 1 ? 's' : '' }}</p>
-                    <p class="text-surface-400">{{ formatNumber(day.promptTokens + day.completionTokens) }} tokens</p>
+                    <p class="text-surface-500">{{ t('dashboard.aiAnalysis.usage.runCount', day.count) }}</p>
+                    <p class="text-surface-400">{{ t('dashboard.aiAnalysis.usage.tokensCount', { count: formatNumber(day.promptTokens + day.completionTokens) }) }}</p>
                     <p v-if="pricing.configured" class="text-emerald-600 dark:text-emerald-400 font-medium">{{ formatCostPrecise(calcCost(day.promptTokens, day.completionTokens)) }}</p>
                   </div>
                 </div>
@@ -329,7 +375,7 @@ function statusBadgeClass(status: string): string {
 
           <!-- Tokens per day bar chart -->
           <div>
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">Tokens per Day</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-3">{{ t('dashboard.aiAnalysis.usage.tokensPerDay') }}</h3>
             <div class="flex items-end gap-1 h-24">
               <div
                 v-for="day in dailyRuns"
@@ -350,8 +396,8 @@ function statusBadgeClass(status: string): string {
                 <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block z-10">
                   <div class="rounded-lg border border-surface-200 bg-white px-2.5 py-1.5 shadow-lg dark:border-surface-700 dark:bg-surface-800 whitespace-nowrap text-[11px]">
                     <p class="font-semibold text-surface-800 dark:text-surface-200">{{ formatDate(day.date) }}</p>
-                    <p class="text-violet-600 dark:text-violet-400">Prompt: {{ formatNumber(day.promptTokens) }}</p>
-                    <p class="text-amber-600 dark:text-amber-400">Completion: {{ formatNumber(day.completionTokens) }}</p>
+                    <p class="text-violet-600 dark:text-violet-400">{{ t('dashboard.aiAnalysis.usage.tooltipPrompt', { count: formatNumber(day.promptTokens) }) }}</p>
+                    <p class="text-amber-600 dark:text-amber-400">{{ t('dashboard.aiAnalysis.usage.tooltipCompletion', { count: formatNumber(day.completionTokens) }) }}</p>
                     <p v-if="pricing.configured" class="text-emerald-600 dark:text-emerald-400 font-medium mt-0.5 pt-0.5 border-t border-surface-100 dark:border-surface-700">{{ formatCostPrecise(calcCost(day.promptTokens, day.completionTokens)) }}</p>
                   </div>
                 </div>
@@ -359,8 +405,8 @@ function statusBadgeClass(status: string): string {
             </div>
             <div class="flex items-center justify-between mt-1.5">
               <div class="flex items-center gap-3 text-[10px] text-surface-400">
-                <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-sm bg-violet-500 dark:bg-violet-400" /> Prompt</span>
-                <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-sm bg-amber-400 dark:bg-amber-300" /> Completion</span>
+                <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-sm bg-violet-500 dark:bg-violet-400" /> {{ t('dashboard.aiAnalysis.usage.promptLegend') }}</span>
+                <span class="flex items-center gap-1"><span class="inline-block size-2 rounded-sm bg-amber-400 dark:bg-amber-300" /> {{ t('dashboard.aiAnalysis.usage.completionLegend') }}</span>
               </div>
               <div class="flex gap-4 text-[10px] text-surface-400">
                 <span>{{ chartStartDate }}</span>
@@ -371,16 +417,16 @@ function statusBadgeClass(status: string): string {
         </div>
       </div>
 
-      <!-- ─── Model breakdown ─── -->
-      <div v-if="modelBreakdown.length > 0" class="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-hidden mb-6">
+      <!-- ─── Model breakdown (delegated tenants only) ─── -->
+      <div v-if="allowOwnLlm && modelBreakdown.length > 0" class="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-hidden mb-6">
         <div class="px-6 py-5 border-b border-surface-200 dark:border-surface-800">
           <div class="flex items-center gap-3">
             <div class="flex items-center justify-center size-10 rounded-lg bg-violet-50 dark:bg-violet-950 text-violet-600 dark:text-violet-400">
               <Sparkles class="size-5" />
             </div>
             <div>
-              <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Model Breakdown</h2>
-              <p class="text-sm text-surface-500 dark:text-surface-400">Usage per AI provider and model</p>
+              <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.aiAnalysis.modelBreakdown.title') }}</h2>
+              <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.modelBreakdown.subtitle') }}</p>
             </div>
           </div>
         </div>
@@ -389,13 +435,13 @@ function statusBadgeClass(status: string): string {
           <table class="w-full text-sm">
             <thead>
               <tr class="bg-surface-50 dark:bg-surface-800/50 border-b border-surface-200 dark:border-surface-800">
-                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">Provider</th>
-                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">Model</th>
-                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400">Runs</th>
-                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">Prompt</th>
-                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">Completion</th>
-                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400">Total Tokens</th>
-                <th v-if="pricing.configured" class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400">Cost</th>
+                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.modelBreakdown.provider') }}</th>
+                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.modelBreakdown.model') }}</th>
+                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.modelBreakdown.runs') }}</th>
+                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">{{ t('dashboard.aiAnalysis.modelBreakdown.prompt') }}</th>
+                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">{{ t('dashboard.aiAnalysis.modelBreakdown.completion') }}</th>
+                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.modelBreakdown.totalTokens') }}</th>
+                <th v-if="pricing.configured" class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.modelBreakdown.cost') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-surface-100 dark:divide-surface-800">
@@ -427,17 +473,17 @@ function statusBadgeClass(status: string): string {
               <Clock class="size-5" />
             </div>
             <div>
-              <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Recent Runs</h2>
-              <p class="text-sm text-surface-500 dark:text-surface-400">Latest AI scoring activity</p>
+              <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.aiAnalysis.recentRuns.title') }}</h2>
+              <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.recentRuns.subtitle') }}</p>
             </div>
           </div>
         </div>
 
         <div v-if="recentRuns.length === 0" class="p-16 text-center">
           <Brain class="size-10 text-surface-300 dark:text-surface-600 mx-auto mb-3" />
-          <h3 class="text-base font-semibold text-surface-700 dark:text-surface-200 mb-1">No AI analysis runs yet</h3>
+          <h3 class="text-base font-semibold text-surface-700 dark:text-surface-200 mb-1">{{ t('dashboard.aiAnalysis.recentRuns.emptyTitle') }}</h3>
           <p class="text-sm text-surface-500 dark:text-surface-400">
-            Runs will appear here once you score candidates.
+            {{ t('dashboard.aiAnalysis.recentRuns.emptyDescription') }}
           </p>
         </div>
 
@@ -445,14 +491,14 @@ function statusBadgeClass(status: string): string {
           <table class="w-full text-sm">
             <thead>
               <tr class="bg-surface-50 dark:bg-surface-800/50 border-b border-surface-200 dark:border-surface-800">
-                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">Status</th>
-                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">Candidate</th>
-                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden lg:table-cell">Job</th>
-                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400">Score</th>
-                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">Model</th>
-                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">Tokens</th>
-                <th v-if="pricing.configured" class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">Cost</th>
-                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400">Date</th>
+                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.recentRuns.status') }}</th>
+                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.recentRuns.candidate') }}</th>
+                <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden lg:table-cell">{{ t('dashboard.aiAnalysis.recentRuns.job') }}</th>
+                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.recentRuns.score') }}</th>
+                <th v-if="allowOwnLlm" class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">{{ t('dashboard.aiAnalysis.recentRuns.model') }}</th>
+                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">{{ t('dashboard.aiAnalysis.recentRuns.tokens') }}</th>
+                <th v-if="pricing.configured" class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">{{ t('dashboard.aiAnalysis.recentRuns.cost') }}</th>
+                <th class="text-right px-4 py-3 font-medium text-surface-500 dark:text-surface-400">{{ t('dashboard.aiAnalysis.recentRuns.date') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-surface-100 dark:divide-surface-800">
@@ -470,7 +516,7 @@ function statusBadgeClass(status: string): string {
                       class="size-1.5 rounded-full"
                       :class="run.status === 'completed' ? 'bg-success-500' : run.status === 'failed' ? 'bg-danger-500' : 'bg-warning-500'"
                     />
-                    {{ run.status }}
+                    {{ statusLabel(run.status) }}
                   </span>
                 </td>
                 <td class="px-4 py-3 font-semibold text-surface-900 dark:text-surface-100 max-w-[160px] truncate">
@@ -489,18 +535,18 @@ function statusBadgeClass(status: string): string {
                   </span>
                   <span v-else class="text-surface-400">—</span>
                 </td>
-                <td class="px-4 py-3 hidden md:table-cell">
+                <td v-if="allowOwnLlm" class="px-4 py-3 hidden md:table-cell">
                   <code class="rounded bg-surface-100 px-1.5 py-0.5 text-[11px] font-mono text-surface-600 dark:bg-surface-800 dark:text-surface-400">{{ run.model }}</code>
                 </td>
                 <td class="px-4 py-3 text-right tabular-nums text-surface-600 dark:text-surface-400 hidden md:table-cell">
                   <span v-if="run.promptTokens != null">
                     {{ formatNumber((run.promptTokens ?? 0) + (run.completionTokens ?? 0)) }}
                   </span>
-                  <span v-else>—</span>
+                  <span v-else>{{ t('dashboard.aiAnalysis.cost.unavailable') }}</span>
                 </td>
                 <td v-if="pricing.configured" class="px-4 py-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 hidden md:table-cell">
                   <span v-if="run.promptTokens != null">{{ formatCostPrecise(calcCost(run.promptTokens ?? 0, run.completionTokens ?? 0)) }}</span>
-                  <span v-else>—</span>
+                  <span v-else>{{ t('dashboard.aiAnalysis.cost.unavailable') }}</span>
                 </td>
                 <td class="px-4 py-3 text-right text-xs text-surface-500 dark:text-surface-400 whitespace-nowrap">
                   {{ formatDateTime(run.createdAt) }}

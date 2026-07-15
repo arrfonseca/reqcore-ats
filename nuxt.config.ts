@@ -7,36 +7,13 @@ const railwayEnvironmentName =
 const railwayPublicDomain =
   process.env.RAILWAY_PUBLIC_DOMAIN?.toLowerCase() ?? "";
 const siteUrl = process.env.NUXT_PUBLIC_SITE_URL || "https://reqcore.com";
-const i18nDefaultLocale = "en";
+const i18nDefaultLocale = "pt-BR";
 const i18nLocales = [
-  { code: "en", language: "en-US", name: "English", file: "en.json" },
   {
-    code: "es",
-    language: "es-ES",
-    name: "Español",
-    file: "es.json",
-    partial: true,
-  },
-  {
-    code: "fr",
-    language: "fr-FR",
-    name: "Français",
-    file: "fr.json",
-    partial: true,
-  },
-  {
-    code: "de",
-    language: "de-DE",
-    name: "Deutsch",
-    file: "de.json",
-    partial: true,
-  },
-  { code: "nb", language: "nb-NO", name: "Norsk Bokmål", file: "nb.json" },
-  {
-    code: "vi",
-    language: "vi-VN",
-    name: "Tiếng Việt",
-    file: "vi.json",
+    code: "pt-BR",
+    language: "pt-BR",
+    name: "Português (Brasil)",
+    file: "pt-BR.json",
     partial: true,
   },
 ];
@@ -47,6 +24,8 @@ const localizedPublicRouteRules = Object.fromEntries(
     .flatMap((locale) => [
       [`/${locale.code}/jobs`, { isr: 3600 }],
       [`/${locale.code}/jobs/**`, { isr: 3600 }],
+      [`/${locale.code}/:orgSlug`, { isr: 3600 }],
+      [`/${locale.code}/:orgSlug/**`, { isr: 3600 }],
     ]),
 );
 
@@ -61,6 +40,14 @@ const localizedJobsRobotsRules = Object.fromEntries(
       ],
       [
         `/${locale.code}/jobs/**`,
+        { headers: { "X-Robots-Tag": "index, follow" } },
+      ],
+      [
+        `/${locale.code}/:orgSlug`,
+        { headers: { "X-Robots-Tag": "index, follow" } },
+      ],
+      [
+        `/${locale.code}/:orgSlug/**`,
         { headers: { "X-Robots-Tag": "index, follow" } },
       ],
     ]),
@@ -93,11 +80,7 @@ export default defineNuxtConfig({
     strategy: "prefix_except_default",
     locales: i18nLocales,
     langDir: "locales",
-    detectBrowserLanguage: {
-      useCookie: true,
-      cookieKey: "reqcore_i18n_redirected",
-      redirectOn: "root",
-    },
+    detectBrowserLanguage: false,
     vueI18n: "./i18n.config.ts",
   },
 
@@ -106,7 +89,7 @@ export default defineNuxtConfig({
   // ─────────────────────────────────────────────
   app: {
     head: {
-      titleTemplate: "%s — Reqcore",
+      titleTemplate: "%s — Recursos Humanos",
       link: [
         { rel: "icon", type: "image/png", href: "/favicon.png" },
         { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
@@ -137,8 +120,7 @@ export default defineNuxtConfig({
       /** Cookie domain for cross-subdomain sharing (e.g. '.reqcore.com') */
       cookieDomain: process.env.NUXT_PUBLIC_COOKIE_DOMAIN || "",
       /** When set, the dashboard shows a read-only demo banner for this org slug */
-      demoOrgSlug:
-        process.env.DEMO_ORG_SLUG || (isRailwayPreview ? "reqcore-demo" : ""),
+      demoOrgSlug: process.env.DEMO_ORG_SLUG || "",
       /** Public live-demo account email used to prefill sign-in */
       liveDemoEmail: (() => {
         const email =
@@ -178,6 +160,17 @@ export default defineNuxtConfig({
         string,
         boolean | string
       >,
+      /** Platform hostname for tenant routing (e.g. reqcore.com) */
+      platformHost:
+        process.env.NUXT_PUBLIC_PLATFORM_HOST
+        || (process.env.NUXT_PUBLIC_SITE_URL
+          ? new URL(process.env.NUXT_PUBLIC_SITE_URL).host
+          : 'reqcore.com'),
+      /** CNAME target for custom domain DNS verification */
+      customDomainCnameTarget:
+        process.env.NUXT_PUBLIC_CUSTOM_DOMAIN_CNAME_TARGET || 'custom.reqcore.com',
+      /** Public site URL for canonical links */
+      siteUrl,
     },
   },
 
@@ -191,6 +184,8 @@ export default defineNuxtConfig({
   routeRules: {
     "/jobs": { isr: 3600 },
     "/jobs/**": { isr: 3600 },
+    "/:orgSlug": { isr: 3600 },
+    "/:orgSlug/**": { isr: 3600 },
     ...localizedPublicRouteRules,
   },
 
@@ -219,6 +214,16 @@ export default defineNuxtConfig({
         },
       },
       "/jobs": {
+        headers: {
+          "X-Robots-Tag": "index, follow",
+        },
+      },
+      "/:orgSlug": {
+        headers: {
+          "X-Robots-Tag": "index, follow",
+        },
+      },
+      "/:orgSlug/**": {
         headers: {
           "X-Robots-Tag": "index, follow",
         },

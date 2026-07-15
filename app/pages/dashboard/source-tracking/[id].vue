@@ -12,6 +12,9 @@ definePageMeta({
   middleware: ['auth', 'require-org'],
 })
 
+const { t } = useI18n()
+const { getChannelLabel, getStageLabel, formatRelativeDate } = useSourceTrackingLabels()
+
 const route = useRoute()
 const localePath = useLocalePath()
 const toast = useToast()
@@ -21,8 +24,8 @@ const { formatPersonName } = useOrgSettings()
 const linkId = computed(() => route.params.id as string)
 
 useSeoMeta({
-  title: 'Link Details — Source Tracking — Reqcore',
-  description: 'Detailed analytics for a tracking link',
+  title: () => t('sourceTracking.detail.seoTitle'),
+  description: () => t('sourceTracking.detail.seoDescription'),
 })
 
 onMounted(() => track('source_tracking_link_detail_viewed', { linkId: linkId.value }))
@@ -93,19 +96,6 @@ async function copyTrackingUrl() {
 // Display helpers
 // ─────────────────────────────────────────────
 
-const channelLabels: Record<string, string> = {
-  linkedin: 'LinkedIn', indeed: 'Indeed', glassdoor: 'Glassdoor',
-  ziprecruiter: 'ZipRecruiter', monster: 'Monster', handshake: 'Handshake',
-  angellist: 'AngelList', wellfound: 'Wellfound', dice: 'Dice',
-  stackoverflow: 'Stack Overflow', weworkremotely: 'We Work Remotely',
-  remoteok: 'Remote OK', builtin: 'Built In', hired: 'Hired',
-  lever: 'Lever', greenhouse_board: 'Greenhouse', google_jobs: 'Google Jobs',
-  facebook: 'Facebook', twitter: 'X / Twitter', instagram: 'Instagram',
-  tiktok: 'TikTok', reddit: 'Reddit', referral: 'Referral',
-  career_site: 'Career Site', email: 'Email', event: 'Event',
-  agency: 'Agency', direct: 'Direct', other: 'Other', custom: 'Custom',
-}
-
 const channelColors: Record<string, string> = {
   linkedin: 'bg-blue-500', indeed: 'bg-indigo-500', glassdoor: 'bg-emerald-500',
   ziprecruiter: 'bg-green-600', monster: 'bg-violet-500', google_jobs: 'bg-red-500',
@@ -143,23 +133,8 @@ function getChannelColor(channel: string) {
   return channelColors[channel] ?? 'bg-surface-400 dark:bg-surface-500'
 }
 
-function getChannelLabel(channel: string) {
-  return channelLabels[channel] ?? channel
-}
-
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return formatRelativeDate(dateStr)
 }
 
 function formatFullDate(dateStr: string) {
@@ -205,11 +180,11 @@ const maxTrendCount = computed(() =>
 const utmParams = computed(() => {
   if (!link.value) return []
   const params: { label: string; value: string }[] = []
-  if (link.value.utmSource) params.push({ label: 'Source', value: link.value.utmSource })
-  if (link.value.utmMedium) params.push({ label: 'Medium', value: link.value.utmMedium })
-  if (link.value.utmCampaign) params.push({ label: 'Campaign', value: link.value.utmCampaign })
-  if (link.value.utmTerm) params.push({ label: 'Term', value: link.value.utmTerm })
-  if (link.value.utmContent) params.push({ label: 'Content', value: link.value.utmContent })
+  if (link.value.utmSource) params.push({ label: t('sourceTracking.detail.config.utmSource'), value: link.value.utmSource })
+  if (link.value.utmMedium) params.push({ label: t('sourceTracking.detail.config.utmMedium'), value: link.value.utmMedium })
+  if (link.value.utmCampaign) params.push({ label: t('sourceTracking.detail.config.utmCampaign'), value: link.value.utmCampaign })
+  if (link.value.utmTerm) params.push({ label: t('sourceTracking.detail.config.utmTerm'), value: link.value.utmTerm })
+  if (link.value.utmContent) params.push({ label: t('sourceTracking.detail.config.utmContent'), value: link.value.utmContent })
   return params
 })
 
@@ -260,10 +235,10 @@ async function handleSaveEdit() {
       },
     })
     showEditModal.value = false
-    toast.success('Link updated')
+    toast.success(t('sourceTracking.detail.updated'))
     await refresh()
   } catch (err: any) {
-    toast.error(err?.data?.statusMessage ?? 'Failed to update link')
+    toast.error(err?.data?.statusMessage ?? t('sourceTracking.detail.updateFailed'))
   } finally {
     isSaving.value = false
   }
@@ -327,12 +302,12 @@ async function handleSidebarUpdated() {
       class="rounded-2xl border border-danger-200 dark:border-danger-900 bg-danger-50 dark:bg-danger-950/60 p-5 text-sm text-danger-700 dark:text-danger-400 flex items-center gap-3"
     >
       <AlertCircle class="size-5 shrink-0" />
-      <span>{{ fetchError?.statusCode === 404 ? 'Tracking link not found.' : 'Failed to load link details.' }}</span>
+      <span>{{ fetchError?.statusCode === 404 ? t('sourceTracking.detail.notFound') : t('sourceTracking.detail.loadFailed') }}</span>
       <NuxtLink
         :to="localePath('/dashboard/source-tracking')"
         class="underline ml-auto font-medium"
       >
-        Back to Source Tracking
+        {{ t('sourceTracking.detail.back') }}
       </NuxtLink>
     </div>
 
@@ -345,7 +320,7 @@ async function handleSidebarUpdated() {
           class="inline-flex items-center gap-1.5 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 transition-colors mb-4"
         >
           <ArrowLeft class="size-4" />
-          Back to Source Tracking
+          {{ t('sourceTracking.detail.back') }}
         </NuxtLink>
 
         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -368,7 +343,7 @@ async function handleSidebarUpdated() {
               >
                 <CheckCircle2 v-if="link.isActive" class="size-3" />
                 <XCircle v-else class="size-3" />
-                {{ link.isActive ? 'Active' : 'Inactive' }}
+                {{ link.isActive ? t('sourceTracking.status.active') : t('sourceTracking.status.inactive') }}
               </span>
             </div>
             <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-surface-400 dark:text-surface-500">
@@ -378,11 +353,11 @@ async function handleSidebarUpdated() {
               </span>
               <span v-else class="inline-flex items-center gap-1">
                 <Layers class="size-3.5" />
-                All jobs
+                {{ t('sourceTracking.detail.allJobs') }}
               </span>
               <span class="inline-flex items-center gap-1">
                 <CalendarDays class="size-3.5" />
-                Created {{ formatFullDate(link.createdAt) }}
+                {{ t('sourceTracking.detail.created', { date: formatFullDate(link.createdAt) }) }}
               </span>
             </div>
           </div>
@@ -399,7 +374,7 @@ async function handleSidebarUpdated() {
                   : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
                 @click="dateRange = range"
               >
-                {{ range === 'all' ? 'All time' : range.toUpperCase() }}
+                {{ range === 'all' ? t('sourceTracking.dateRange.allTime') : range.toUpperCase() }}
               </button>
             </div>
 
@@ -409,7 +384,7 @@ async function handleSidebarUpdated() {
               @click="openEditModal"
             >
               <Pencil class="size-3.5" />
-              Edit
+              {{ t('sourceTracking.detail.edit') }}
             </button>
 
             <!-- Copy URL -->
@@ -419,7 +394,7 @@ async function handleSidebarUpdated() {
             >
               <Copy v-if="!copied" class="size-3.5" />
               <CheckCircle2 v-else class="size-3.5 text-green-500" />
-              {{ copied ? 'Copied!' : 'Copy URL' }}
+              {{ copied ? t('sourceTracking.detail.copied') : t('sourceTracking.detail.copyUrl') }}
             </button>
           </div>
         </div>
@@ -435,7 +410,7 @@ async function handleSidebarUpdated() {
           class="shrink-0 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
           @click="copyTrackingUrl"
         >
-          {{ copied ? 'Copied!' : 'Copy' }}
+          {{ copied ? t('sourceTracking.detail.copied') : t('sourceTracking.detail.copy') }}
         </button>
       </div>
 
@@ -452,8 +427,8 @@ async function handleSidebarUpdated() {
               </span>
               <span class="size-1.5 rounded-full bg-blue-500 shrink-0 mb-1" />
             </div>
-            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Clicks</span>
-            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">Total clicks</p>
+            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('sourceTracking.detail.stats.clicks') }}</span>
+            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ t('sourceTracking.detail.stats.clicksHint') }}</p>
           </div>
         </div>
 
@@ -468,8 +443,8 @@ async function handleSidebarUpdated() {
               </span>
               <span class="size-1.5 rounded-full bg-brand-500 shrink-0 mb-1" />
             </div>
-            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Applications</span>
-            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">Total attributed</p>
+            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('sourceTracking.detail.stats.applications') }}</span>
+            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ t('sourceTracking.detail.stats.applicationsHint') }}</p>
           </div>
         </div>
 
@@ -484,8 +459,8 @@ async function handleSidebarUpdated() {
               </span>
               <span class="size-1.5 rounded-full bg-teal-500 shrink-0 mb-1" />
             </div>
-            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">CVR</span>
-            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">Click → Application</p>
+            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('sourceTracking.detail.stats.cvr') }}</span>
+            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ t('sourceTracking.detail.stats.cvrHint') }}</p>
           </div>
         </div>
 
@@ -500,8 +475,8 @@ async function handleSidebarUpdated() {
               </span>
               <span class="size-1.5 rounded-full bg-green-500 shrink-0 mb-1" />
             </div>
-            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Hire Rate</span>
-            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">Application → Hired</p>
+            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('sourceTracking.detail.stats.hireRate') }}</span>
+            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ t('sourceTracking.detail.stats.hireRateHint') }}</p>
           </div>
         </div>
 
@@ -516,8 +491,8 @@ async function handleSidebarUpdated() {
               </span>
               <span class="size-1.5 rounded-full bg-violet-500 shrink-0 mb-1" />
             </div>
-            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Attributed</span>
-            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">All time</p>
+            <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('sourceTracking.detail.stats.attributed') }}</span>
+            <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ t('sourceTracking.detail.stats.attributedHint') }}</p>
           </div>
         </div>
       </div>
@@ -533,23 +508,23 @@ async function handleSidebarUpdated() {
                 <div class="flex items-center justify-center size-7 rounded-lg bg-surface-100 dark:bg-surface-800">
                   <TrendingUp class="size-3.5 text-surface-500 dark:text-surface-400" />
                 </div>
-                <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Application Pipeline</h2>
+                <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.detail.pipeline.title') }}</h2>
               </div>
-              <span class="text-xs text-surface-400 tabular-nums font-medium">{{ funnelTotal }} total</span>
+              <span class="text-xs text-surface-400 tabular-nums font-medium">{{ t('sourceTracking.detail.pipeline.total', { count: funnelTotal }) }}</span>
             </div>
 
             <div v-if="funnelTotal === 0" class="px-6 py-12 text-center">
               <div class="mx-auto mb-4 flex items-center justify-center size-12 rounded-2xl bg-surface-100 dark:bg-surface-800">
                 <TrendingUp class="size-5 text-surface-400 dark:text-surface-500" />
               </div>
-              <p class="text-sm font-medium text-surface-500 dark:text-surface-400 mb-1">No applications yet</p>
-              <p class="text-xs text-surface-400 dark:text-surface-500">Applications from this link will appear here.</p>
+              <p class="text-sm font-medium text-surface-500 dark:text-surface-400 mb-1">{{ t('sourceTracking.detail.pipeline.emptyTitle') }}</p>
+              <p class="text-xs text-surface-400 dark:text-surface-500">{{ t('sourceTracking.detail.pipeline.emptyDescription') }}</p>
             </div>
 
             <div v-else class="px-6 py-5 space-y-4">
               <div v-for="s in funnelStages" :key="s.stage">
                 <div class="flex items-center justify-between mb-1.5">
-                  <span class="text-sm font-medium text-surface-700 dark:text-surface-200 capitalize">{{ s.stage }}</span>
+                  <span class="text-sm font-medium text-surface-700 dark:text-surface-200">{{ getStageLabel(s.stage) }}</span>
                   <div class="flex items-center gap-3">
                     <span class="text-xs text-surface-400 tabular-nums">{{ s.pct }}%</span>
                     <span class="text-sm font-bold text-surface-900 dark:text-surface-100 tabular-nums w-8 text-right">{{ s.count }}</span>
@@ -582,29 +557,29 @@ async function handleSidebarUpdated() {
               <div class="flex items-center justify-center size-7 rounded-lg bg-surface-100 dark:bg-surface-800">
                 <Tag class="size-3.5 text-surface-500 dark:text-surface-400" />
               </div>
-              <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Link Configuration</h2>
+              <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.detail.config.title') }}</h2>
             </div>
 
             <div class="px-5 py-4 space-y-3">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-surface-500 dark:text-surface-400">Channel</span>
+                <span class="text-xs font-medium text-surface-500 dark:text-surface-400">{{ t('sourceTracking.detail.config.channel') }}</span>
                 <span class="inline-flex items-center gap-1.5 text-sm font-medium text-surface-800 dark:text-surface-200">
                   <span class="size-2 rounded-full" :class="getChannelColor(link.channel)" />
                   {{ getChannelLabel(link.channel) }}
                 </span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-surface-500 dark:text-surface-400">Code</span>
+                <span class="text-xs font-medium text-surface-500 dark:text-surface-400">{{ t('sourceTracking.detail.config.code') }}</span>
                 <code class="text-xs font-mono text-surface-700 dark:text-surface-300 bg-surface-100 dark:bg-surface-800 px-2 py-0.5 rounded">{{ link.code }}</code>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-surface-500 dark:text-surface-400">Job Scope</span>
-                <span class="text-sm text-surface-700 dark:text-surface-300">{{ link.jobTitle ?? 'All jobs' }}</span>
+                <span class="text-xs font-medium text-surface-500 dark:text-surface-400">{{ t('sourceTracking.detail.config.jobScope') }}</span>
+                <span class="text-sm text-surface-700 dark:text-surface-300">{{ link.jobTitle ?? t('sourceTracking.detail.allJobs') }}</span>
               </div>
 
               <template v-if="utmParams.length > 0">
                 <div class="border-t border-surface-100 dark:border-surface-800 pt-3 mt-3">
-                  <span class="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-2 block">UTM Parameters</span>
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-2 block">{{ t('sourceTracking.detail.config.utmParameters') }}</span>
                   <div class="space-y-2">
                     <div v-for="p in utmParams" :key="p.label" class="flex items-center justify-between">
                       <span class="text-xs text-surface-500 dark:text-surface-400">{{ p.label }}</span>
@@ -615,7 +590,7 @@ async function handleSidebarUpdated() {
               </template>
 
               <div v-else class="border-t border-surface-100 dark:border-surface-800 pt-3 mt-3">
-                <p class="text-xs text-surface-400 dark:text-surface-500 text-center">No UTM parameters configured</p>
+                <p class="text-xs text-surface-400 dark:text-surface-500 text-center">{{ t('sourceTracking.detail.config.noUtm') }}</p>
               </div>
             </div>
           </div>
@@ -626,14 +601,14 @@ async function handleSidebarUpdated() {
               <div class="flex items-center justify-center size-7 rounded-lg bg-surface-100 dark:bg-surface-800">
                 <Globe class="size-3.5 text-surface-500 dark:text-surface-400" />
               </div>
-              <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Referrer Domains</h2>
+              <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.detail.referrerDomains') }}</h2>
             </div>
 
             <div v-if="referrerDomains.length === 0" class="px-5 py-10 text-center">
               <div class="mx-auto mb-3 flex items-center justify-center size-10 rounded-2xl bg-surface-100 dark:bg-surface-800">
                 <Globe class="size-4 text-surface-400 dark:text-surface-500" />
               </div>
-              <p class="text-xs font-medium text-surface-500 dark:text-surface-400">No referrer data</p>
+              <p class="text-xs font-medium text-surface-500 dark:text-surface-400">{{ t('sourceTracking.detail.noReferrerData') }}</p>
             </div>
 
             <div v-else class="px-5 py-4 space-y-3">
@@ -646,7 +621,7 @@ async function handleSidebarUpdated() {
                   <div class="size-5 rounded bg-surface-100 dark:bg-surface-800 flex items-center justify-center shrink-0">
                     <Globe class="size-3 text-surface-400" />
                   </div>
-                  <span class="text-sm text-surface-700 dark:text-surface-300 truncate">{{ ref.domain ?? 'Unknown' }}</span>
+                  <span class="text-sm text-surface-700 dark:text-surface-300 truncate">{{ ref.domain ?? t('sourceTracking.unknown') }}</span>
                 </div>
                 <span class="text-sm font-bold text-surface-900 dark:text-surface-100 tabular-nums shrink-0 ml-2">{{ ref.count }}</span>
               </div>
@@ -662,7 +637,7 @@ async function handleSidebarUpdated() {
             <div class="flex items-center justify-center size-7 rounded-lg bg-surface-100 dark:bg-surface-800">
               <BarChart3 class="size-3.5 text-surface-500 dark:text-surface-400" />
             </div>
-            <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Applications Over Time</h2>
+            <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.detail.trend.title') }}</h2>
           </div>
         </div>
 
@@ -670,8 +645,8 @@ async function handleSidebarUpdated() {
           <div class="mx-auto mb-4 flex items-center justify-center size-12 rounded-2xl bg-surface-100 dark:bg-surface-800">
             <BarChart3 class="size-5 text-surface-400 dark:text-surface-500" />
           </div>
-          <p class="text-sm font-medium text-surface-500 dark:text-surface-400 mb-1">No trend data yet</p>
-          <p class="text-xs text-surface-400 dark:text-surface-500">Daily application counts will appear here.</p>
+          <p class="text-sm font-medium text-surface-500 dark:text-surface-400 mb-1">{{ t('sourceTracking.detail.trend.emptyTitle') }}</p>
+          <p class="text-xs text-surface-400 dark:text-surface-500">{{ t('sourceTracking.detail.trend.emptyDescription') }}</p>
         </div>
 
         <div v-else class="px-6 py-5">
@@ -704,18 +679,18 @@ async function handleSidebarUpdated() {
             <div class="flex items-center justify-center size-7 rounded-lg bg-surface-100 dark:bg-surface-800">
               <Users class="size-3.5 text-surface-500 dark:text-surface-400" />
             </div>
-            <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Attributed Applications</h2>
+            <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.detail.applications') }}</h2>
           </div>
-          <span class="text-xs text-surface-400 tabular-nums font-medium">{{ applications.length }} shown</span>
+          <span class="text-xs text-surface-400 tabular-nums font-medium">{{ t('sourceTracking.detail.applicationsShown', { count: applications.length }) }}</span>
         </div>
 
         <div v-if="applications.length === 0" class="px-6 py-12 text-center">
           <div class="mx-auto mb-4 flex items-center justify-center size-12 rounded-2xl bg-surface-100 dark:bg-surface-800">
             <Users class="size-5 text-surface-400 dark:text-surface-500" />
           </div>
-          <p class="text-sm font-medium text-surface-500 dark:text-surface-400 mb-1">No applications attributed</p>
+          <p class="text-sm font-medium text-surface-500 dark:text-surface-400 mb-1">{{ t('sourceTracking.detail.applicationsEmptyTitle') }}</p>
           <p class="text-xs text-surface-400 dark:text-surface-500 max-w-sm mx-auto">
-            Applications that come through this tracking link will be listed here.
+            {{ t('sourceTracking.detail.applicationsEmptyDescription') }}
           </p>
         </div>
 
@@ -723,12 +698,12 @@ async function handleSidebarUpdated() {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-800/30">
-                <th class="px-5 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Candidate</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Job</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Referrer</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Campaign</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Status</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Applied</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.candidate') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.job') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.referrer') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.campaign') }}</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.status') }}</th>
+                <th class="px-4 py-3 text-right text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.applied') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-surface-100 dark:divide-surface-800">
@@ -779,7 +754,7 @@ async function handleSidebarUpdated() {
                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ring-1 ring-inset"
                     :class="statusBadgeClasses[app.status] ?? 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400 ring-surface-200 dark:ring-surface-700'"
                   >
-                    {{ app.status }}
+                    {{ getStageLabel(app.status) }}
                   </span>
                 </td>
                 <!-- Applied date -->
@@ -811,7 +786,7 @@ async function handleSidebarUpdated() {
         <div class="relative w-full max-w-lg rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 shadow-2xl">
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-4 border-b border-surface-100 dark:border-surface-800">
-            <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Edit Tracking Link</h2>
+            <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.modal.editTitle') }}</h2>
             <button
               class="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
               @click="showEditModal = false"
@@ -824,7 +799,7 @@ async function handleSidebarUpdated() {
           <form class="px-6 py-5 space-y-4" @submit.prevent="handleSaveEdit">
             <!-- Name -->
             <div>
-              <label for="edit-link-name" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Link Name</label>
+              <label for="edit-link-name" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">{{ t('sourceTracking.modal.linkName') }}</label>
               <input
                 id="edit-link-name"
                 v-model="editForm.name"
@@ -835,19 +810,19 @@ async function handleSidebarUpdated() {
 
             <!-- Channel -->
             <div>
-              <label for="edit-link-channel" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Source Channel</label>
+              <label for="edit-link-channel" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">{{ t('sourceTracking.modal.sourceChannel') }}</label>
               <select
                 id="edit-link-channel"
                 v-model="editForm.channel"
                 class="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-4 py-2.5 text-sm text-surface-900 dark:text-surface-100 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all"
               >
-                <optgroup label="Job Boards">
-                  <option v-for="ch in ['linkedin', 'indeed', 'glassdoor', 'ziprecruiter', 'monster', 'handshake', 'angellist', 'wellfound', 'dice', 'stackoverflow', 'weworkremotely', 'remoteok', 'builtin', 'hired', 'lever', 'greenhouse_board', 'google_jobs']" :key="ch" :value="ch">{{ getChannelLabel(ch) }}</option>
+                <optgroup :label="t('sourceTracking.modal.jobBoards')">
+                  <option v-for="ch in ['linkedin', 'indeed', 'glassdoor', 'vagas_com', 'catho', 'infojobs', 'adecco', 'manpower', 'ziprecruiter', 'monster', 'handshake', 'angellist', 'wellfound', 'dice', 'stackoverflow', 'weworkremotely', 'remoteok', 'builtin', 'hired', 'lever', 'greenhouse_board', 'google_jobs']" :key="ch" :value="ch">{{ getChannelLabel(ch) }}</option>
                 </optgroup>
-                <optgroup label="Social Media">
-                  <option v-for="ch in ['facebook', 'twitter', 'instagram', 'tiktok', 'reddit']" :key="ch" :value="ch">{{ getChannelLabel(ch) }}</option>
+                <optgroup :label="t('sourceTracking.modal.socialMedia')">
+                  <option v-for="ch in ['facebook', 'twitter', 'instagram', 'tiktok']" :key="ch" :value="ch">{{ getChannelLabel(ch) }}</option>
                 </optgroup>
-                <optgroup label="Other">
+                <optgroup :label="t('sourceTracking.modal.other')">
                   <option v-for="ch in ['referral', 'career_site', 'email', 'event', 'agency', 'direct', 'custom', 'other']" :key="ch" :value="ch">{{ getChannelLabel(ch) }}</option>
                 </optgroup>
               </select>
@@ -857,7 +832,7 @@ async function handleSidebarUpdated() {
             <details class="group">
               <summary class="flex items-center gap-2 text-sm font-medium text-surface-500 dark:text-surface-400 cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors">
                 <ChevronDown class="size-4 transition-transform group-open:rotate-180" />
-                UTM Parameters
+                {{ t('sourceTracking.modal.utmParametersEdit') }}
               </summary>
               <div class="mt-3 grid grid-cols-2 gap-3">
                 <div>
@@ -890,14 +865,14 @@ async function handleSidebarUpdated() {
                 class="rounded-xl px-4 py-2.5 text-sm font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
                 @click="showEditModal = false"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="submit"
                 :disabled="!editForm.name.trim() || isSaving"
                 class="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 shadow-sm shadow-brand-600/15 transition-all"
               >
-                {{ isSaving ? 'Saving…' : 'Save Changes' }}
+                {{ isSaving ? t('sourceTracking.modal.saving') : t('sourceTracking.modal.saveChanges') }}
               </button>
             </div>
           </form>

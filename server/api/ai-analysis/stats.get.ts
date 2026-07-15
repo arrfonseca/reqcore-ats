@@ -1,5 +1,6 @@
 import { eq, and, desc, sql, count, sum } from 'drizzle-orm'
-import { analysisRun, job, application, candidate, aiConfig } from '../../database/schema'
+import { analysisRun, job, application, candidate, aiConfig, platformAiConfig } from '../../database/schema'
+import { getTenantAiPolicy } from '../../utils/ai/tenantAiPolicy'
 
 /**
  * GET /api/ai-analysis/stats
@@ -14,31 +15,71 @@ export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['read'] })
   const orgId = session.session.activeOrganizationId
 
+  const { allowOwnLlm } = await getTenantAiPolicy(orgId)
+
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
   const thirtyDaysAgoISO = thirtyDaysAgo.toISOString()
 
-  // Fetch pricing from ALL configs in the org so historical model breakdown
-  // can be priced correctly even if the user has multiple configurations.
-  const pricingConfigs = await db.query.aiConfig.findMany({
-    where: eq(aiConfig.organizationId, orgId),
-    columns: {
-      provider: true,
-      model: true,
-      inputPricePer1m: true,
-      outputPricePer1m: true,
-      isDefaultAnalysis: true,
-    },
-  })
+  // Fetch pricing: tenant configs when delegated, platform configs when platform-managed.
+  let pricingByModel = new Map<string, { inputPricePer1m: number | null, outputPricePer1m: number | null }>()
+  let defaultAnalysisConfig: { provider: string, model: string, inputPricePer1m: number | null, outputPricePer1m: number | null } | null = null
 
-  const pricingByModel = new Map<string, { inputPricePer1m: number | null, outputPricePer1m: number | null }>()
-  for (const c of pricingConfigs) {
-    pricingByModel.set(`${c.provider}::${c.model}`, {
-      inputPricePer1m: c.inputPricePer1m != null ? Number(c.inputPricePer1m) : null,
-      outputPricePer1m: c.outputPricePer1m != null ? Number(c.outputPricePer1m) : null,
+  if (allowOwnLlm) {
+    const pricingConfigs = await db.query.aiConfig.findMany({
+      where: eq(aiConfig.organizationId, orgId),
+      columns: {
+        provider: true,
+        model: true,
+        inputPricePer1m: true,
+        outputPricePer1m: true,
+        isDefaultAnalysis: true,
+      },
     })
+
+    for (const c of pricingConfigs) {
+      pricingByModel.set(`${c.provider}::${c.model}`, {
+        inputPricePer1m: c.inputPricePer1m != null ? Number(c.inputPricePer1m) : null,
+        outputPricePer1m: c.outputPricePer1m != null ? Number(c.outputPricePer1m) : null,
+      })
+    }
+    const defaultRow = pricingConfigs.find(c => c.isDefaultAnalysis) ?? pricingConfigs[0] ?? null
+    if (defaultRow) {
+      defaultAnalysisConfig = {
+        provider: defaultRow.provider,
+        model: defaultRow.model,
+        inputPricePer1m: defaultRow.inputPricePer1m != null ? Number(defaultRow.inputPricePer1m) : null,
+        outputPricePer1m: defaultRow.outputPricePer1m != null ? Number(defaultRow.outputPricePer1m) : null,
+      }
+    }
   }
-  const defaultAnalysisConfig = pricingConfigs.find(c => c.isDefaultAnalysis) ?? pricingConfigs[0] ?? null
+  else {
+    const pricingConfigs = await db.query.platformAiConfig.findMany({
+      columns: {
+        provider: true,
+        model: true,
+        inputPricePer1m: true,
+        outputPricePer1m: true,
+        isDefaultAnalysis: true,
+      },
+    })
+
+    for (const c of pricingConfigs) {
+      pricingByModel.set(`${c.provider}::${c.model}`, {
+        inputPricePer1m: c.inputPricePer1m != null ? Number(c.inputPricePer1m) : null,
+        outputPricePer1m: c.outputPricePer1m != null ? Number(c.outputPricePer1m) : null,
+      })
+    }
+    const defaultRow = pricingConfigs.find(c => c.isDefaultAnalysis) ?? pricingConfigs[0] ?? null
+    if (defaultRow) {
+      defaultAnalysisConfig = {
+        provider: defaultRow.provider,
+        model: defaultRow.model,
+        inputPricePer1m: defaultRow.inputPricePer1m != null ? Number(defaultRow.inputPricePer1m) : null,
+        outputPricePer1m: defaultRow.outputPricePer1m != null ? Number(defaultRow.outputPricePer1m) : null,
+      }
+    }
+  }
 
   const [
     totalRuns,
@@ -122,8 +163,8 @@ export default defineEventHandler(async (event) => {
 
   const usage = tokenUsage[0]
 
-  const inputPrice = defaultAnalysisConfig?.inputPricePer1m != null ? Number(defaultAnalysisConfig.inputPricePer1m) : null
-  const outputPrice = defaultAnalysisConfig?.outputPricePer1m != null ? Number(defaultAnalysisConfig.outputPricePer1m) : null
+  const inputPrice = defaultAnalysisConfig?.inputPricePer1m ?? null
+  const outputPrice = defaultAnalysisConfig?.outputPricePer1m ?? null
 
   return {
     pricing: {

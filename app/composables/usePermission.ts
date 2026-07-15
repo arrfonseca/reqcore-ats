@@ -1,4 +1,5 @@
 import type { statements } from '~~/shared/permissions'
+import { saasAdminHasOrgContext } from '~~/shared/saasAdmin'
 
 /**
  * Permission descriptor — same shape as the server-side PermissionRequest.
@@ -24,27 +25,23 @@ type PermissionRequest = {
  * **Important:** client-side checks are cosmetic only.  They control
  * UI visibility (hide buttons, disable inputs).  The real enforcement
  * happens on the server via `requirePermission()`.
- *
- * Usage:
- * ```vue
- * <script setup>
- * const { allowed: canCreateJob } = usePermission({ job: ['create'] })
- * </script>
- *
- * <template>
- *   <UButton v-if="canCreateJob" @click="createJob">New Job</UButton>
- * </template>
- * ```
  */
 export function usePermission(permissions: PermissionRequest) {
   const role = ref<string | null>(null)
   const isLoading = ref(true)
 
-  // Fetch the active member's role and re-fetch when org changes
+  const sessionState = authClient.useSession(useFetch)
   const activeOrgState = authClient.useActiveOrganization()
+  const { isSaasAdmin } = useSaasAdmin()
+
+  const hasSaasOrgContext = computed(() =>
+    saasAdminHasOrgContext(
+      isSaasAdmin.value,
+      sessionState.value?.data?.session?.activeOrganizationId,
+    ),
+  )
 
   async function fetchRole() {
-    // Reset immediately to avoid stale role from previous org (race condition)
     role.value = null
     isLoading.value = true
 
@@ -55,18 +52,16 @@ export function usePermission(permissions: PermissionRequest) {
     isLoading.value = false
   }
 
-  // Only fetch on the client — during SSR there is no window.location,
-  // so the Better Auth client cannot resolve relative API URLs.
-  // Permission checks are cosmetic (UI gating); real enforcement is server-side.
   if (import.meta.client) {
     watch(
-      () => activeOrgState.value.data?.id,
+      () => activeOrgState.value?.data?.id,
       () => fetchRole(),
       { immediate: true },
     )
   }
 
   const allowed = computed(() => {
+    if (hasSaasOrgContext.value) return true
     if (!role.value) return false
 
     return authClient.organization.checkRolePermission({
@@ -75,5 +70,5 @@ export function usePermission(permissions: PermissionRequest) {
     })
   })
 
-  return { allowed, role: readonly(role), isLoading: readonly(isLoading) }
+  return { allowed, role: readonly(role), isLoading: readonly(isLoading), isSaasAdmin, hasSaasOrgContext }
 }

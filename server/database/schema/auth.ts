@@ -20,6 +20,8 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
+  /** Platform role — `saas_admin` for cross-tenant operators; null for normal users. */
+  platformRole: text('platform_role'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
@@ -78,6 +80,18 @@ export const organization = pgTable('organization', {
   slug: text('slug').notNull().unique(),
   logo: text('logo'),
   metadata: text('metadata'),
+  status: text('status').notNull().default('active'),
+  legalName: text('legal_name'),
+  taxId: text('tax_id'),
+  phone: text('phone'),
+  street: text('street'),
+  city: text('city'),
+  state: text('state'),
+  postalCode: text('postal_code'),
+  country: text('country').default('BR'),
+  suspendedAt: timestamp('suspended_at'),
+  archivedAt: timestamp('archived_at'),
+  suspendedReason: text('suspended_reason'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
 

@@ -8,25 +8,29 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, updateOrgSettingsSchema.parse)
 
-  // Upsert: insert or update on conflict
+  // Name/date formats are managed at platform level by country.
   const [result] = await db
     .insert(orgSettings)
     .values({
       organizationId: orgId,
-      nameDisplayFormat: body.nameDisplayFormat ?? 'first_last',
-      dateFormat: body.dateFormat ?? 'mdy',
+      nameDisplayFormat: 'first_last',
+      dateFormat: 'dmy',
+      companyWebsiteUrl: body.companyWebsiteUrl ?? null,
+      brandSubtitle: body.brandSubtitle ?? null,
     })
     .onConflictDoUpdate({
       target: orgSettings.organizationId,
       set: {
-        ...(body.nameDisplayFormat !== undefined && { nameDisplayFormat: body.nameDisplayFormat }),
-        ...(body.dateFormat !== undefined && { dateFormat: body.dateFormat }),
+        ...(body.companyWebsiteUrl !== undefined && { companyWebsiteUrl: body.companyWebsiteUrl }),
+        ...(body.brandSubtitle !== undefined && { brandSubtitle: body.brandSubtitle }),
         updatedAt: new Date(),
       },
     })
     .returning({
       nameDisplayFormat: orgSettings.nameDisplayFormat,
       dateFormat: orgSettings.dateFormat,
+      companyWebsiteUrl: orgSettings.companyWebsiteUrl,
+      brandSubtitle: orgSettings.brandSubtitle,
     })
 
   if (!result) {

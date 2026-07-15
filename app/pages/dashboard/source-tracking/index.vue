@@ -8,14 +8,17 @@ import {
   Trash2, ChevronDown, ChevronUp, X,
 } from 'lucide-vue-next'
 
+const { t, te } = useI18n()
+const { getChannelLabel, formatRelativeDate } = useSourceTrackingLabels()
+
 definePageMeta({
   layout: 'dashboard',
   middleware: ['auth', 'require-org'],
 })
 
 useSeoMeta({
-  title: 'Source Tracking — Reqcore',
-  description: 'Track where your applications come from',
+  title: () => t('sourceTracking.seoTitle'),
+  description: () => t('sourceTracking.seoDescription'),
 })
 
 const localePath = useLocalePath()
@@ -116,7 +119,7 @@ async function handleCreateLink() {
     newLink.value = { name: '', channel: 'custom', jobId: '', utmSource: '', utmMedium: '', utmCampaign: '' }
     await refreshStats()
   } catch (err: any) {
-    toast.error(err?.data?.statusMessage ?? 'Failed to create link')
+    toast.error(err?.data?.statusMessage ?? t('sourceTracking.errors.createFailed'))
   } finally {
     isCreating.value = false
   }
@@ -140,7 +143,7 @@ async function handleDelete() {
     await deleteLink(deletingId.value)
     await refreshStats()
   } catch (err: any) {
-    toast.error(err?.data?.statusMessage ?? 'Failed to delete')
+    toast.error(err?.data?.statusMessage ?? t('sourceTracking.delete.failed'))
   } finally {
     showDeleteConfirm.value = false
     deletingId.value = null
@@ -172,43 +175,30 @@ async function copyTrackingUrl(code: string) {
 // Display helpers
 // ─────────────────────────────────────────────
 
-const channelLabels: Record<string, string> = {
-  linkedin: 'LinkedIn',
-  indeed: 'Indeed',
-  glassdoor: 'Glassdoor',
-  ziprecruiter: 'ZipRecruiter',
-  monster: 'Monster',
-  handshake: 'Handshake',
-  angellist: 'AngelList',
-  wellfound: 'Wellfound',
-  dice: 'Dice',
-  stackoverflow: 'Stack Overflow',
-  weworkremotely: 'We Work Remotely',
-  remoteok: 'Remote OK',
-  builtin: 'Built In',
-  hired: 'Hired',
-  lever: 'Lever',
-  greenhouse_board: 'Greenhouse',
-  google_jobs: 'Google Jobs',
-  facebook: 'Facebook',
-  twitter: 'X / Twitter',
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  reddit: 'Reddit',
-  referral: 'Referral',
-  career_site: 'Career Site',
-  email: 'Email',
-  event: 'Event',
-  agency: 'Agency',
-  direct: 'Direct',
-  other: 'Other',
-  custom: 'Custom',
-}
+const stageLabels = computed(() => ({
+  new: t('common.stages.new'),
+  screening: t('common.stages.screening'),
+  interview: t('common.stages.interview'),
+  offer: t('common.stages.offer'),
+  hired: t('common.stages.hired'),
+  rejected: t('common.stages.rejected'),
+}))
+
+const tabs = computed(() => [
+  { key: 'overview' as const, label: t('sourceTracking.tabs.overview'), icon: BarChart3 },
+  { key: 'links' as const, label: t('sourceTracking.tabs.links'), icon: Link2 },
+  { key: 'table' as const, label: t('sourceTracking.tabs.attributionLog'), icon: Users },
+])
 
 const channelColors: Record<string, string> = {
   linkedin: 'bg-blue-500',
   indeed: 'bg-indigo-500',
   glassdoor: 'bg-emerald-500',
+  vagas_com: 'bg-orange-500',
+  catho: 'bg-red-600',
+  infojobs: 'bg-blue-600',
+  adecco: 'bg-red-500',
+  manpower: 'bg-blue-700',
   ziprecruiter: 'bg-green-600',
   monster: 'bg-violet-500',
   google_jobs: 'bg-red-500',
@@ -245,9 +235,7 @@ function getChannelColor(channel: string) {
   return channelColors[channel] ?? 'bg-surface-400 dark:bg-surface-500'
 }
 
-function getChannelLabel(channel: string) {
-  return channelLabels[channel] ?? channel
-}
+const funnelStages = ['new', 'screening', 'interview', 'offer', 'hired'] as const
 
 const statusBadgeClasses: Record<string, string> = {
   new: 'bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-950 dark:text-blue-400 dark:ring-blue-800/40',
@@ -276,18 +264,7 @@ function conversionRate(channel: string): number {
 }
 
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return formatRelativeDate(dateStr)
 }
 
 const filteredAttributed = computed(() => {
@@ -386,8 +363,8 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
       class="rounded-2xl border border-danger-200 dark:border-danger-900 bg-danger-50 dark:bg-danger-950/60 p-5 text-sm text-danger-700 dark:text-danger-400 flex items-center gap-3"
     >
       <AlertCircle class="size-5 shrink-0" />
-      <span>Failed to load source tracking data.</span>
-      <button class="underline ml-auto font-medium cursor-pointer" @click="refreshStats()">Retry</button>
+      <span>{{ t('sourceTracking.loadFailed') }}</span>
+      <button class="underline ml-auto font-medium cursor-pointer" @click="refreshStats()">{{ t('common.actions.retry') }}</button>
     </div>
 
     <!-- ─── Main content ─── -->
@@ -395,9 +372,9 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
       <!-- ─── Header ─── -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-10">
         <div>
-          <h1 class="text-xl sm:text-2xl font-bold text-surface-900 dark:text-surface-50 tracking-tight">Source Tracking</h1>
+          <h1 class="text-xl sm:text-2xl font-bold text-surface-900 dark:text-surface-50 tracking-tight">{{ t('sourceTracking.title') }}</h1>
           <p class="text-sm text-surface-400 dark:text-surface-500 mt-1">
-            Track where your applications come from
+            {{ t('sourceTracking.subtitle') }}
           </p>
         </div>
         <div class="flex items-center gap-2">
@@ -412,7 +389,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                 : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200'"
               @click="dateRange = range"
             >
-              {{ range === 'all' ? 'All time' : range.toUpperCase() }}
+              {{ range === 'all' ? t('sourceTracking.dateRange.allTime') : range.toUpperCase() }}
             </button>
           </div>
 
@@ -422,7 +399,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
               v-model="selectedJobId"
               class="appearance-none rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 pl-3 pr-8 py-2 text-xs font-medium text-surface-700 dark:text-surface-300 cursor-pointer"
             >
-              <option :value="undefined">All jobs</option>
+              <option :value="undefined">{{ t('sourceTracking.allJobs') }}</option>
               <option v-for="j in jobs" :key="j.id" :value="j.id">{{ j.title }}</option>
             </select>
             <ChevronDown class="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-surface-400 pointer-events-none" />
@@ -435,7 +412,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
             @click="showCreateModal = true"
           >
             <Plus class="size-4" />
-            <span class="hidden sm:inline">New Link</span>
+            <span class="hidden sm:inline">{{ t('sourceTracking.newLink') }}</span>
           </button>
         </div>
       </div>
@@ -443,11 +420,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
       <!-- ─── Tab navigation ─── -->
       <div class="flex items-center gap-1 mb-6 border-b border-surface-200 dark:border-surface-800">
         <button
-          v-for="tab in [
-            { key: 'overview', label: 'Overview', icon: BarChart3 },
-            { key: 'links', label: 'Tracking Links', icon: Link2 },
-            { key: 'table', label: 'Attribution Log', icon: Users },
-          ] as const"
+          v-for="tab in tabs"
           :key="tab.key"
           class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors"
           :class="showTab === tab.key
@@ -486,8 +459,8 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                 </span>
                 <span class="size-1.5 rounded-full bg-brand-500 shrink-0 mb-1" />
               </div>
-              <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Tracked</span>
-              <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">With source attribution</p>
+              <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('sourceTracking.stats.tracked') }}</span>
+              <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ t('sourceTracking.stats.trackedHint') }}</p>
             </div>
           </div>
 
@@ -502,8 +475,8 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                 </span>
                 <span class="size-1.5 rounded-full bg-teal-500 shrink-0 mb-1" />
               </div>
-              <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Attribution</span>
-              <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">Of all applications</p>
+              <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('sourceTracking.stats.attribution') }}</span>
+              <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ t('sourceTracking.stats.attributionHint') }}</p>
             </div>
           </div>
 
@@ -518,8 +491,8 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                 </span>
                 <span class="size-1.5 rounded-full bg-violet-500 shrink-0 mb-1" />
               </div>
-              <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Active Links</span>
-              <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ totalLinks }} total created</p>
+              <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('sourceTracking.stats.activeLinks') }}</span>
+              <p class="text-[11px] text-surface-300 dark:text-surface-600 mt-1">{{ t('sourceTracking.stats.activeLinksHint', { total: totalLinks }) }}</p>
             </div>
           </div>
 
@@ -552,9 +525,9 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                   <span v-if="summary.totalUntracked > 0" class="absolute inset-0 size-1.5 rounded-full bg-warning-500 animate-ping" />
                 </span>
               </div>
-              <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">Untracked</span>
+              <span class="block mt-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-surface-400 dark:text-surface-500">{{ t('sourceTracking.stats.untracked') }}</span>
               <p class="text-[11px] mt-1" :class="summary.totalUntracked > 0 ? 'text-warning-500 dark:text-warning-500 font-medium' : 'text-surface-300 dark:text-surface-600'">
-                {{ summary.totalUntracked > 0 ? 'Without attribution' : 'All attributed' }}
+                {{ summary.totalUntracked > 0 ? t('sourceTracking.stats.withoutAttribution') : t('sourceTracking.stats.allAttributed') }}
               </p>
             </div>
           </div>
@@ -571,18 +544,18 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                   <div class="flex items-center justify-center size-7 rounded-lg bg-surface-100 dark:bg-surface-800">
                     <BarChart3 class="size-3.5 text-surface-500 dark:text-surface-400" />
                   </div>
-                  <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Applications by Source</h2>
+                  <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.overview.applicationsBySource') }}</h2>
                 </div>
-                <span class="text-xs text-surface-400 tabular-nums font-medium">{{ totalApplications }} total</span>
+                <span class="text-xs text-surface-400 tabular-nums font-medium">{{ t('sourceTracking.overview.totalApplications', { count: totalApplications }) }}</span>
               </div>
 
               <div v-if="channelBreakdown.length === 0" class="px-6 py-12 text-center">
                 <div class="mx-auto mb-4 flex items-center justify-center size-12 rounded-2xl bg-surface-100 dark:bg-surface-800">
                   <BarChart3 class="size-5 text-surface-400 dark:text-surface-500" />
                 </div>
-                <p class="text-sm font-medium text-surface-500 dark:text-surface-400 mb-1">No attributed applications yet</p>
+                <p class="text-sm font-medium text-surface-500 dark:text-surface-400 mb-1">{{ t('sourceTracking.overview.noAttributedTitle') }}</p>
                 <p class="text-xs text-surface-400 dark:text-surface-500 max-w-xs mx-auto">
-                  Create tracking links and share them on job boards to start collecting source data.
+                  {{ t('sourceTracking.overview.noAttributedDescription') }}
                 </p>
               </div>
 
@@ -630,7 +603,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                   <div class="flex items-center justify-center size-7 rounded-lg bg-surface-100 dark:bg-surface-800">
                     <TrendingUp class="size-3.5 text-surface-500 dark:text-surface-400" />
                   </div>
-                  <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Conversion by Source</h2>
+                  <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.overview.conversionBySource') }}</h2>
                 </div>
               </div>
 
@@ -638,13 +611,9 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                 <table class="w-full text-sm">
                   <thead>
                     <tr class="border-b border-surface-100 dark:border-surface-800">
-                      <th class="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Source</th>
-                      <th class="px-3 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">New</th>
-                      <th class="px-3 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Screening</th>
-                      <th class="px-3 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Interview</th>
-                      <th class="px-3 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Offer</th>
-                      <th class="px-3 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Hired</th>
-                      <th class="px-3 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Hire Rate</th>
+                      <th class="px-6 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.overview.source') }}</th>
+                      <th v-for="stage in funnelStages" :key="stage" class="px-3 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ stageLabels[stage] }}</th>
+                      <th class="px-3 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.overview.hireRate') }}</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-surface-100 dark:divide-surface-800">
@@ -693,13 +662,13 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                   <div class="flex items-center justify-center size-7 rounded-lg bg-surface-100 dark:bg-surface-800">
                     <Link2 class="size-3.5 text-surface-500 dark:text-surface-400" />
                   </div>
-                  <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Top Links</h2>
+                  <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.overview.topLinks') }}</h2>
                 </div>
                 <button
                   class="text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 inline-flex items-center gap-1 group/link"
                   @click="showTab = 'links'"
                 >
-                  View all
+                  {{ t('sourceTracking.overview.viewAll') }}
                   <ArrowRight class="size-3 group-hover/link:translate-x-0.5 transition-transform" />
                 </button>
               </div>
@@ -708,7 +677,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                 <div class="mx-auto mb-3 flex items-center justify-center size-10 rounded-2xl bg-surface-100 dark:bg-surface-800">
                   <Link2 class="size-4 text-surface-400 dark:text-surface-500" />
                 </div>
-                <p class="text-xs font-medium text-surface-500 dark:text-surface-400">No links created yet</p>
+                <p class="text-xs font-medium text-surface-500 dark:text-surface-400">{{ t('sourceTracking.overview.noLinksTitle') }}</p>
               </div>
 
               <div v-else class="divide-y divide-surface-100 dark:divide-surface-800">
@@ -730,14 +699,14 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                   <div class="flex items-center gap-4 text-xs text-surface-400">
                     <span class="inline-flex items-center gap-1 tabular-nums">
                       <MousePointerClick class="size-3" />
-                      {{ link.clickCount }} clicks
+                      {{ t('sourceTracking.overview.clicks', { count: link.clickCount }) }}
                     </span>
                     <span class="inline-flex items-center gap-1 tabular-nums">
                       <Users class="size-3" />
-                      {{ link.applicationCount }} apps
+                      {{ t('sourceTracking.overview.apps', { count: link.applicationCount }) }}
                     </span>
                     <span v-if="link.clickCount > 0" class="tabular-nums font-medium" :class="link.applicationCount > 0 ? 'text-green-600 dark:text-green-400' : ''">
-                      {{ Math.round((link.applicationCount / link.clickCount) * 100) }}% CVR
+                      {{ Math.round((link.applicationCount / link.clickCount) * 100) }}% {{ t('sourceTracking.links.table.cvr') }}
                     </span>
                   </div>
                 </NuxtLink>
@@ -751,7 +720,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                   <div class="flex items-center justify-center size-7 rounded-lg bg-surface-100 dark:bg-surface-800">
                     <Globe class="size-3.5 text-surface-500 dark:text-surface-400" />
                   </div>
-                  <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Top Referrers</h2>
+                  <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.overview.topReferrers') }}</h2>
                 </div>
               </div>
 
@@ -759,7 +728,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                 <div class="mx-auto mb-3 flex items-center justify-center size-10 rounded-2xl bg-surface-100 dark:bg-surface-800">
                   <Globe class="size-4 text-surface-400 dark:text-surface-500" />
                 </div>
-                <p class="text-xs font-medium text-surface-500 dark:text-surface-400">No referrer data yet</p>
+                <p class="text-xs font-medium text-surface-500 dark:text-surface-400">{{ t('sourceTracking.overview.noReferrerData') }}</p>
               </div>
 
               <div v-else class="px-5 py-4 space-y-3">
@@ -772,7 +741,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                     <div class="size-5 rounded bg-surface-100 dark:bg-surface-800 flex items-center justify-center shrink-0">
                       <Globe class="size-3 text-surface-400" />
                     </div>
-                    <span class="text-sm text-surface-700 dark:text-surface-300 truncate">{{ ref.domain ?? 'Unknown' }}</span>
+                    <span class="text-sm text-surface-700 dark:text-surface-300 truncate">{{ ref.domain ?? t('sourceTracking.unknown') }}</span>
                   </div>
                   <span class="text-sm font-bold text-surface-900 dark:text-surface-100 tabular-nums shrink-0 ml-2">{{ ref.count }}</span>
                 </div>
@@ -786,19 +755,19 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                   <div class="flex items-center justify-center size-7 rounded-lg bg-surface-100 dark:bg-surface-800">
                     <Clock class="size-3.5 text-surface-500 dark:text-surface-400" />
                   </div>
-                  <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Recent Attributed</h2>
+                  <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.overview.recentAttributed') }}</h2>
                 </div>
                 <button
                   class="text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 inline-flex items-center gap-1 group/link"
                   @click="showTab = 'table'"
                 >
-                  View all
+                  {{ t('sourceTracking.overview.viewAll') }}
                   <ArrowRight class="size-3 group-hover/link:translate-x-0.5 transition-transform" />
                 </button>
               </div>
 
               <div v-if="recentAttributed.length === 0" class="px-5 py-10 text-center">
-                <p class="text-xs text-surface-400">No attributed applications yet</p>
+                <p class="text-xs text-surface-400">{{ t('sourceTracking.overview.noRecentAttributed') }}</p>
               </div>
 
               <div v-else class="divide-y divide-surface-100 dark:divide-surface-800">
@@ -842,10 +811,10 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
               <Link2 class="size-9 text-white" />
             </div>
             <h2 class="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-3 tracking-tight">
-              Create Your First Tracking Link
+              {{ t('sourceTracking.links.emptyTitle') }}
             </h2>
             <p class="text-sm text-surface-500 dark:text-surface-400 mb-10 leading-relaxed max-w-sm mx-auto">
-              Generate unique links for each job board, campaign, or referral source. Track clicks, applications, and conversions in real time.
+              {{ t('sourceTracking.links.emptyDescription') }}
             </p>
             <button
               v-if="canManageLinks"
@@ -853,7 +822,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
               @click="showCreateModal = true"
             >
               <Plus class="size-4" />
-              Create Tracking Link
+              {{ t('sourceTracking.links.createLink') }}
             </button>
           </div>
         </div>
@@ -864,25 +833,25 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
               <thead>
                 <tr class="border-b border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-800/30">
                   <th class="px-5 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" @click="toggleLinkSort('name')">
-                    <span class="inline-flex items-center gap-1">Name <component :is="linkSortKey === 'name' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'name' ? 'opacity-100' : 'opacity-0'" /></span>
+                    <span class="inline-flex items-center gap-1">{{ t('sourceTracking.links.table.name') }} <component :is="linkSortKey === 'name' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'name' ? 'opacity-100' : 'opacity-0'" /></span>
                   </th>
                   <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" @click="toggleLinkSort('channel')">
-                    <span class="inline-flex items-center gap-1">Source <component :is="linkSortKey === 'channel' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'channel' ? 'opacity-100' : 'opacity-0'" /></span>
+                    <span class="inline-flex items-center gap-1">{{ t('sourceTracking.links.table.source') }} <component :is="linkSortKey === 'channel' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'channel' ? 'opacity-100' : 'opacity-0'" /></span>
                   </th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Job</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.links.table.job') }}</th>
                   <th class="px-4 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" @click="toggleLinkSort('clickCount')">
-                    <span class="inline-flex items-center gap-1">Clicks <component :is="linkSortKey === 'clickCount' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'clickCount' ? 'opacity-100' : 'opacity-0'" /></span>
+                    <span class="inline-flex items-center gap-1">{{ t('sourceTracking.links.table.clicks') }} <component :is="linkSortKey === 'clickCount' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'clickCount' ? 'opacity-100' : 'opacity-0'" /></span>
                   </th>
                   <th class="px-4 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" @click="toggleLinkSort('applicationCount')">
-                    <span class="inline-flex items-center gap-1">Apps <component :is="linkSortKey === 'applicationCount' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'applicationCount' ? 'opacity-100' : 'opacity-0'" /></span>
+                    <span class="inline-flex items-center gap-1">{{ t('sourceTracking.links.table.apps') }} <component :is="linkSortKey === 'applicationCount' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'applicationCount' ? 'opacity-100' : 'opacity-0'" /></span>
                   </th>
                   <th class="px-4 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" @click="toggleLinkSort('cvr')">
-                    <span class="inline-flex items-center gap-1">CVR <component :is="linkSortKey === 'cvr' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'cvr' ? 'opacity-100' : 'opacity-0'" /></span>
+                    <span class="inline-flex items-center gap-1">{{ t('sourceTracking.links.table.cvr') }} <component :is="linkSortKey === 'cvr' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'cvr' ? 'opacity-100' : 'opacity-0'" /></span>
                   </th>
                   <th class="px-4 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" @click="toggleLinkSort('isActive')">
-                    <span class="inline-flex items-center gap-1">Status <component :is="linkSortKey === 'isActive' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'isActive' ? 'opacity-100' : 'opacity-0'" /></span>
+                    <span class="inline-flex items-center gap-1">{{ t('sourceTracking.links.table.status') }} <component :is="linkSortKey === 'isActive' ? (linkSortAsc ? ChevronUp : ChevronDown) : ChevronDown" class="size-3" :class="linkSortKey === 'isActive' ? 'opacity-100' : 'opacity-0'" /></span>
                   </th>
-                  <th class="px-4 py-3 text-right text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Actions</th>
+                  <th class="px-4 py-3 text-right text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.links.table.actions') }}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-surface-100 dark:divide-surface-800">
@@ -910,7 +879,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                   </td>
                   <!-- Job -->
                   <td class="px-4 py-3.5 text-surface-600 dark:text-surface-300 truncate max-w-[150px]">
-                    {{ link.jobTitle ?? 'All jobs' }}
+                    {{ link.jobTitle ?? t('sourceTracking.links.allJobs') }}
                   </td>
                   <!-- Clicks -->
                   <td class="px-4 py-3.5 text-center tabular-nums font-medium text-surface-700 dark:text-surface-200">
@@ -936,7 +905,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                     >
                       <CheckCircle2 v-if="link.isActive" class="size-3" />
                       <XCircle v-else class="size-3" />
-                      {{ link.isActive ? 'Active' : 'Inactive' }}
+                      {{ link.isActive ? t('sourceTracking.status.active') : t('sourceTracking.status.inactive') }}
                     </span>
                   </td>
                   <!-- Actions -->
@@ -944,7 +913,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                     <div class="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         class="p-1.5 rounded-lg text-surface-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                        title="Copy tracking URL"
+                        :title="t('sourceTracking.links.copyUrl')"
                         @click="copyTrackingUrl(link.code)"
                       >
                         <Copy v-if="copiedCode !== link.code" class="size-3.5" />
@@ -953,7 +922,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                       <button
                         v-if="canManageLinks"
                         class="p-1.5 rounded-lg text-surface-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                        :title="link.isActive ? 'Deactivate' : 'Activate'"
+                        :title="link.isActive ? t('sourceTracking.links.deactivate') : t('sourceTracking.links.activate')"
                         @click="toggleLink(link.id, !link.isActive)"
                       >
                         <ToggleRight v-if="link.isActive" class="size-3.5" />
@@ -962,7 +931,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                       <button
                         v-if="canManageLinks"
                         class="p-1.5 rounded-lg text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                        title="Delete"
+                        :title="t('sourceTracking.links.delete')"
                         @click="confirmDelete(link.id)"
                       >
                         <Trash2 class="size-3.5" />
@@ -982,7 +951,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
       <div v-if="showTab === 'table'">
         <!-- Channel filter chip -->
         <div v-if="selectedChannel" class="mb-4 flex items-center gap-2">
-          <span class="text-xs text-surface-500 dark:text-surface-400">Filtered by:</span>
+          <span class="text-xs text-surface-500 dark:text-surface-400">{{ t('sourceTracking.attribution.filteredBy') }}</span>
           <span
             class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset"
             :class="getChannelBadge(selectedChannel)"
@@ -999,9 +968,9 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
           <div class="mx-auto mb-4 flex items-center justify-center size-14 rounded-2xl bg-surface-100 dark:bg-surface-800">
             <Users class="size-6 text-surface-400 dark:text-surface-500" />
           </div>
-          <p class="text-sm font-medium text-surface-500 dark:text-surface-400 mb-1">No attributed applications</p>
+          <p class="text-sm font-medium text-surface-500 dark:text-surface-400 mb-1">{{ t('sourceTracking.attribution.emptyTitle') }}</p>
           <p class="text-xs text-surface-400 dark:text-surface-500 max-w-sm">
-            Start sharing your tracking links to see source attribution data here.
+            {{ t('sourceTracking.attribution.emptyDescription') }}
           </p>
         </div>
 
@@ -1010,12 +979,12 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-800/30">
-                  <th class="px-5 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Candidate</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Job</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Source</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Campaign</th>
-                  <th class="px-4 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Status</th>
-                  <th class="px-4 py-3 text-right text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">Applied</th>
+                  <th class="px-5 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.candidate') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.job') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.source') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.campaign') }}</th>
+                  <th class="px-4 py-3 text-center text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.status') }}</th>
+                  <th class="px-4 py-3 text-right text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">{{ t('sourceTracking.attribution.applied') }}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-surface-100 dark:divide-surface-800">
@@ -1054,7 +1023,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                       </span>
                     </div>
                     <div v-if="app.trackingLinkName" class="text-[11px] text-surface-400 mt-0.5 truncate max-w-[140px]">
-                      via {{ app.trackingLinkName }}
+                      {{ t('sourceTracking.attribution.via', { name: app.trackingLinkName }) }}
                     </div>
                     <div v-else-if="app.referrerDomain" class="text-[11px] text-surface-400 mt-0.5 truncate max-w-[140px]">
                       {{ app.referrerDomain }}
@@ -1070,7 +1039,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                       class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ring-1 ring-inset"
                       :class="statusBadgeClasses[app.status] ?? 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400 ring-surface-200 dark:ring-surface-700'"
                     >
-                      {{ app.status }}
+                      {{ stageLabels[app.status as keyof typeof stageLabels] ?? app.status }}
                     </span>
                   </td>
                   <!-- Applied date -->
@@ -1094,7 +1063,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
         <div class="relative w-full max-w-lg rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 shadow-2xl">
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-4 border-b border-surface-100 dark:border-surface-800">
-            <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Create Tracking Link</h2>
+            <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">{{ t('sourceTracking.modal.createTitle') }}</h2>
             <button
               class="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
               @click="showCreateModal = false"
@@ -1107,31 +1076,31 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
           <form class="px-6 py-5 space-y-4" @submit.prevent="handleCreateLink">
             <!-- Name -->
             <div>
-              <label for="link-name" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Link Name</label>
+              <label for="link-name" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">{{ t('sourceTracking.modal.linkName') }}</label>
               <input
                 id="link-name"
                 v-model="newLink.name"
                 type="text"
-                placeholder="e.g. LinkedIn Spring Campaign"
+                :placeholder="t('sourceTracking.modal.linkNamePlaceholder')"
                 class="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-4 py-2.5 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all"
               />
             </div>
 
             <!-- Channel -->
             <div>
-              <label for="link-channel" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Source Channel</label>
+              <label for="link-channel" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">{{ t('sourceTracking.modal.sourceChannel') }}</label>
               <select
                 id="link-channel"
                 v-model="newLink.channel"
                 class="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-4 py-2.5 text-sm text-surface-900 dark:text-surface-100 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all"
               >
-                <optgroup label="Job Boards">
-                  <option v-for="ch in ['linkedin', 'indeed', 'glassdoor', 'ziprecruiter', 'monster', 'handshake', 'angellist', 'wellfound', 'dice', 'stackoverflow', 'weworkremotely', 'remoteok', 'builtin', 'hired', 'lever', 'greenhouse_board', 'google_jobs']" :key="ch" :value="ch">{{ getChannelLabel(ch) }}</option>
+                <optgroup :label="t('sourceTracking.modal.jobBoards')">
+                  <option v-for="ch in ['linkedin', 'indeed', 'glassdoor', 'vagas_com', 'catho', 'infojobs', 'adecco', 'manpower', 'ziprecruiter', 'monster', 'handshake', 'angellist', 'wellfound', 'dice', 'stackoverflow', 'weworkremotely', 'remoteok', 'builtin', 'hired', 'lever', 'greenhouse_board', 'google_jobs']" :key="ch" :value="ch">{{ getChannelLabel(ch) }}</option>
                 </optgroup>
-                <optgroup label="Social Media">
-                  <option v-for="ch in ['facebook', 'twitter', 'instagram', 'tiktok', 'reddit']" :key="ch" :value="ch">{{ getChannelLabel(ch) }}</option>
+                <optgroup :label="t('sourceTracking.modal.socialMedia')">
+                  <option v-for="ch in ['facebook', 'twitter', 'instagram', 'tiktok']" :key="ch" :value="ch">{{ getChannelLabel(ch) }}</option>
                 </optgroup>
-                <optgroup label="Other">
+                <optgroup :label="t('sourceTracking.modal.other')">
                   <option v-for="ch in ['referral', 'career_site', 'email', 'event', 'agency', 'direct', 'custom', 'other']" :key="ch" :value="ch">{{ getChannelLabel(ch) }}</option>
                 </optgroup>
               </select>
@@ -1139,13 +1108,13 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
 
             <!-- Job (optional) -->
             <div>
-              <label for="link-job" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Scope to Job <span class="text-surface-400 font-normal">(optional)</span></label>
+              <label for="link-job" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">{{ t('sourceTracking.modal.scopeToJob') }} <span class="text-surface-400 font-normal">{{ t('sourceTracking.modal.optional') }}</span></label>
               <select
                 id="link-job"
                 v-model="newLink.jobId"
                 class="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-4 py-2.5 text-sm text-surface-900 dark:text-surface-100 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all"
               >
-                <option value="">All jobs (org-wide)</option>
+                <option value="">{{ t('sourceTracking.allJobsOrgWide') }}</option>
                 <option v-for="j in jobs" :key="j.id" :value="j.id">{{ j.title }}</option>
               </select>
             </div>
@@ -1154,7 +1123,7 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
             <details class="group">
               <summary class="flex items-center gap-2 text-sm font-medium text-surface-500 dark:text-surface-400 cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors">
                 <ChevronDown class="size-4 transition-transform group-open:rotate-180" />
-                UTM Parameters (optional)
+                {{ t('sourceTracking.modal.utmParameters') }}
               </summary>
               <div class="mt-3 grid grid-cols-2 gap-3">
                 <div>
@@ -1179,14 +1148,14 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
                 class="rounded-xl px-4 py-2.5 text-sm font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
                 @click="showCreateModal = false"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="submit"
                 :disabled="!newLink.name.trim() || isCreating"
                 class="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 shadow-sm shadow-brand-600/15 transition-all"
               >
-                {{ isCreating ? 'Creating…' : 'Create Link' }}
+                {{ isCreating ? t('sourceTracking.modal.creating') : t('sourceTracking.modal.createLink') }}
               </button>
             </div>
           </form>
@@ -1204,22 +1173,22 @@ const showTab = ref<'overview' | 'links' | 'table'>(initialTab)
           <div class="mx-auto mb-4 flex items-center justify-center size-12 rounded-2xl bg-danger-50 dark:bg-danger-950/40">
             <Trash2 class="size-5 text-danger-600 dark:text-danger-400" />
           </div>
-          <h3 class="text-base font-semibold text-surface-900 dark:text-surface-100 mb-2">Delete Tracking Link?</h3>
+          <h3 class="text-base font-semibold text-surface-900 dark:text-surface-100 mb-2">{{ t('sourceTracking.delete.title') }}</h3>
           <p class="text-sm text-surface-500 dark:text-surface-400 mb-6">
-            Existing attribution data will be preserved, but new clicks won't be tracked.
+            {{ t('sourceTracking.delete.description') }}
           </p>
           <div class="flex items-center justify-center gap-3">
             <button
               class="rounded-xl px-4 py-2.5 text-sm font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
               @click="showDeleteConfirm = false"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
             <button
               class="rounded-xl bg-danger-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-danger-700 transition-colors"
               @click="handleDelete"
             >
-              Delete
+              {{ t('sourceTracking.delete.confirm') }}
             </button>
           </div>
         </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const { tenantPath, publicJobPath, platformPath } = useTenantPaths()
 import { Sun, Moon } from 'lucide-vue-next'
 
 defineProps<{
@@ -19,16 +20,8 @@ const { isDark, toggle: toggleColorMode } = useColorMode()
         :href="useRuntimeConfig().public.marketingUrl"
         class="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight text-surface-900 dark:text-white"
       >
-        <img
-          src="/eagle-mascot-logo-128.png"
-          alt="Reqcore mascot"
-          width="28"
-          height="28"
-          loading="eager"
-          decoding="sync"
-          class="h-7 w-7 object-contain"
-        />
-        Reqcore
+        <ReqcoreLogo class="h-7 w-7 shrink-0" />
+        {{ t('common.brand.name') }}
       </a>
 
       <!-- Center nav links (desktop) -->
@@ -42,12 +35,12 @@ const { isDark, toggle: toggleColorMode } = useColorMode()
         </NuxtLink>
       </div>
 
-      <!-- Right: session actions + language switcher -->
+      <!-- Right: session actions -->
       <div class="flex items-center gap-2">
         <ClientOnly>
           <button
             class="inline-flex items-center justify-center size-8 rounded-lg text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-white hover:bg-surface-100 dark:hover:bg-white/10 transition-all duration-200 cursor-pointer border-0 bg-transparent"
-            :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+            :title="isDark ? t('common.theme.switchToLight') : t('common.theme.switchToDark')"
             @click="toggleColorMode"
           >
             <Sun v-if="isDark" class="size-4" />
@@ -57,10 +50,9 @@ const { isDark, toggle: toggleColorMode } = useColorMode()
             <div class="size-8" aria-hidden="true" />
           </template>
         </ClientOnly>
-        <LanguageSwitcher />
         <template v-if="session?.user">
           <NuxtLink
-            :to="localePath('/dashboard')"
+            :to="tenantPath('')"
             class="rounded-md bg-surface-900 dark:bg-white px-3.5 py-1.5 text-[13px] font-semibold text-white dark:text-[#09090b] transition hover:bg-surface-800 dark:hover:bg-white/90"
           >
             {{ t('home.nav.dashboard') }}

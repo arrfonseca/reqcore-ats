@@ -1,6 +1,7 @@
 import { and, eq, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { aiConfig } from '../../database/schema'
+import { requireTenantOwnLlm } from '../../utils/ai/tenantAiPolicy'
 
 const paramsSchema = z.object({ id: z.string().min(1) })
 
@@ -17,6 +18,7 @@ const paramsSchema = z.object({ id: z.string().min(1) })
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['create'] })
   const orgId = session.session.activeOrganizationId
+  await requireTenantOwnLlm(orgId)
   const { id } = await getValidatedRouterParams(event, paramsSchema.parse)
 
   const existing = await db.query.aiConfig.findFirst({

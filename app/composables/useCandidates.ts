@@ -15,6 +15,8 @@ export function useCandidates(options?: {
 }) {
   const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 
+  const { effectiveOrgSlug } = useTenantPaths()
+
   const query = computed(() => {
     const pf = toValue(options?.propertyFilters)
     return {
@@ -27,7 +29,7 @@ export function useCandidates(options?: {
   })
 
   const { data, status: fetchStatus, error, refresh } = useFetch('/api/candidates', {
-    key: 'candidates',
+    key: () => `candidates-${effectiveOrgSlug.value ?? 'none'}`,
     query,
     headers: useRequestHeaders(['cookie']),
   })

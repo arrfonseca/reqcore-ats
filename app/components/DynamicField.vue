@@ -25,6 +25,7 @@ const emit = defineEmits<{
 }>()
 
 const model = defineModel<string | string[] | number | boolean | undefined>()
+const { t } = useI18n()
 
 // String-coerced model for text inputs (avoids TS error with boolean in v-model on <input>)
 const stringModel = computed({
@@ -38,18 +39,13 @@ const numberModel = computed({
 })
 
 const booleanModel = computed({
-  get: () => (model.value as boolean) ?? false,
-  set: (v: boolean) => { model.value = v },
+  get: () => model.value as boolean | undefined,
+  set: (v: boolean | undefined) => { model.value = v },
 })
 
 // For multi_select, ensure model value is always an array
 if (props.question.type === 'multi_select' && !Array.isArray(model.value)) {
   model.value = []
-}
-
-// For checkbox, ensure model value is always a boolean
-if (props.question.type === 'checkbox' && typeof model.value !== 'boolean') {
-  model.value = false
 }
 
 function toggleMultiOption(option: string) {
@@ -113,7 +109,7 @@ const normalBorderClass = 'border-surface-300 dark:border-surface-700'
 
 <template>
   <div>
-    <label :for="`q-${question.id}`" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+    <label :id="`q-label-${question.id}`" :for="question.type === 'checkbox' ? undefined : 'q-' + question.id" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
       {{ question.label }}
       <span v-if="question.required" class="text-danger-500">*</span>
     </label>
@@ -146,7 +142,7 @@ const normalBorderClass = 'border-surface-300 dark:border-surface-700'
       :required="question.required"
       :class="[inputClasses, 'bg-white dark:bg-surface-900', error ? errorBorderClass : normalBorderClass]"
     >
-      <option value="" disabled>Select an option…</option>
+      <option value="" disabled>{{ t('components.dynamicField.selectOption') }}</option>
       <option v-for="opt in question.options" :key="opt" :value="opt">
         {{ opt }}
       </option>
@@ -200,16 +196,36 @@ const normalBorderClass = 'border-surface-300 dark:border-surface-700'
       :class="[inputClasses, error ? errorBorderClass : normalBorderClass]"
     />
 
-    <!-- Checkbox (boolean) -->
-    <label v-else-if="question.type === 'checkbox'" class="flex items-center gap-2 mt-1 cursor-pointer">
-      <input
-        :id="`q-${question.id}`"
-        v-model="booleanModel"
-        type="checkbox"
-        class="size-4 rounded border-surface-300 dark:border-surface-700 text-brand-600 focus:ring-brand-500"
-      />
-      <span class="text-sm text-surface-700 dark:text-surface-300">Yes</span>
-    </label>
+    <!-- Yes / No -->
+    <div
+      v-else-if="question.type === 'checkbox'"
+      role="radiogroup"
+      :aria-labelledby="`q-label-${question.id}`"
+      class="flex items-center gap-4 mt-1"
+    >
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input
+          :id="`q-${question.id}-yes`"
+          v-model="booleanModel"
+          type="radio"
+          :name="`q-${question.id}`"
+          :value="true"
+          class="size-4 border-surface-300 dark:border-surface-700 text-brand-600 focus:ring-brand-500"
+        />
+        <span class="text-sm text-surface-700 dark:text-surface-300">{{ t('common.yesNo.yes') }}</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input
+          :id="`q-${question.id}-no`"
+          v-model="booleanModel"
+          type="radio"
+          :name="`q-${question.id}`"
+          :value="false"
+          class="size-4 border-surface-300 dark:border-surface-700 text-brand-600 focus:ring-brand-500"
+        />
+        <span class="text-sm text-surface-700 dark:text-surface-300">{{ t('common.yesNo.no') }}</span>
+      </label>
+    </div>
 
     <!-- File Upload -->
     <div v-else-if="question.type === 'file_upload'" class="mt-1">
@@ -230,7 +246,7 @@ const normalBorderClass = 'border-surface-300 dark:border-surface-700'
         @click="fileInputRef?.click()"
       >
         <Upload class="size-4" />
-        Choose file (PDF, DOC, DOCX — max 10 MB)
+        {{ t('components.dynamicField.chooseFile') }}
       </button>
 
       <!-- File selected -->

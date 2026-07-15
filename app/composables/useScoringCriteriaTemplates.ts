@@ -5,6 +5,7 @@ import {
   getTemplatesForCategory,
   getUniversalTemplates,
   hasTemplatesForCategory,
+  isPremadeCriterionKey,
   type ScoringCriterionTemplate,
   type ScoringCriteriaTemplate,
   type ScoringTemplateId,
@@ -66,10 +67,38 @@ export function useScoringCriteriaTemplates() {
     }))
   }
 
+  function resolveCriterion(criterion: ScoringCriterionTemplate): ScoringCriterionTemplate {
+    if (!isPremadeCriterionKey(criterion.key)) {
+      return { ...criterion }
+    }
+    return {
+      ...criterion,
+      name: t(`scoring.premadeCriteria.${criterion.key}.name`, criterion.name),
+      description: t(`scoring.premadeCriteria.${criterion.key}.description`, criterion.description),
+    }
+  }
+
+  function resolveCriterionDisplay(input: {
+    key: string
+    name?: string | null
+    description?: string | null
+  }): { name: string, description: string } {
+    if (isPremadeCriterionKey(input.key)) {
+      return {
+        name: t(`scoring.premadeCriteria.${input.key}.name`, input.name ?? input.key),
+        description: t(`scoring.premadeCriteria.${input.key}.description`, input.description ?? ''),
+      }
+    }
+    return {
+      name: input.name ?? input.key,
+      description: input.description ?? '',
+    }
+  }
+
   function getCriteria(templateId: ScoringTemplateId | string): ScoringCriterionDraft[] {
     const template = getScoringTemplate(templateId)
     if (!template) return []
-    return structuredClone(template.criteria)
+    return structuredClone(template.criteria).map(resolveCriterion)
   }
 
   const templateList = computed(() =>
@@ -88,6 +117,9 @@ export function useScoringCriteriaTemplates() {
     hasTemplatesForCategory,
     getCriteria,
     getScoringTemplate,
+    resolveCriterion,
+    resolveCriterionDisplay,
+    isPremadeCriterionKey,
     comingSoonLabel: computed(() => t('scoring.comingSoon')),
     sectionUniversal: computed(() => t('scoring.sections.universal')),
     sectionIsco: computed(() => t('scoring.sections.isco')),

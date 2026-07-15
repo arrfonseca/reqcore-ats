@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const { tenantPath, platformPath } = useTenantPaths()
 import { UserPlus, Pencil, Trash2, MoreHorizontal, Brain, Settings2 } from 'lucide-vue-next'
 import { JOB_STATUS_TRANSITIONS } from '~~/shared/status-transitions'
 
@@ -10,6 +11,7 @@ const toast = useToast()
 const { track } = useTrack()
 const localePath = useLocalePath()
 const { t } = useI18n()
+const { aiSettingsPath, aiSettingsLinkLabel } = useEffectiveAi()
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 
 const { job, updateJob, deleteJob, refresh: refreshJob } = useJob(props.jobId)
@@ -18,12 +20,12 @@ const { job, updateJob, deleteJob, refresh: refreshJob } = useJob(props.jobId)
 // Job status transitions
 // ─────────────────────────────────────────────
 
-const jobTransitionLabels: Record<string, string> = {
-  draft: 'Revert to Draft',
-  open: 'Publish',
-  closed: 'Close',
-  archived: 'Archive',
-}
+const jobTransitionLabels = computed<Record<string, string>>(() => ({
+  draft: t('components.jobSubNavActions.transitions.draft'),
+  open: t('components.jobSubNavActions.transitions.open'),
+  closed: t('components.jobSubNavActions.transitions.closed'),
+  archived: t('components.jobSubNavActions.transitions.archived'),
+}))
 
 const jobTransitionClasses: Record<string, string> = {
   open: 'bg-success-600 text-white hover:bg-success-700',
@@ -51,7 +53,7 @@ async function handleJobTransition(newStatus: string) {
     await refreshJob()
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to update status', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('components.jobSubNavActions.toasts.updateStatusFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
   } finally {
     isJobTransitioning.value = false
   }
@@ -71,7 +73,7 @@ async function handleDelete() {
     await deleteJob()
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to delete job', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('components.jobSubNavActions.toasts.deleteFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
     isDeleting.value = false
     showDeleteConfirm.value = false
   }
@@ -106,7 +108,7 @@ async function scoreAllCandidates() {
     scoringProgress.value.total = applicationIds.length
     track('bulk_scoring_started', { job_id: props.jobId, candidate_count: applicationIds.length })
     if (applicationIds.length === 0) {
-      toast.info('All candidates scored', 'Every candidate already has a score.')
+      toast.info(t('components.jobSubNavActions.toasts.allScored'), t('components.jobSubNavActions.toasts.allScoredHint'))
       return
     }
 
@@ -123,24 +125,24 @@ async function scoreAllCandidates() {
     }
     await refreshNuxtData(`pipeline-apps-${props.jobId}`)
     if (failed === 0) {
-      toast.success('Scoring complete', `${applicationIds.length} candidate${applicationIds.length === 1 ? '' : 's'} scored successfully.`)
+      toast.success(t('components.jobSubNavActions.toasts.scoringComplete'), t('components.jobSubNavActions.toasts.scoringCompleteHint', applicationIds.length))
     } else {
-      toast.warning('Scoring partially complete', `${applicationIds.length - failed} scored, ${failed} failed (missing resume or criteria).`)
+      toast.warning(t('components.jobSubNavActions.toasts.scoringPartial'), t('components.jobSubNavActions.toasts.scoringPartialHint', { success: applicationIds.length - failed, failed }))
     }
   } catch (err: any) {
     const statusMessage = err?.data?.statusMessage ?? ''
     if (statusMessage.includes('AI provider not configured') || statusMessage.includes('No scoring criteria')) {
       toast.add({
         type: 'warning',
-        title: 'Cannot score candidates',
+        title: t('components.jobSubNavActions.toasts.cannotScore'),
         message: statusMessage,
         link: statusMessage.includes('AI provider')
-          ? { label: 'Go to AI Settings', href: '/dashboard/settings/ai' }
+          ? { label: aiSettingsLinkLabel.value, href: aiSettingsPath.value }
           : undefined,
         duration: 8000,
       })
     } else {
-      toast.error('Scoring failed', { message: statusMessage || 'An unexpected error occurred.', statusCode: err?.data?.statusCode })
+      toast.error(t('components.jobSubNavActions.toasts.scoringFailed'), { message: statusMessage || t('dashboard.jobs.pipeline.toasts.unexpectedError'), statusCode: err?.data?.statusCode })
     }
   } finally {
     isScoringAll.value = false
@@ -207,7 +209,7 @@ function openPropertyEditor(scope: 'org' | 'job') {
         @click="showApplyModal = true"
       >
         <UserPlus class="size-3" />
-        Add Candidate
+        {{ t('components.jobSubNavActions.addCandidate') }}
       </button>
 
       <!-- Primary job action (e.g., Publish) -->
@@ -245,19 +247,19 @@ function openPropertyEditor(scope: 'org' | 'job') {
               class="z-[200] w-52 rounded-xl border border-surface-200 dark:border-surface-700/80 bg-white dark:bg-surface-900 shadow-xl shadow-surface-900/5 dark:shadow-black/20 py-1.5 origin-top-right"
             >
               <NuxtLink
-                :to="localePath(`/dashboard/jobs/${jobId}/settings`)"
+                :to="tenantPath(`jobs/${jobId}/settings`)"
                 class="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 transition-colors"
                 @click="showMoreMenu = false"
               >
                 <Pencil class="size-3.5 text-surface-400" />
-                Edit Job
+                {{ t('components.jobSubNavActions.editJob') }}
               </NuxtLink>
               <button
                 class="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 transition-colors sm:hidden"
                 @click="showApplyModal = true; showMoreMenu = false"
               >
                 <UserPlus class="size-3.5 text-surface-400" />
-                Add Candidate
+                {{ t('components.jobSubNavActions.addCandidate') }}
               </button>
               <div class="border-t border-surface-100 dark:border-surface-800 my-1.5 mx-2" />
               <button
@@ -266,32 +268,32 @@ function openPropertyEditor(scope: 'org' | 'job') {
                 @click="scoreAllCandidates()"
               >
                 <Brain class="size-3.5 text-surface-400" />
-                {{ isScoringAll ? `Scoring ${scoringProgress.done}/${scoringProgress.total}…` : t('dashboard.actions.scoreAllCandidates') }}
+                {{ isScoringAll ? t('components.jobSubNavActions.scoringProgress', { done: scoringProgress.done, total: scoringProgress.total }) : t('dashboard.actions.scoreAllCandidates') }}
               </button>
               <button
                 class="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 transition-colors"
                 @click="openPropertyEditor('job')"
               >
                 <Settings2 class="size-3.5 text-surface-400" />
-                Manage job-specific properties
+                {{ t('components.jobSubNavActions.manageJobProperties') }}
               </button>
               <button
                 class="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 transition-colors"
                 @click="openPropertyEditor('org')"
               >
                 <Settings2 class="size-3.5 text-surface-400" />
-                Manage org-wide application properties
+                {{ t('components.jobSubNavActions.manageOrgProperties') }}
               </button>
               <template v-if="secondaryJobTransitions.length > 0">
                 <div class="border-t border-surface-100 dark:border-surface-800 my-1.5 mx-2" />
                 <button
-                  v-for="t in secondaryJobTransitions"
-                  :key="t"
+                  v-for="transition in secondaryJobTransitions"
+                  :key="transition"
                   :disabled="isJobTransitioning"
                   class="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-sm text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/80 transition-colors disabled:opacity-50"
-                  @click="handleJobTransition(t); showMoreMenu = false"
+                  @click="handleJobTransition(transition); showMoreMenu = false"
                 >
-                  {{ jobTransitionLabels[t] ?? t }}
+                  {{ jobTransitionLabels[transition] ?? transition }}
                 </button>
               </template>
               <div class="border-t border-surface-100 dark:border-surface-800 my-1.5 mx-2" />
@@ -300,7 +302,7 @@ function openPropertyEditor(scope: 'org' | 'job') {
                 @click="showDeleteConfirm = true; showMoreMenu = false"
               >
                 <Trash2 class="size-3.5" />
-                Delete Job
+                {{ t('components.jobSubNavActions.deleteJob') }}
               </button>
             </div>
           </Transition>
@@ -322,9 +324,9 @@ function openPropertyEditor(scope: 'org' | 'job') {
     <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showDeleteConfirm = false" />
       <div class="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl shadow-surface-900/10 dark:shadow-black/30 ring-1 ring-surface-200/80 dark:ring-surface-700/60 p-6 max-w-sm w-full mx-4">
-        <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">Delete Job</h3>
+        <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">{{ t('components.jobSubNavActions.deleteJob') }}</h3>
         <p class="text-sm text-surface-600 dark:text-surface-400 mb-4">
-          Are you sure you want to delete <strong>{{ job?.title }}</strong>? This will also delete all associated applications. This action cannot be undone.
+          {{ t('components.jobSubNavActions.deleteConfirm', { title: job?.title ?? '' }) }}
         </p>
         <div class="flex justify-end gap-2">
           <button
@@ -332,14 +334,14 @@ function openPropertyEditor(scope: 'org' | 'job') {
             class="cursor-pointer rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
             @click="showDeleteConfirm = false"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
           <button
             :disabled="isDeleting"
             class="cursor-pointer rounded-lg bg-danger-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             @click="handleDelete"
           >
-            {{ isDeleting ? 'Deleting…' : 'Delete' }}
+            {{ isDeleting ? t('common.actions.deleting') : t('common.actions.delete') }}
           </button>
         </div>
       </div>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Columns2, Check } from 'lucide-vue-next'
 
+const { t } = useI18n()
+
 const props = defineProps<{
   columns: { key: string; label: string; required?: boolean }[]
   modelValue: Record<string, boolean>
@@ -48,7 +50,7 @@ const hiddenCount = computed(() =>
       @click.stop="open = !open"
     >
       <Columns2 class="size-4" />
-      Columns
+      {{ t('common.columns.columns') }}
       <span
         v-if="hiddenCount > 0"
         class="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-brand-600 text-white text-[10px] font-semibold"
@@ -60,7 +62,7 @@ const hiddenCount = computed(() =>
       class="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-lg py-1"
     >
       <div class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500 border-b border-surface-100 dark:border-surface-800 mb-1">
-        Toggle columns
+        {{ t('common.columns.toggleColumns') }}
       </div>
       <button
         v-for="col in columns"

@@ -1,5 +1,6 @@
 import { eq, and, desc } from 'drizzle-orm'
 import { application, criterionScore, analysisRun, scoringCriterion } from '../../../database/schema'
+import { getScoringCategoryLabelPt } from '../../../utils/scoringCategoryLabels'
 import { z } from 'zod'
 
 const paramsSchema = z.object({ id: z.string().min(1) })
@@ -67,7 +68,10 @@ export default defineEventHandler(async (event) => {
 
   return {
     compositeScore: app.score,
-    scores: rawScores,
+    scores: rawScores.map(({ category, ...score }) => ({
+      ...score,
+      categoryLabel: getScoringCategoryLabelPt(category),
+    })),
     latestRun: latestRun ?? null,
   }
 })

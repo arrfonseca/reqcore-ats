@@ -1,6 +1,6 @@
 import { eq, and } from 'drizzle-orm'
 import { document } from '../../../database/schema'
-import { parseDocument } from '../../../utils/resume-parser'
+import { ensureDocumentParsed } from '../../../utils/ensureDocumentParsed'
 import { z } from 'zod'
 
 const paramsSchema = z.object({ id: z.string().min(1) })
@@ -40,29 +40,35 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Document not found' })
   }
 
-  // Download file from S3
-  const fileBuffer = await downloadFromS3(doc.storageKey)
+  const text = await ensureDocumentParsed({
+    id: doc.id,
+    organizationId: orgId,
+    storageKey: doc.storageKey,
+    mimeType: doc.mimeType,
+    force: true,
+  })
 
-  // Parse document content
-  const parsedContent = await parseDocument(fileBuffer, doc.mimeType)
-
-  if (!parsedContent) {
+  if (!text) {
     throw createError({
       statusCode: 422,
       statusMessage: 'Failed to extract text from this document. The file may be image-based or corrupted.',
     })
   }
 
-  // Update the document record with parsed content
-  await db.update(document)
-    .set({ parsedContent: parsedContent as any })
-    .where(eq(document.id, documentId))
+  const updated = await db.query.document.findFirst({
+    where: eq(document.id, documentId),
+    columns: { parsedContent: true },
+  })
+  const parsedContent = updated?.parsedContent as {
+    metadata?: { wordCount?: number, sourceFormat?: string }
+    sections?: unknown[]
+  } | null
 
   return {
     id: doc.id,
     parsed: true,
-    wordCount: parsedContent.metadata.wordCount,
-    sectionCount: parsedContent.sections.length,
-    sourceFormat: parsedContent.metadata.sourceFormat,
+    wordCount: parsedContent?.metadata?.wordCount ?? 0,
+    sectionCount: parsedContent?.sections?.length ?? 0,
+    sourceFormat: parsedContent?.metadata?.sourceFormat ?? doc.mimeType,
   }
 })

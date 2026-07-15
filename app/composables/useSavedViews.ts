@@ -20,6 +20,7 @@ function genId() {
 }
 
 export function useSavedViews<T extends Record<string, unknown>>(scope: string, defaultSettings: T) {
+  const { t } = useI18n()
   const storageKey = `${STORAGE_PREFIX}${scope}`
   const views = ref([]) as Ref<SavedView<T>[]>
   const activeViewId = ref<string | null>(null)
@@ -67,7 +68,7 @@ export function useSavedViews<T extends Record<string, unknown>>(scope: string, 
   }
 
   function saveView(name: string, settings: T, opts?: { setActive?: boolean }): SavedView<T> {
-    const trimmed = name.trim() || 'Untitled view'
+    const trimmed = name.trim() || t('savedViews.untitled')
     const view: SavedView<T> = { id: genId(), name: trimmed, settings: { ...settings } }
     views.value = [...views.value, view]
     persist()

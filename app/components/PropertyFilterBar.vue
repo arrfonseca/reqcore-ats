@@ -27,6 +27,8 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: PropertyFilter[]): void
 }>()
 
+const { t } = useI18n()
+
 const { definitions } = useProperties({
   entityType: () => props.entityType,
   jobId: () => props.jobId ?? null,
@@ -92,13 +94,13 @@ function operatorsFor(def: PropertyDefinition): PropertyOperator[] {
   }
 }
 
-const OPERATOR_LABELS: Record<PropertyOperator, string> = {
-  equals: 'is',
-  contains: 'contains',
-  in: 'is any of',
-  isEmpty: 'is empty',
-  isNotEmpty: 'is set',
-}
+const operatorLabels = computed((): Record<PropertyOperator, string> => ({
+  equals: t('properties.filters.operators.equals'),
+  contains: t('properties.filters.operators.contains'),
+  in: t('properties.filters.operators.in'),
+  isEmpty: t('properties.filters.operators.isEmpty'),
+  isNotEmpty: t('properties.filters.operators.isNotEmpty'),
+}))
 
 function addFilter(def: PropertyDefinition) {
   const op = defaultOpFor(def)
@@ -144,21 +146,24 @@ watchEffect((onCleanup) => {
 function summarizeFilter(f: PropertyFilter): string {
   const def = definitionMap.value.get(f.propertyDefinitionId)
   if (!def) return ''
-  const opLabel = OPERATOR_LABELS[f.op]
+  const opLabel = operatorLabels.value[f.op]
+  const ellipsis = t('properties.filters.ellipsis')
   if (f.op === 'isEmpty' || f.op === 'isNotEmpty') return `${def.name} ${opLabel}`
   if (f.op === 'in') {
     const ids = (f.value as string[]) ?? []
     const opts = (def.config as { options?: { id: string; label: string }[] } | null)?.options ?? []
     const labels = ids.map((id) => opts.find((o) => o.id === id)?.label).filter(Boolean)
-    return `${def.name} ${opLabel} ${labels.join(', ') || '…'}`
+    return `${def.name} ${opLabel} ${labels.join(', ') || ellipsis}`
   }
   if (def.type === 'select') {
     const opts = (def.config as { options?: { id: string; label: string }[] } | null)?.options ?? []
-    const label = opts.find((o) => o.id === f.value)?.label ?? '…'
+    const label = opts.find((o) => o.id === f.value)?.label ?? ellipsis
     return `${def.name} ${opLabel} ${label}`
   }
-  if (def.type === 'checkbox') return `${def.name} ${opLabel} ${f.value ? 'checked' : 'unchecked'}`
-  return `${def.name} ${opLabel} ${f.value || '…'}`
+  if (def.type === 'checkbox') {
+    return `${def.name} ${opLabel} ${f.value ? t('properties.filters.checked') : t('properties.filters.unchecked')}`
+  }
+  return `${def.name} ${opLabel} ${f.value || ellipsis}`
 }
 
 const showableDefs = computed(() => definitions.value)
@@ -178,7 +183,7 @@ const showableDefs = computed(() => definitions.value)
         <button
           type="button"
           class="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 cursor-pointer"
-          :aria-label="`Edit filter: ${summarizeFilter(f)}`"
+          :aria-label="t('properties.filters.editFilterAria', { summary: summarizeFilter(f) })"
           @click="editingIdx = editingIdx === idx ? null : idx"
         >
           <span class="max-w-[20rem] truncate">{{ summarizeFilter(f) }}</span>
@@ -186,7 +191,7 @@ const showableDefs = computed(() => definitions.value)
         <button
           type="button"
           class="pr-2 pl-1 py-1 text-brand-500 hover:text-brand-700 cursor-pointer"
-          :aria-label="`Remove filter: ${summarizeFilter(f)}`"
+          :aria-label="t('properties.filters.removeFilterAria', { summary: summarizeFilter(f) })"
           @click.stop="removeFilter(idx)"
         >
           <X class="size-3" />
@@ -210,7 +215,7 @@ const showableDefs = computed(() => definitions.value)
               @change="(e) => patchFilter(idx, { op: (e.target as HTMLSelectElement).value as PropertyOperator })"
             >
               <option v-for="op in operatorsFor(definitionMap.get(f.propertyDefinitionId)!)" :key="op" :value="op">
-                {{ OPERATOR_LABELS[op] }}
+                {{ operatorLabels[op] }}
               </option>
             </select>
 
@@ -253,8 +258,8 @@ const showableDefs = computed(() => definitions.value)
                 class="w-full rounded border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 px-2 py-1 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
                 @change="(e) => patchFilter(idx, { value: (e.target as HTMLSelectElement).value === 'true' })"
               >
-                <option value="true">checked</option>
-                <option value="false">unchecked</option>
+                <option value="true">{{ t('properties.filters.checked') }}</option>
+                <option value="false">{{ t('properties.filters.unchecked') }}</option>
               </select>
 
               <!-- date / number equals -->
@@ -279,7 +284,7 @@ const showableDefs = computed(() => definitions.value)
                 v-else
                 type="text"
                 :value="(f.value as string) ?? ''"
-                placeholder="Value"
+                :placeholder="t('properties.filters.valuePlaceholder')"
                 class="w-full rounded border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 px-2 py-1 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
                 @input="(e) => patchFilter(idx, { value: (e.target as HTMLInputElement).value })"
               />
@@ -297,7 +302,7 @@ const showableDefs = computed(() => definitions.value)
         @click="pickerOpen = !pickerOpen"
       >
         <component :is="modelValue.length === 0 ? Filter : Plus" class="size-3.5" />
-        {{ modelValue.length === 0 ? 'Filter' : 'Add filter' }}
+        {{ modelValue.length === 0 ? t('properties.filters.filter') : t('properties.filters.addFilter') }}
       </button>
       <div
         v-if="pickerOpen"
@@ -315,7 +320,7 @@ const showableDefs = computed(() => definitions.value)
             <span class="text-[10px] uppercase tracking-wide text-surface-400">{{ def.type }}</span>
           </button>
           <div v-if="showableDefs.length === 0" class="px-3 py-2 text-xs text-surface-400">
-            No properties to filter by yet.
+            {{ t('properties.filters.emptyDefinitions') }}
           </div>
         </div>
       </div>
@@ -326,6 +331,6 @@ const showableDefs = computed(() => definitions.value)
       type="button"
       class="text-xs text-surface-500 hover:text-surface-800 dark:hover:text-surface-100 cursor-pointer"
       @click="clearAll"
-    >Clear all</button>
+    >{{ t('properties.filters.clearAll') }}</button>
   </div>
 </template>

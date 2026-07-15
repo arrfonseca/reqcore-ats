@@ -10,11 +10,15 @@ import {
   Pencil, Trash2, Zap, Check, KeyRound, Server,
 } from 'lucide-vue-next'
 
-definePageMeta({})
+const { t } = useI18n()
+
+definePageMeta({
+  middleware: ['require-own-llm-ai'],
+})
 
 useSeoMeta({
-  title: 'AI Configuration — Reqcore',
-  description: 'Configure AI providers and models for the chatbot and candidate analysis.',
+  title: t('settings.ai.seoTitle'),
+  description: t('settings.ai.seoDescription'),
 })
 
 interface AiConfigRow {
@@ -41,7 +45,6 @@ interface ProviderInfo {
   signupUrl?: string
   supportsBaseUrl: boolean
   defaultModel: string
-  models: { id: string, label: string, description: string, inputPricePer1m?: number, outputPricePer1m?: number, badge?: 'recommended' | 'fast' | 'powerful' | 'cheap' }[]
 }
 
 const { allowed: canManageAi, isLoading: isPermissionLoading } = usePermission({ scoring: ['create'] })
@@ -73,11 +76,14 @@ async function setDefault(c: AiConfigRow, purpose: 'chatbot' | 'analysis') {
       body: { purposes: [purpose] },
       headers: useRequestHeaders(['cookie']),
     })
-    toast.success(`Set as default for ${purpose === 'chatbot' ? 'chatbot' : 'analysis'}`, `"${c.name}" will now be used.`)
+    toast.success(
+      t('settings.ai.toasts.setDefaultTitle', { purpose: t(`settings.ai.purposes.${purpose}`) }),
+      t('settings.ai.toasts.setDefaultBody', { name: c.name }),
+    )
     await refreshConfigs()
   } catch (err: any) {
-    const message = err?.data?.statusMessage ?? 'Failed to set default.'
-    toast.error('Could not change default', { message })
+    const message = err?.data?.statusMessage ?? t('settings.ai.toasts.setDefaultFailed')
+    toast.error(t('settings.ai.toasts.setDefaultFailedTitle'), { message })
   } finally {
     togglingDefaultId.value = null
     togglingPurpose.value = null
@@ -95,11 +101,11 @@ async function testConnection(c: AiConfigRow) {
       headers: useRequestHeaders(['cookie']),
     })
     testResults.value = { ...testResults.value, [c.id]: { success: true } }
-    toast.success('Connection works', `"${c.name}" responded correctly.`)
+    toast.success(t('settings.ai.toasts.connectionWorks'), t('settings.ai.toasts.connectionWorksBody', { name: c.name }))
   } catch (err: any) {
-    const message = err?.data?.statusMessage ?? 'Connection test failed.'
+    const message = err?.data?.statusMessage ?? t('settings.ai.toasts.testFailedDefault')
     testResults.value = { ...testResults.value, [c.id]: { success: false, message } }
-    toast.error('Test failed', { message })
+    toast.error(t('settings.ai.toasts.testFailed'), { message })
   } finally {
     testingId.value = null
   }
@@ -107,18 +113,18 @@ async function testConnection(c: AiConfigRow) {
 
 const deletingId = ref<string | null>(null)
 async function deleteConfig(c: AiConfigRow) {
-  if (!confirm(`Delete the "${c.name}" configuration? Conversations using it will fall back to the default.`)) return
+  if (!confirm(t('settings.ai.deleteConfirm', { name: c.name }))) return
   deletingId.value = c.id
   try {
     await $fetch(`/api/ai-config/${c.id}`, {
       method: 'DELETE',
       headers: useRequestHeaders(['cookie']),
     })
-    toast.success('Configuration deleted', `"${c.name}" removed.`)
+    toast.success(t('settings.ai.toasts.deleted'), t('settings.ai.toasts.deletedBody', { name: c.name }))
     await refreshConfigs()
   } catch (err: any) {
-    const message = err?.data?.statusMessage ?? 'Failed to delete configuration.'
-    toast.error('Delete failed', { message })
+    const message = err?.data?.statusMessage ?? t('settings.ai.toasts.deleteFailedDefault')
+    toast.error(t('settings.ai.toasts.deleteFailed'), { message })
   } finally {
     deletingId.value = null
   }
@@ -138,9 +144,9 @@ function formatPrice(p: number | null): string {
     <!-- Page header -->
     <div class="mb-6 flex items-start justify-between gap-4 flex-wrap">
       <div>
-        <h1 class="text-lg font-semibold text-surface-900 dark:text-surface-50">AI Configuration</h1>
+        <h1 class="text-lg font-semibold text-surface-900 dark:text-surface-50">{{ t('settings.ai.pageTitle') }}</h1>
         <p class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
-          Add as many providers and models as you like. Pick which one powers the chatbot and which one scores candidates.
+          {{ t('settings.ai.pageSubtitle') }}
         </p>
       </div>
       <NuxtLink
@@ -149,7 +155,7 @@ function formatPrice(p: number | null): string {
         class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
       >
         <Plus class="size-4" />
-        Add a model
+        {{ t('settings.ai.addModel') }}
       </NuxtLink>
     </div>
 
@@ -164,15 +170,15 @@ function formatPrice(p: number | null): string {
     >
       <AlertTriangle class="size-5 shrink-0 mt-0.5" />
       <div>
-        <p class="font-semibold mb-1">Insufficient permissions</p>
-        <p>You don't have permission to manage AI settings. Contact your organization owner or admin.</p>
+        <p class="font-semibold mb-1">{{ t('settings.ai.insufficientPermissions') }}</p>
+        <p>{{ t('settings.ai.noPermission') }}</p>
       </div>
     </div>
 
     <!-- Loading -->
     <div v-else-if="isLoading" class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-8 text-center text-sm text-surface-500">
       <Loader2 class="size-5 animate-spin mx-auto mb-2 text-surface-400" />
-      Loading configurations…
+      {{ t('settings.ai.loading') }}
     </div>
 
     <!-- Empty state -->
@@ -183,16 +189,16 @@ function formatPrice(p: number | null): string {
       <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-950 text-brand-600 dark:text-brand-400 mb-3">
         <Brain class="size-6" />
       </div>
-      <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">No AI models configured yet</h2>
+      <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">{{ t('settings.ai.emptyTitle') }}</h2>
       <p class="mt-1 mb-4 text-sm text-surface-500 dark:text-surface-400">
-        Add your first model to enable the chatbot and candidate analysis. Pick from popular providers or bring your own OpenAI-compatible endpoint.
+        {{ t('settings.ai.emptyDescription') }}
       </p>
       <NuxtLink
         to="/dashboard/settings/ai/new"
         class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
       >
         <Plus class="size-4" />
-        Add your first model
+        {{ t('settings.ai.addFirstModel') }}
       </NuxtLink>
     </div>
 
@@ -214,22 +220,22 @@ function formatPrice(p: number | null): string {
               <span
                 v-if="c.isDefaultChatbot"
                 class="inline-flex items-center gap-1 rounded-full border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/50 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:text-brand-300"
-                title="Default for the chatbot"
+                :title="t('settings.ai.useForChatbotTitle')"
               >
-                <Sparkles class="size-3" /> Chatbot default
+                <Sparkles class="size-3" /> {{ t('settings.ai.chatbotDefault') }}
               </span>
               <span
                 v-if="c.isDefaultAnalysis"
                 class="inline-flex items-center gap-1 rounded-full border border-warning-200 dark:border-warning-800 bg-warning-50 dark:bg-warning-950/50 px-2 py-0.5 text-[11px] font-medium text-warning-700 dark:text-warning-300"
-                title="Default for candidate analysis"
+                :title="t('settings.ai.useForAnalysisTitle')"
               >
-                <Star class="size-3" /> Analysis default
+                <Star class="size-3" /> {{ t('settings.ai.analysisDefault') }}
               </span>
               <span
                 v-if="!c.hasApiKey"
                 class="inline-flex items-center gap-1 rounded-full border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-950/50 px-2 py-0.5 text-[11px] font-medium text-danger-700 dark:text-danger-300"
               >
-                <AlertTriangle class="size-3" /> Missing API key
+                <AlertTriangle class="size-3" /> {{ t('settings.ai.missingApiKey') }}
               </span>
             </div>
             <div class="mt-1 flex items-center gap-2 flex-wrap text-xs text-surface-500">
@@ -238,9 +244,9 @@ function formatPrice(p: number | null): string {
                 <Server class="size-3" />
                 <span class="font-mono truncate max-w-[260px]" :title="c.baseUrl">{{ c.baseUrl }}</span>
               </span>
-              <span class="inline-flex items-center gap-1" title="Pricing per 1M tokens">
+              <span class="inline-flex items-center gap-1" :title="t('settings.ai.pricingPer1m')">
                 <BarChart3 class="size-3" />
-                {{ formatPrice(c.inputPricePer1m) }} in / {{ formatPrice(c.outputPricePer1m) }} out
+                {{ t('settings.ai.pricingInOut', { input: formatPrice(c.inputPricePer1m), output: formatPrice(c.outputPricePer1m) }) }}
               </span>
             </div>
 
@@ -249,7 +255,7 @@ function formatPrice(p: number | null): string {
                 v-if="testResults[c.id]?.success"
                 class="inline-flex items-center gap-1 text-[11px] text-success-600 dark:text-success-400"
               >
-                <Check class="size-3" /> Connection verified.
+                <Check class="size-3" /> {{ t('settings.ai.connectionVerified') }}
               </span>
               <span
                 v-else
@@ -266,24 +272,24 @@ function formatPrice(p: number | null): string {
               v-if="!c.isDefaultChatbot"
               :disabled="!c.hasApiKey || (togglingDefaultId === c.id && togglingPurpose === 'chatbot')"
               class="inline-flex items-center gap-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-2.5 py-1.5 text-xs font-medium text-surface-700 dark:text-surface-300 hover:border-brand-300 dark:hover:border-brand-700 hover:text-brand-700 dark:hover:text-brand-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              :title="c.hasApiKey ? 'Use this model for the chatbot' : 'Add an API key first'"
+              :title="c.hasApiKey ? t('settings.ai.useForChatbotTitle') : t('settings.ai.addApiKeyFirst')"
               @click="setDefault(c, 'chatbot')"
             >
               <Loader2 v-if="togglingDefaultId === c.id && togglingPurpose === 'chatbot'" class="size-3.5 animate-spin" />
               <Sparkles v-else class="size-3.5" />
-              Use for chatbot
+              {{ t('settings.ai.useForChatbot') }}
             </button>
 
             <button
               v-if="!c.isDefaultAnalysis"
               :disabled="!c.hasApiKey || (togglingDefaultId === c.id && togglingPurpose === 'analysis')"
               class="inline-flex items-center gap-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-2.5 py-1.5 text-xs font-medium text-surface-700 dark:text-surface-300 hover:border-warning-300 dark:hover:border-warning-700 hover:text-warning-700 dark:hover:text-warning-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              :title="c.hasApiKey ? 'Use this model for candidate analysis' : 'Add an API key first'"
+              :title="c.hasApiKey ? t('settings.ai.useForAnalysisTitle') : t('settings.ai.addApiKeyFirst')"
               @click="setDefault(c, 'analysis')"
             >
               <Loader2 v-if="togglingDefaultId === c.id && togglingPurpose === 'analysis'" class="size-3.5 animate-spin" />
               <Star v-else class="size-3.5" />
-              Use for analysis
+              {{ t('settings.ai.useForAnalysis') }}
             </button>
 
             <button
@@ -293,7 +299,7 @@ function formatPrice(p: number | null): string {
             >
               <Loader2 v-if="testingId === c.id" class="size-3.5 animate-spin" />
               <Zap v-else class="size-3.5" />
-              Test
+              {{ t('settings.ai.test') }}
             </button>
 
             <NuxtLink
@@ -301,7 +307,7 @@ function formatPrice(p: number | null): string {
               class="inline-flex items-center gap-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-2.5 py-1.5 text-xs font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors"
             >
               <Pencil class="size-3.5" />
-              Edit
+              {{ t('settings.ai.edit') }}
             </NuxtLink>
 
             <button
@@ -320,7 +326,7 @@ function formatPrice(p: number | null): string {
     <!-- Footer hint -->
     <p v-if="canManageAi && configs.length > 0" class="mt-4 text-xs text-surface-500 dark:text-surface-400 flex items-start gap-1.5">
       <KeyRound class="size-3.5 mt-0.5 shrink-0" />
-      <span>API keys are encrypted at rest with AES-256-GCM and never returned to the browser. Need a free key? OpenAI, Anthropic, and Google all offer trial credits.</span>
+      <span>{{ t('settings.ai.footerHint') }}</span>
     </p>
   </div>
 </template>

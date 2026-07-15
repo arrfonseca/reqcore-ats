@@ -12,11 +12,12 @@
  */
 import { eq } from 'drizzle-orm'
 import * as schema from '../database/schema'
-import { isRailwayPreviewEnvironment } from './env'
 
 const demoOrgIdBySlug = new Map<string, string>()
 const demoOrgIdSet = new Set<string>()
-const DEFAULT_PREVIEW_DEMO_ORG_SLUG = 'reqcore-demo'
+
+/** Known demo slugs — always excluded from platform analytics even if DEMO_ORG_SLUG is unset. */
+export const DEMO_ORG_SLUGS = ['reqcore-demo', 'applirank-demo'] as const
 
 export interface DemoSlugsResult {
   slugs: string[]
@@ -31,10 +32,6 @@ export function getConfiguredDemoSlugs(): DemoSlugsResult {
   if (env.DEMO_ORG_SLUG) {
     slugs.add(env.DEMO_ORG_SLUG)
     isExplicitlyConfigured = true
-  }
-
-  if (isRailwayPreviewEnvironment(env.RAILWAY_ENVIRONMENT_NAME)) {
-    slugs.add(DEFAULT_PREVIEW_DEMO_ORG_SLUG)
   }
 
   return { slugs: [...slugs], isExplicitlyConfigured }

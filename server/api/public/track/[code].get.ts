@@ -1,6 +1,7 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq, sql, and } from 'drizzle-orm'
 import { z } from 'zod'
-import { trackingLink } from '../../../database/schema'
+import { trackingLink, organizationCustomDomain } from '../../../database/schema'
+import { buildPublicJobUrl, buildPublicCareersUrl } from '../../../utils/tenantContext'
 
 /** Tracking codes are 8-char base64url strings */
 const TRACKING_CODE_RE = /^[A-Za-z0-9_-]{1,100}$/
@@ -20,9 +21,14 @@ export default defineEventHandler(async (event) => {
 
   const link = await db.query.trackingLink.findFirst({
     where: eq(trackingLink.code, code),
-    columns: { id: true, jobId: true, isActive: true },
+    columns: { id: true, jobId: true, isActive: true, organizationId: true },
     with: {
-      job: { columns: { slug: true } },
+      job: {
+        columns: { slug: true },
+        with: {
+          organization: { columns: { slug: true } },
+        },
+      },
     },
   })
 
@@ -49,9 +55,36 @@ export default defineEventHandler(async (event) => {
   if (!baseUrl) {
     throw createError({ statusCode: 500, statusMessage: 'Server misconfiguration' })
   }
-  const targetPath = link.job?.slug
-    ? `/jobs/${link.job.slug}/apply?ref=${encodeURIComponent(code)}`
-    : `/jobs?ref=${encodeURIComponent(code)}`
 
-  return sendRedirect(event, `${baseUrl}${targetPath}`, 302)
+  const orgSlug = link.job?.organization?.slug
+  const customDomain = orgSlug
+    ? await db.query.organizationCustomDomain.findFirst({
+        where: and(
+          eq(organizationCustomDomain.organizationId, link.organizationId),
+          eq(organizationCustomDomain.status, 'verified'),
+        ),
+        columns: { hostname: true },
+      })
+    : null
+
+  const refSuffix = `?ref=${encodeURIComponent(code)}`
+
+  const targetUrl = link.job?.slug && orgSlug
+    ? buildPublicJobUrl({
+        orgSlug,
+        jobSlug: link.job.slug,
+        customHostname: customDomain?.hostname,
+        platformOrigin: baseUrl.replace(/\/$/, ''),
+        suffix: `/apply${refSuffix}`,
+      })
+    : orgSlug
+      ? buildPublicCareersUrl({
+          orgSlug,
+          customHostname: customDomain?.hostname,
+          platformOrigin: baseUrl.replace(/\/$/, ''),
+          query: refSuffix.slice(1),
+        })
+      : `${baseUrl}/jobs${refSuffix}`
+
+  return sendRedirect(event, targetUrl, 302)
 })

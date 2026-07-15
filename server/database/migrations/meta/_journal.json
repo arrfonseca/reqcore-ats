@@ -204,6 +204,83 @@
       "when": 1777463601249,
       "tag": "0028_custom_properties",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1777600000000,
+      "tag": "0029_job_isco_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1777700000000,
+      "tag": "0030_job_contract_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1777800000000,
+      "tag": "0031_brazil_source_channels",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1777900000000,
+      "tag": "0032_org_company_website",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1778000000000,
+      "tag": "0033_user_platform_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1778100000000,
+      "tag": "0034_platform_tenant_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1778200000000,
+      "tag": "0035_platform_ai_defaults",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1778300000000,
+      "tag": "0036_platform_ai_hidden_and_verification",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1778400000000,
+      "tag": "0037_organization_custom_domain",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1778500000000,
+      "tag": "0038_org_branding_logos",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1778600000000,
+      "tag": "0039_org_brand_subtitle",
+      "breakpoints": true
     }
   ]
 }

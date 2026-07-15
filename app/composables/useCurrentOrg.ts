@@ -7,6 +7,7 @@
  */
 export function useCurrentOrg() {
   const localePath = useLocalePath()
+  const { isSaasAdmin } = useSaasAdmin()
 
   // ═══════════════════════════════════════════
   // 1. ORG LIST — reactive hook from Better Auth
@@ -21,6 +22,9 @@ export function useCurrentOrg() {
   const activeOrgState = authClient.useActiveOrganization()
   const activeOrg = computed(() => activeOrgState.value.data)
 
+  const canSwitchOrg = computed(() => isSaasAdmin.value)
+  const canCreateOrg = computed(() => isSaasAdmin.value || orgs.value.length === 0)
+
   // ═══════════════════════════════════════════
   // 3. ACTIONS
   // ═══════════════════════════════════════════
@@ -30,10 +34,20 @@ export function useCurrentOrg() {
    * Reloads the app to reset all cached data.
    */
   async function switchOrg(orgId: string) {
-    await authClient.organization.setActive({ organizationId: orgId })
-    // Hard navigation ensures all component state is fully reset.
-    // reloadNuxtApp() without force can soft-reload and leak stale state.
-    window.location.href = localePath('/dashboard')
+    if (isSaasAdmin.value) {
+      await $fetch('/api/saas/switch-org', {
+        method: 'POST',
+        body: { organizationId: orgId },
+      })
+    }
+    else {
+      await authClient.organization.setActive({ organizationId: orgId })
+    }
+
+    const org = orgs.value.find(o => o.id === orgId)
+    window.location.href = org?.slug
+      ? localePath(`/${org.slug}/admin`)
+      : localePath('/onboarding/create-org')
   }
 
   /**
@@ -50,13 +64,19 @@ export function useCurrentOrg() {
       throw result.error
     }
 
-    // Explicitly set the new org as active to ensure the session reflects it
     if (result.data?.id) {
-      await authClient.organization.setActive({ organizationId: result.data.id })
+      if (isSaasAdmin.value) {
+        await $fetch('/api/saas/switch-org', {
+          method: 'POST',
+          body: { organizationId: result.data.id },
+        })
+      }
+      else {
+        await authClient.organization.setActive({ organizationId: result.data.id })
+      }
     }
 
-    // Hard navigation ensures fresh session state is loaded (same pattern as switchOrg)
-    window.location.href = localePath('/dashboard')
+    window.location.href = localePath(`/${data.slug}/admin`)
   }
 
   // ═══════════════════════════════════════════
@@ -66,6 +86,8 @@ export function useCurrentOrg() {
     orgs,
     isOrgsLoading,
     activeOrg,
+    canSwitchOrg,
+    canCreateOrg,
     switchOrg,
     createOrg,
   }

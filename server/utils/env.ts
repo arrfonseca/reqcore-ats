@@ -1,4 +1,5 @@
-import { z } from "zod";
+import { z } from 'zod'
+import { APP_BRAND_NAME } from '~~/shared/brand'
 
 /**
  * Preprocessor that normalizes empty strings to undefined.
@@ -89,13 +90,24 @@ export const envSchema = z
     TRUSTED_PROXY_IP: z.string().min(1).optional(),
     /** Slug of the demo organization. When set, write operations are blocked for this org. */
     DEMO_ORG_SLUG: emptyToUndefined.optional(),
+    /** Comma-separated emails granted platform SaaS admin (bootstrap / env override). */
+    SAAS_ADMIN_EMAILS: emptyToUndefined
+      .pipe(z.string())
+      .transform((value) =>
+        value
+          .split(',')
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean),
+      )
+      .optional()
+      .default([]),
     /** Resend API key for transactional emails (invitations, etc.). When not set, emails are logged to console. */
     RESEND_API_KEY: emptyToUndefined.pipe(z.string().min(1)).optional(),
-    /** Sender email address for Resend emails. Must be a verified domain in Resend. Defaults to "Reqcore <noreply@reqcore.com>". */
+    /** Sender email address for Resend emails. Must be a verified domain in Resend. Defaults to "Recursos Humanos <noreply@reqcore.com>". */
     RESEND_FROM_EMAIL: emptyToUndefined
       .pipe(z.string().min(1))
       .optional()
-      .default("Reqcore <noreply@reqcore.com>"),
+      .default(`${APP_BRAND_NAME} <noreply@reqcore.com>`),
     /** SMTP hostname for outbound email (e.g. smtp.gmail.com). When set, SMTP is used instead of Resend. */
     SMTP_HOST: emptyToUndefined.pipe(z.string().min(1)).optional(),
     /** SMTP port. Defaults to 587 (STARTTLS). Use 465 for implicit TLS, 25 for unencrypted. */
@@ -112,11 +124,11 @@ export const envSchema = z
     SMTP_USER: emptyToUndefined.pipe(z.string().min(1)).optional(),
     /** SMTP password for authentication. Omit for anonymous relay. */
     SMTP_PASS: emptyToUndefined.pipe(z.string().min(1)).optional(),
-    /** Sender address for SMTP emails. Defaults to "Reqcore <noreply@reqcore.com>". */
+    /** Sender address for SMTP emails. Defaults to "Recursos Humanos <noreply@reqcore.com>". */
     SMTP_FROM: emptyToUndefined
       .pipe(z.string().min(1))
       .optional()
-      .default('Reqcore <noreply@reqcore.com>'),
+      .default(`${APP_BRAND_NAME} <noreply@reqcore.com>`),
     /** Use implicit TLS on port 465. When false, uses STARTTLS (port 587). Defaults to false. */
     SMTP_SECURE: z.preprocess(
       (val) => typeof val === 'string' && val.trim() === '' ? false : val === 'true',
@@ -229,7 +241,7 @@ export const env = new Proxy({} as z.infer<typeof envSchema>, {
             `Ensure these variables are set in your Railway service (Settings → Variables).\n` +
             `Required: DATABASE_URL, BETTER_AUTH_SECRET, S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY, S3_BUCKET\n` +
             `Required when not on Railway: BETTER_AUTH_URL (or generate a Railway domain)\n` +
-            `Optional: BETTER_AUTH_TRUSTED_ORIGINS, S3_REGION (default: us-east-1), S3_FORCE_PATH_STYLE (default: true), TRUSTED_PROXY_IP, DEMO_ORG_SLUG, RESEND_API_KEY, RESEND_FROM_EMAIL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_SECURE, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_DISCOVERY_URL, OIDC_PROVIDER_NAME, AUTH_GOOGLE_CLIENT_ID, AUTH_GOOGLE_CLIENT_SECRET, AUTH_GITHUB_CLIENT_ID, AUTH_GITHUB_CLIENT_SECRET, AUTH_MICROSOFT_CLIENT_ID, AUTH_MICROSOFT_CLIENT_SECRET, AUTH_MICROSOFT_TENANT_ID\n`,
+            `Optional: BETTER_AUTH_TRUSTED_ORIGINS, S3_REGION (default: us-east-1), S3_FORCE_PATH_STYLE (default: true), TRUSTED_PROXY_IP, DEMO_ORG_SLUG, SAAS_ADMIN_EMAILS, RESEND_API_KEY, RESEND_FROM_EMAIL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_SECURE, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_DISCOVERY_URL, OIDC_PROVIDER_NAME, AUTH_GOOGLE_CLIENT_ID, AUTH_GOOGLE_CLIENT_SECRET, AUTH_GITHUB_CLIENT_ID, AUTH_GITHUB_CLIENT_SECRET, AUTH_MICROSOFT_CLIENT_ID, AUTH_MICROSOFT_CLIENT_SECRET, AUTH_MICROSOFT_TENANT_ID\n`,
         );
         throw result.error;
       }

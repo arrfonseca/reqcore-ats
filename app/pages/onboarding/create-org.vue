@@ -1,21 +1,34 @@
 <script setup lang="ts">
-import { Building2, UserPlus, Search, Loader2, Check, Link2, MessageSquare } from 'lucide-vue-next'
+import { Building2, UserPlus, Search, Loader2, Check, Link2 } from 'lucide-vue-next'
+
+import { validateOrgSlug } from '~~/shared/tenant-routing'
 
 definePageMeta({
   layout: 'auth',
   middleware: ['auth'],
 })
 
+const { t } = useI18n()
+
 useSeoMeta({
-  title: 'Create Organization — Reqcore',
-  description: 'Create your organization to start recruiting',
+  title: t('onboarding.organization.seoTitle'),
+  description: t('onboarding.organization.seoDescription'),
   robots: 'noindex, nofollow',
 })
 
-const { orgs, isOrgsLoading, switchOrg, createOrg, activeOrg } = useCurrentOrg()
+const { orgs, isOrgsLoading, switchOrg, createOrg, activeOrg, canCreateOrg } = useCurrentOrg()
+const { isSaasAdmin } = useSaasAdmin()
+const route = useRoute()
 const { acceptInviteLink } = useInviteLinks()
 const localePath = useLocalePath()
 const { track } = useTrack()
+
+watch([orgs, isOrgsLoading, isSaasAdmin], ([orgList, loading, saasAdmin]) => {
+  if (loading || saasAdmin) return
+  if (orgList.length > 0) {
+    navigateTo(localePath('/dashboard'))
+  }
+}, { immediate: true })
 
 onMounted(() => track('onboarding_viewed', { mode: viewMode.value }))
 
@@ -30,6 +43,14 @@ const showCreateForm = ref(false)
 // View mode: 'picker' | 'create' | 'join'
 // ─────────────────────────────────────────────
 const viewMode = ref<'picker' | 'create' | 'join'>('picker')
+
+function applySaasCreateMode() {
+  if (isSaasAdmin.value && route.query.mode === 'create') {
+    viewMode.value = 'create'
+  }
+}
+
+watch([isSaasAdmin, () => route.query.mode], applySaasCreateMode, { immediate: true })
 
 // ─────────────────────────────────────────────
 // Auto-switch: if user already belongs to exactly one org, activate it
@@ -89,17 +110,23 @@ async function handleCreateOrg() {
   error.value = ''
 
   if (!orgName.value.trim()) {
-    error.value = 'Organization name is required.'
+    error.value = t('onboarding.organization.errors.nameRequired')
     return
   }
 
   if (!slug.value.trim()) {
-    error.value = 'Slug is required.'
+    error.value = t('onboarding.organization.errors.slugRequired')
     return
   }
 
   if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(slug.value)) {
-    error.value = 'Slug must be lowercase alphanumeric with hyphens, and cannot start or end with a hyphen.'
+    error.value = t('onboarding.organization.errors.slugInvalid')
+    return
+  }
+
+  const reservedError = validateOrgSlug(slug.value)
+  if (reservedError) {
+    error.value = t('onboarding.organization.errors.slugReserved')
     return
   }
 
@@ -112,7 +139,7 @@ async function handleCreateOrg() {
     await createOrg({ name: orgName.value.trim(), slug: slug.value.trim() })
   }
   catch (err: any) {
-    error.value = err?.message ?? 'Failed to create organization. The slug may already be taken.'
+    error.value = err?.message ?? t('onboarding.organization.errors.createFailed')
     isLoading.value = false
   }
 }
@@ -150,7 +177,7 @@ async function handleAcceptInviteCode() {
   const token = extractToken(inviteCode.value)
 
   if (!token) {
-    inviteCodeError.value = 'Please enter an invite link or code.'
+    inviteCodeError.value = t('onboarding.organization.errors.inviteRequired')
     return
   }
 
@@ -173,7 +200,7 @@ async function handleAcceptInviteCode() {
     }, 1500)
   }
   catch (err: any) {
-    inviteCodeError.value = err?.data?.statusMessage || 'Invalid, expired, or already used invite link.'
+    inviteCodeError.value = err?.data?.statusMessage || t('onboarding.organization.errors.inviteInvalid')
   }
   finally {
     isAcceptingCode.value = false
@@ -218,7 +245,7 @@ async function handleOrgSearch() {
     orgSearchResults.value = data as typeof orgSearchResults.value
   }
   catch (err: any) {
-    searchError.value = err?.data?.statusMessage || 'Search failed'
+    searchError.value = err?.data?.statusMessage || t('onboarding.organization.errors.searchFailed')
   }
   finally {
     isSearching.value = false
@@ -240,13 +267,13 @@ async function handleSubmitJoinRequest() {
         message: joinRequestMessage.value.trim() || undefined,
       },
     })
-    requestSuccess.value = `Join request sent to ${selectedOrg.value.name}! An admin will review it.`
+    requestSuccess.value = t('onboarding.organization.requestSent', { name: selectedOrg.value.name })
     track('org_joined', { method: 'search_request' })
     selectedOrg.value = null
     joinRequestMessage.value = ''
   }
   catch (err: any) {
-    requestError.value = err?.data?.statusMessage || 'Failed to send join request'
+    requestError.value = err?.data?.statusMessage || t('onboarding.organization.errors.requestFailed')
   }
   finally {
     isSubmittingRequest.value = false
@@ -258,7 +285,7 @@ async function handleSubmitJoinRequest() {
   <!-- Loading / auto-switching state -->
   <div v-if="isLoading || isOrgsLoading" class="flex flex-col items-center gap-3 py-8">
     <div class="size-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-    <p class="text-sm text-surface-500 dark:text-surface-400">Setting up your workspace…</p>
+    <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('onboarding.organization.settingUp') }}</p>
   </div>
 
   <!-- Invite code accepted success -->
@@ -267,16 +294,16 @@ async function handleSubmitJoinRequest() {
       <Check class="size-6" />
     </div>
     <div class="text-center">
-      <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-1">You're in!</h2>
-      <p class="text-sm text-surface-500 dark:text-surface-400">Redirecting to dashboard…</p>
+      <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-1">{{ t('onboarding.organization.successTitle') }}</h2>
+      <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('onboarding.organization.redirecting') }}</p>
     </div>
   </div>
 
   <!-- Org picker: user has orgs but none is active -->
   <div v-else-if="orgs.length > 0 && viewMode === 'picker'" class="flex flex-col gap-4">
-    <h2 class="text-xl font-semibold text-center text-surface-900 dark:text-surface-100">Select an organization</h2>
+    <h2 class="text-xl font-semibold text-center text-surface-900 dark:text-surface-100">{{ t('onboarding.organization.pickerTitle') }}</h2>
     <p class="text-sm text-surface-500 dark:text-surface-400 text-center mb-2">
-      Choose which workspace to open.
+      {{ t('onboarding.organization.pickerDescription') }}
     </p>
 
     <button
@@ -294,16 +321,18 @@ async function handleSubmitJoinRequest() {
 
     <div class="flex flex-col gap-2 mt-2 pt-2 border-t border-surface-200 dark:border-surface-800">
       <button
+        v-if="canCreateOrg"
         class="text-sm text-brand-600 dark:text-brand-400 hover:underline"
         @click="viewMode = 'create'"
       >
-        Create a new organization
+        {{ t('onboarding.organization.createNew') }}
       </button>
       <button
+        v-if="!isSaasAdmin"
         class="text-sm text-brand-600 dark:text-brand-400 hover:underline"
         @click="viewMode = 'join'"
       >
-        Join an existing organization
+        {{ t('onboarding.organization.joinExisting') }}
       </button>
     </div>
   </div>
@@ -311,9 +340,9 @@ async function handleSubmitJoinRequest() {
   <!-- Join existing org -->
   <div v-else-if="viewMode === 'join'" class="flex flex-col gap-5">
     <div class="text-center">
-      <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-100">Join an organization</h2>
+      <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-100">{{ t('onboarding.organization.joinTitle') }}</h2>
       <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">
-        Enter an invite link/code, or search for an organization to request access.
+        {{ t('onboarding.organization.joinDescription') }}
       </p>
     </div>
 
@@ -321,13 +350,13 @@ async function handleSubmitJoinRequest() {
     <div class="rounded-lg border border-surface-200 dark:border-surface-800 p-4 bg-white dark:bg-surface-800/50">
       <div class="flex items-center gap-2 mb-3">
         <Link2 class="size-4 text-brand-600 dark:text-brand-400" />
-        <h3 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Have an invite link?</h3>
+        <h3 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('onboarding.organization.inviteLinkTitle') }}</h3>
       </div>
       <div class="flex gap-2">
         <input
           v-model="inviteCode"
           type="text"
-          placeholder="Paste invite link or code"
+          :placeholder="t('onboarding.organization.invitePlaceholder')"
           class="flex-1 px-3 py-2 border border-surface-300 dark:border-surface-700 rounded-md text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
           @keydown.enter="handleAcceptInviteCode"
         />
@@ -337,7 +366,7 @@ async function handleSubmitJoinRequest() {
           @click="handleAcceptInviteCode"
         >
           <Loader2 v-if="isAcceptingCode" class="size-4 animate-spin" />
-          Join
+          {{ t('onboarding.organization.join') }}
         </button>
       </div>
       <div v-if="inviteCodeError" class="mt-2 text-xs text-danger-600 dark:text-danger-400">{{ inviteCodeError }}</div>
@@ -346,7 +375,7 @@ async function handleSubmitJoinRequest() {
     <!-- Divider -->
     <div class="flex items-center gap-3">
       <div class="flex-1 border-t border-surface-200 dark:border-surface-800" />
-      <span class="text-xs text-surface-400 dark:text-surface-500">or</span>
+      <span class="text-xs text-surface-400 dark:text-surface-500">{{ t('onboarding.organization.or') }}</span>
       <div class="flex-1 border-t border-surface-200 dark:border-surface-800" />
     </div>
 
@@ -354,17 +383,17 @@ async function handleSubmitJoinRequest() {
     <div class="rounded-lg border border-surface-200 dark:border-surface-800 p-4 bg-white dark:bg-surface-800/50">
       <div class="flex items-center gap-2 mb-3">
         <Search class="size-4 text-brand-600 dark:text-brand-400" />
-        <h3 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Request to join</h3>
+        <h3 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('onboarding.organization.requestTitle') }}</h3>
       </div>
       <p class="text-xs text-surface-500 dark:text-surface-400 mb-3">
-        Search by organization name or slug. An admin must approve your request.
+        {{ t('onboarding.organization.requestDescription') }}
       </p>
 
       <div class="relative">
         <input
           v-model="orgSearch"
           type="text"
-          placeholder="Search organizations…"
+          :placeholder="t('onboarding.organization.searchPlaceholder')"
           class="w-full px-3 py-2 border border-surface-300 dark:border-surface-700 rounded-md text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 pl-9"
         />
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-surface-400" />
@@ -390,7 +419,7 @@ async function handleSubmitJoinRequest() {
       </div>
 
       <div v-if="orgSearch.trim().length >= 2 && !isSearching && orgSearchResults.length === 0 && !selectedOrg" class="mt-2 text-xs text-surface-500 dark:text-surface-400 text-center py-2">
-        No organizations found
+        {{ t('onboarding.organization.noOrgsFound') }}
       </div>
 
       <!-- Selected org — request form -->
@@ -404,15 +433,15 @@ async function handleSubmitJoinRequest() {
             class="text-xs text-surface-400 hover:text-surface-600 transition-colors"
             @click="selectedOrg = null"
           >
-            Change
+            {{ t('onboarding.organization.change') }}
           </button>
         </div>
 
         <label class="flex flex-col gap-1 text-xs text-surface-600 dark:text-surface-400">
-          <span>Message (optional)</span>
+          <span>{{ t('onboarding.organization.messageOptional') }}</span>
           <textarea
             v-model="joinRequestMessage"
-            placeholder="Tell the admin why you'd like to join…"
+            :placeholder="t('onboarding.organization.messagePlaceholder')"
             rows="2"
             maxlength="500"
             class="px-3 py-2 border border-surface-300 dark:border-surface-700 rounded-md text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 resize-none"
@@ -426,7 +455,7 @@ async function handleSubmitJoinRequest() {
         >
           <Loader2 v-if="isSubmittingRequest" class="size-4 animate-spin" />
           <UserPlus v-else class="size-4" />
-          {{ isSubmittingRequest ? 'Sending…' : 'Send join request' }}
+          {{ isSubmittingRequest ? t('onboarding.organization.sending') : t('onboarding.organization.sendRequest') }}
         </button>
       </div>
 
@@ -445,42 +474,42 @@ async function handleSubmitJoinRequest() {
         class="text-sm text-brand-600 dark:text-brand-400 hover:underline"
         @click="viewMode = orgs.length > 0 ? 'picker' : 'create'"
       >
-        {{ orgs.length > 0 ? 'Back to organization list' : 'Create a new organization instead' }}
+        {{ orgs.length > 0 ? t('onboarding.organization.backToList') : t('onboarding.organization.createInstead') }}
       </button>
     </div>
   </div>
 
   <!-- Create org form -->
   <form v-else class="flex flex-col gap-4" @submit.prevent="handleCreateOrg">
-    <h2 class="text-xl font-semibold text-center text-surface-900 dark:text-surface-100">Create your organization</h2>
+    <h2 class="text-xl font-semibold text-center text-surface-900 dark:text-surface-100">{{ t('onboarding.organization.createTitle') }}</h2>
     <p class="text-sm text-surface-500 dark:text-surface-400 text-center mb-2">
-      Set up your workspace to start managing candidates and jobs.
+      {{ t('onboarding.organization.createDescription') }}
     </p>
 
     <div v-if="error" class="rounded-md border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-950 p-3 text-sm text-danger-700 dark:text-danger-400">{{ error }}</div>
 
     <label class="flex flex-col gap-1 text-sm font-medium text-surface-700 dark:text-surface-300">
-      <span>Organization name</span>
+      <span>{{ t('onboarding.organization.orgName') }}</span>
       <input
         v-model="orgName"
         type="text"
-        placeholder="Acme Corp"
+        :placeholder="t('onboarding.organization.orgNamePlaceholder')"
         required
         class="px-3 py-2 border border-surface-300 dark:border-surface-700 rounded-md text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
       />
     </label>
 
     <label class="flex flex-col gap-1 text-sm font-medium text-surface-700 dark:text-surface-300">
-      <span>Slug</span>
+      <span>{{ t('onboarding.organization.slug') }}</span>
       <input
         v-model="slug"
         type="text"
-        placeholder="acme-corp"
+        :placeholder="t('onboarding.organization.slugPlaceholder')"
         required
         class="px-3 py-2 border border-surface-300 dark:border-surface-700 rounded-md text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
         @input="onSlugInput"
       />
-      <span class="text-xs font-normal text-surface-400">Used in URLs. Lowercase letters, numbers, and hyphens only.</span>
+      <span class="text-xs font-normal text-surface-400">{{ t('onboarding.organization.slugHelper') }}</span>
     </label>
 
     <button
@@ -488,7 +517,7 @@ async function handleSubmitJoinRequest() {
       :disabled="isLoading"
       class="mt-2 px-4 py-2.5 bg-brand-600 text-white rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
     >
-      {{ isLoading ? 'Creating…' : 'Create organization' }}
+      {{ isLoading ? t('onboarding.organization.creating') : t('onboarding.organization.createSubmit') }}
     </button>
 
     <div class="flex flex-col items-center gap-2 mt-1">
@@ -498,15 +527,23 @@ async function handleSubmitJoinRequest() {
         class="text-sm text-brand-600 dark:text-brand-400 hover:underline"
         @click="viewMode = 'picker'"
       >
-        Back to organization list
+        {{ t('onboarding.organization.backToList') }}
       </button>
       <button
+        v-if="!isSaasAdmin"
         type="button"
         class="text-sm text-brand-600 dark:text-brand-400 hover:underline"
         @click="viewMode = 'join'"
       >
-        Join an existing organization instead
+        {{ t('onboarding.organization.joinInstead') }}
       </button>
+      <NuxtLink
+        v-else
+        :to="localePath('/admin')"
+        class="text-sm text-brand-600 dark:text-brand-400 hover:underline no-underline"
+      >
+        {{ t('dashboard.saas.backToPlatform') }}
+      </NuxtLink>
     </div>
   </form>
 </template>

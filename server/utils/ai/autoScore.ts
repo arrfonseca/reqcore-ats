@@ -11,7 +11,7 @@ import {
 import { scoreApplication, computeCompositeScore } from './scoring'
 import type { CriterionDefinition } from './scoring'
 import type { SupportedProvider } from './provider'
-import { loadAiConfig } from './loadConfig'
+import { loadEffectiveAiConfig } from './loadConfig'
 import { extractResumeText } from '../resume-parser'
 
 export async function autoScoreApplication(applicationId: string, orgId: string) {
@@ -26,7 +26,7 @@ export async function autoScoreApplication(applicationId: string, orgId: string)
 
   let config
   try {
-    config = await loadAiConfig(orgId, { purpose: 'analysis' })
+    config = await loadEffectiveAiConfig(orgId, { purpose: 'analysis' })
   } catch {
     return
   }

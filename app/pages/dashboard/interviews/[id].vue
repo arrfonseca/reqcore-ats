@@ -14,6 +14,7 @@ definePageMeta({
 
 const route = useRoute()
 const interviewId = route.params.id as string
+const { t, locale } = useI18n()
 const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 const toast = useToast()
 const { activeOrg } = useCurrentOrg()
@@ -25,8 +26,8 @@ const { interview, status: fetchStatus, error, updateInterview, deleteInterview,
 useSeoMeta({
   title: computed(() =>
     interview.value
-      ? `${interview.value.title} — Reqcore`
-      : 'Interview — Reqcore',
+      ? `${interview.value.title} — ${t('common.brand.name')}`
+      : t('dashboard.interviews.detail.seoTitle'),
   ),
   robots: 'noindex, nofollow',
 })
@@ -34,32 +35,57 @@ useSeoMeta({
 // ─── Status config ──────────────────────────────────────────────
 type InterviewStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show'
 
-const statusConfig: Record<InterviewStatus, { label: string; icon: any; class: string; dot: string }> = {
+const statusConfig = computed<Record<InterviewStatus, { label: string; icon: any; class: string; dot: string }>>(() => ({
   scheduled: {
-    label: 'Scheduled',
+    label: t('dashboard.interviews.shared.status.scheduled'),
     icon: Calendar,
     class: 'bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-950/50 dark:text-brand-300 dark:ring-brand-800',
     dot: 'bg-brand-500',
   },
   completed: {
-    label: 'Completed',
+    label: t('dashboard.interviews.shared.status.completed'),
     icon: CheckCircle2,
     class: 'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/50 dark:text-success-300 dark:ring-success-800',
     dot: 'bg-success-500',
   },
   cancelled: {
-    label: 'Cancelled',
+    label: t('dashboard.interviews.shared.status.cancelled'),
     icon: XCircle,
     class: 'bg-surface-100 text-surface-500 ring-surface-200 dark:bg-surface-800/50 dark:text-surface-400 dark:ring-surface-700',
     dot: 'bg-surface-400',
   },
   no_show: {
-    label: 'No Show',
+    label: t('dashboard.interviews.shared.status.no_show'),
     icon: AlertTriangle,
     class: 'bg-danger-50 text-danger-700 ring-danger-200 dark:bg-danger-950/50 dark:text-danger-300 dark:ring-danger-800',
     dot: 'bg-danger-500',
   },
-}
+}))
+
+type CandidateResponse = 'pending' | 'accepted' | 'declined' | 'tentative'
+
+const candidateResponseConfig = computed<Record<CandidateResponse, { label: string; class: string; dot: string }>>(() => ({
+  pending: {
+    label: t('dashboard.interviews.shared.candidateResponse.pending'),
+    class: 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-800',
+    dot: 'bg-amber-500',
+  },
+  accepted: {
+    label: t('dashboard.interviews.shared.candidateResponse.accepted'),
+    class: 'bg-success-50 text-success-700 ring-success-200 dark:bg-success-950/50 dark:text-success-300 dark:ring-success-800',
+    dot: 'bg-success-500',
+  },
+  declined: {
+    label: t('dashboard.interviews.shared.candidateResponse.declined'),
+    class: 'bg-danger-50 text-danger-700 ring-danger-200 dark:bg-danger-950/50 dark:text-danger-300 dark:ring-danger-800',
+    dot: 'bg-danger-500',
+  },
+  tentative: {
+    label: t('dashboard.interviews.shared.candidateResponse.tentative'),
+    class: 'bg-warning-50 text-warning-800 ring-warning-200 dark:bg-warning-950/50 dark:text-warning-300 dark:ring-warning-800',
+    dot: 'bg-warning-500',
+  },
+}))
 
 const typeIcons: Record<string, any> = {
   video: Video,
@@ -70,14 +96,23 @@ const typeIcons: Record<string, any> = {
   take_home: FileText,
 }
 
-const typeLabels: Record<string, string> = {
-  video: 'Video',
-  phone: 'Phone',
-  in_person: 'In Person',
-  technical: 'Technical',
-  panel: 'Panel',
-  take_home: 'Take Home',
-}
+const typeLabels = computed<Record<string, string>>(() => ({
+  video: t('dashboard.interviews.shared.types.video'),
+  phone: t('dashboard.interviews.shared.types.phone'),
+  in_person: t('dashboard.interviews.shared.types.in_person'),
+  technical: t('dashboard.interviews.shared.types.technical'),
+  panel: t('dashboard.interviews.shared.types.panel'),
+  take_home: t('dashboard.interviews.shared.types.take_home'),
+}))
+
+const typeLabelsEmail = computed<Record<string, string>>(() => ({
+  video: t('dashboard.interviews.shared.typeLabels.video'),
+  phone: t('dashboard.interviews.shared.typeLabels.phone'),
+  in_person: t('dashboard.interviews.shared.typeLabels.in_person'),
+  technical: t('dashboard.interviews.shared.typeLabels.technical'),
+  panel: t('dashboard.interviews.shared.typeLabels.panel'),
+  take_home: t('dashboard.interviews.shared.typeLabels.take_home'),
+}))
 
 // ─── Status transitions (from shared single source of truth) ────
 import { INTERVIEW_STATUS_TRANSITIONS } from '~~/shared/status-transitions'
@@ -107,7 +142,7 @@ async function handleTransition(newStatus: InterviewStatus) {
     })
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to update status', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('dashboard.interviews.detail.errors.updateStatusFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
   } finally {
     isTransitioning.value = false
   }
@@ -115,19 +150,18 @@ async function handleTransition(newStatus: InterviewStatus) {
 
 // ─── Display helpers ─────────────────────────────────────────────
 function formatDateTime(dateStr: string) {
-  return new Date(dateStr).toLocaleString('en-US', {
+  return new Date(dateStr).toLocaleString(locale.value, {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true,
   })
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return new Date(dateStr).toLocaleDateString(locale.value, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -161,7 +195,7 @@ async function saveNotes() {
     isEditingNotes.value = false
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to save notes', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('dashboard.interviews.detail.errors.saveNotesFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
   } finally {
     isSavingNotes.value = false
   }
@@ -190,7 +224,7 @@ function openReschedule() {
 async function handleReschedule() {
   rescheduleError.value = ''
   if (!rescheduleForm.date || !rescheduleForm.time) {
-    rescheduleError.value = 'Date and time are required'
+    rescheduleError.value = t('dashboard.interviews.detail.errors.dateTimeRequired')
     return
   }
 
@@ -205,7 +239,7 @@ async function handleReschedule() {
     showReschedule.value = false
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    rescheduleError.value = err.data?.statusMessage ?? 'Failed to reschedule'
+    rescheduleError.value = err.data?.statusMessage ?? t('dashboard.interviews.detail.errors.rescheduleFailed')
   } finally {
     isRescheduling.value = false
   }
@@ -235,7 +269,7 @@ function openEditDetails() {
 async function handleSaveDetails() {
   editErrors.value = {}
   if (!editForm.title.trim()) {
-    editErrors.value.title = 'Title is required'
+    editErrors.value.title = t('dashboard.interviews.detail.errors.titleRequired')
     return
   }
 
@@ -251,7 +285,7 @@ async function handleSaveDetails() {
     showEditDetails.value = false
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    editErrors.value.submit = err.data?.statusMessage ?? 'Failed to update'
+    editErrors.value.submit = err.data?.statusMessage ?? t('dashboard.interviews.detail.errors.updateFailed')
   } finally {
     isSavingEdit.value = false
   }
@@ -269,7 +303,7 @@ async function handleDelete() {
     await navigateTo(useLocalePath()('/dashboard/interviews'))
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to delete interview', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('dashboard.interviews.detail.errors.deleteFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
   } finally {
     isDeleting.value = false
   }
@@ -286,7 +320,7 @@ const showEmailPreview = ref(false)
 const { templates: emailTemplates, sendInvitation } = useEmailTemplates()
 
 const allTemplates = computed(() => [
-  ...SYSTEM_TEMPLATES.map(t => ({ ...t, isSystem: true as const })),
+  ...getSystemTemplates(locale.value).map(t => ({ ...t, isSystem: true as const })),
   ...(emailTemplates.value ?? []).map(t => ({ ...t, isSystem: false as const, description: '' })),
 ])
 
@@ -303,20 +337,17 @@ const emailPreviewVariables = computed(() => {
     candidateEmail: interview.value.candidateEmail,
     jobTitle: interview.value.jobTitle,
     interviewTitle: interview.value.title,
-    interviewDate: new Date(interview.value.scheduledAt).toLocaleDateString('en-US', {
+    interviewDate: new Date(interview.value.scheduledAt).toLocaleDateString(locale.value, {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
     }),
-    interviewTime: new Date(interview.value.scheduledAt).toLocaleTimeString('en-US', {
-      hour: 'numeric', minute: '2-digit', hour12: true,
+    interviewTime: new Date(interview.value.scheduledAt).toLocaleTimeString(locale.value, {
+      hour: 'numeric', minute: '2-digit',
     }),
     interviewDuration: String(interview.value.duration),
-    interviewType: ({
-      video: 'Video Call', phone: 'Phone Call', in_person: 'In Person',
-      technical: 'Technical Interview', panel: 'Panel Interview', take_home: 'Take-Home Assignment',
-    } as Record<string, string>)[interview.value.type] ?? interview.value.type,
-    interviewLocation: interview.value.location ?? 'To be confirmed',
-    interviewers: interview.value.interviewers?.join(', ') ?? 'To be confirmed',
-    organizationName: activeOrg.value?.name ?? 'Your Organization',
+    interviewType: typeLabelsEmail.value[interview.value.type] ?? interview.value.type,
+    interviewLocation: interview.value.location ?? t('dashboard.interviews.shared.toBeConfirmed'),
+    interviewers: interview.value.interviewers?.join(', ') ?? t('dashboard.interviews.shared.toBeConfirmed'),
+    organizationName: activeOrg.value?.name ?? t('dashboard.interviews.shared.yourOrganization'),
   }
 })
 
@@ -341,7 +372,7 @@ async function handleSendInvitation() {
     }, 2000)
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    sendEmailError.value = err?.data?.statusMessage ?? err?.message ?? 'Failed to send invitation'
+    sendEmailError.value = err?.data?.statusMessage ?? err?.message ?? t('dashboard.interviews.detail.errors.sendInvitationFailed')
   } finally {
     isSendingEmail.value = false
   }
@@ -358,13 +389,13 @@ const localePath = useLocalePath()
       class="mb-4 inline-flex items-center gap-1 rounded-full border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-1.5 text-sm text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
     >
       <ArrowLeft class="size-4" />
-      Back to Interviews
+      {{ t('dashboard.interviews.detail.backToInterviews') }}
     </NuxtLink>
 
     <!-- Loading -->
     <div v-if="fetchStatus === 'pending'" class="flex flex-col items-center justify-center py-20">
       <div class="size-8 rounded-full border-2 border-brand-200 border-t-brand-600 dark:border-brand-800 dark:border-t-brand-400 animate-spin" />
-      <p class="mt-3 text-sm text-surface-400">Loading interview…</p>
+      <p class="mt-3 text-sm text-surface-400">{{ t('dashboard.interviews.detail.loading') }}</p>
     </div>
 
     <!-- Error -->
@@ -372,8 +403,8 @@ const localePath = useLocalePath()
       v-else-if="error"
       class="rounded-xl border border-danger-200 bg-danger-50 p-5 text-sm text-danger-700 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-300"
     >
-      {{ (error as any).statusCode === 404 ? 'Interview not found.' : 'Failed to load interview.' }}
-      <NuxtLink :to="$localePath('/dashboard/interviews')" class="underline ml-1">Back to Interviews</NuxtLink>
+      {{ (error as any).statusCode === 404 ? t('dashboard.interviews.detail.notFound') : t('dashboard.interviews.detail.loadFailed') }}
+      <NuxtLink :to="$localePath('/dashboard/interviews')" class="underline ml-1">{{ t('dashboard.interviews.detail.backToInterviews') }}</NuxtLink>
     </div>
 
     <!-- Interview detail -->
@@ -401,6 +432,13 @@ const localePath = useLocalePath()
                 >
                   <span class="size-1.5 rounded-full" :class="statusConfig[interview.status as InterviewStatus]?.dot" />
                   {{ statusConfig[interview.status as InterviewStatus]?.label }}
+                </span>
+                <span
+                  class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset"
+                  :class="candidateResponseConfig[interview.candidateResponse as CandidateResponse]?.class"
+                >
+                  <span class="size-1.5 rounded-full" :class="candidateResponseConfig[interview.candidateResponse as CandidateResponse]?.dot" />
+                  {{ candidateResponseConfig[interview.candidateResponse as CandidateResponse]?.label }}
                 </span>
               </div>
               <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm text-surface-500 dark:text-surface-400">
@@ -436,7 +474,14 @@ const localePath = useLocalePath()
           class="mt-3 flex items-center gap-1.5 text-xs text-success-600 dark:text-success-400"
         >
           <CheckCheck class="size-3.5" />
-          Invitation sent <TimelineDateLink :date="interview.invitationSentAt" class="text-success-600 dark:text-success-400">{{ formatDate(interview.invitationSentAt) }}</TimelineDateLink>
+          {{ t('dashboard.interviews.detail.invitationSent') }} <TimelineDateLink :date="interview.invitationSentAt" class="text-success-600 dark:text-success-400">{{ formatDate(interview.invitationSentAt) }}</TimelineDateLink>
+        </div>
+        <div
+          v-if="interview.candidateRespondedAt"
+          class="mt-2 flex items-center gap-1.5 text-xs text-surface-600 dark:text-surface-400"
+        >
+          <UserRound class="size-3.5" />
+          {{ t('dashboard.interviews.detail.candidateRespondedAt') }} <TimelineDateLink :date="interview.candidateRespondedAt" class="text-surface-600 dark:text-surface-400">{{ formatDate(interview.candidateRespondedAt) }}</TimelineDateLink>
         </div>
         <!-- Google Calendar sync status -->
         <div
@@ -450,8 +495,8 @@ const localePath = useLocalePath()
             target="_blank"
             rel="noopener noreferrer"
             class="underline underline-offset-2 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
-          >Open in Google Calendar</a>
-          <span v-else>Synced to Google Calendar</span>
+          >{{ t('dashboard.interviews.detail.openInGoogleCalendar') }}</a>
+          <span v-else>{{ t('dashboard.interviews.detail.syncedToGoogleCalendar') }}</span>
         </div>
       </div>
 
@@ -461,7 +506,7 @@ const localePath = useLocalePath()
         class="mb-6 rounded-xl border border-surface-200 dark:border-surface-800 bg-white/80 dark:bg-surface-900/70 p-3"
       >
         <div class="flex flex-wrap items-center gap-2">
-          <span class="inline-flex items-center rounded-full bg-surface-100 dark:bg-surface-800 px-2.5 py-1 text-xs font-medium text-surface-600 dark:text-surface-400">Quick actions</span>
+          <span class="inline-flex items-center rounded-full bg-surface-100 dark:bg-surface-800 px-2.5 py-1 text-xs font-medium text-surface-600 dark:text-surface-400">{{ t('dashboard.interviews.detail.quickActions') }}</span>
           <button
             v-for="nextStatus in allowedTransitions"
             :key="nextStatus"
@@ -474,14 +519,14 @@ const localePath = useLocalePath()
               class="mr-2 inline-flex size-1.5 rounded-full"
               :class="nextStatus === 'completed' ? 'bg-success-200' : nextStatus === 'cancelled' ? 'bg-surface-200' : nextStatus === 'no_show' ? 'bg-danger-200' : 'bg-brand-200'"
             />
-            {{ nextStatus === 'scheduled' ? 'Re-schedule' : `Mark ${statusConfig[nextStatus]?.label}` }}
+            {{ nextStatus === 'scheduled' ? t('dashboard.interviews.detail.reschedule') : statusConfig[nextStatus]?.label }}
           </button>
           <button
             class="inline-flex cursor-pointer items-center rounded-full border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/30 px-3.5 py-1.5 text-sm font-medium text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-950/50 transition-all duration-150"
             @click="openReschedule"
           >
             <Calendar class="mr-1.5 size-3.5" />
-            Reschedule
+            {{ t('dashboard.interviews.detail.rescheduleAction') }}
           </button>
           <button
             v-if="interview.status === 'scheduled'"
@@ -489,7 +534,7 @@ const localePath = useLocalePath()
             @click="showSendInvitation = !showSendInvitation"
           >
             <Mail class="mr-1.5 size-3.5" />
-            {{ interview.invitationSentAt ? 'Resend Invitation' : 'Send Invitation' }}
+            {{ interview.invitationSentAt ? t('dashboard.interviews.detail.resendInvitation') : t('dashboard.interviews.detail.sendInvitation') }}
             <ChevronDown class="ml-1 size-3 transition-transform" :class="showSendInvitation ? 'rotate-180' : ''" />
           </button>
         </div>
@@ -510,8 +555,8 @@ const localePath = useLocalePath()
             <div class="flex size-12 items-center justify-center rounded-full bg-success-100 dark:bg-success-950/40 mb-3">
               <Check class="size-6 text-success-600 dark:text-success-400" />
             </div>
-            <h3 class="text-base font-semibold text-surface-900 dark:text-surface-100 mb-1">Invitation Sent!</h3>
-            <p class="text-sm text-surface-500 dark:text-surface-400">Email sent to {{ interview.candidateEmail }}</p>
+            <h3 class="text-base font-semibold text-surface-900 dark:text-surface-100 mb-1">{{ t('dashboard.interviews.detail.invitationSentToast') }}</h3>
+            <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('dashboard.interviews.emailModal.sentTo', { email: interview.candidateEmail }) }}</p>
           </div>
 
           <template v-else>
@@ -523,7 +568,7 @@ const localePath = useLocalePath()
                     <Mail class="size-4 text-brand-600 dark:text-brand-400" />
                   </div>
                   <div>
-                    <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Send Interview Invitation</h3>
+                    <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ t('dashboard.interviews.detail.sections.sendInvitation') }}</h3>
                     <p class="text-xs text-surface-500 dark:text-surface-400">to {{ interview.candidateEmail }}</p>
                   </div>
                 </div>
@@ -545,34 +590,34 @@ const localePath = useLocalePath()
             <!-- Template selection -->
             <div class="p-5">
               <div class="flex items-center justify-between mb-3">
-                <p class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">Choose a Template</p>
+                <p class="text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">{{ t('dashboard.interviews.detail.sections.chooseTemplate') }}</p>
                 <NuxtLink
                   :to="localePath('/dashboard/interviews/templates')"
                   class="inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors no-underline"
                 >
-                  Manage Templates
+                  {{ t('dashboard.interviews.detail.sections.manageTemplates') }}
                   <ExternalLink class="size-3" />
                 </NuxtLink>
               </div>
 
               <div class="grid gap-2 sm:grid-cols-2">
                 <button
-                  v-for="t in allTemplates"
-                  :key="t.id"
+                  v-for="tmpl in allTemplates"
+                  :key="tmpl.id"
                   type="button"
                   class="w-full text-left rounded-xl border-2 p-3.5 transition-all duration-150 cursor-pointer"
-                  :class="selectedTemplateId === t.id
+                  :class="selectedTemplateId === tmpl.id
                     ? 'border-brand-500 bg-brand-50/50 dark:border-brand-400 dark:bg-brand-950/20 shadow-sm'
                     : 'border-surface-200 dark:border-surface-700/80 hover:border-surface-300 dark:hover:border-surface-600 hover:bg-surface-50 dark:hover:bg-surface-800/40'"
-                  @click="selectedTemplateId = t.id"
+                  @click="selectedTemplateId = tmpl.id"
                 >
                   <div class="flex items-center justify-between mb-1">
-                    <span class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ t.name }}</span>
-                    <span v-if="t.isSystem" class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded">
-                      Built-in
+                    <span class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ tmpl.name }}</span>
+                    <span v-if="tmpl.isSystem" class="text-[10px] uppercase tracking-wider font-semibold text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded">
+                      {{ t('dashboard.interviews.shared.builtIn') }}
                     </span>
                   </div>
-                  <p class="text-xs text-surface-500 dark:text-surface-400 truncate">{{ t.subject }}</p>
+                  <p class="text-xs text-surface-500 dark:text-surface-400 truncate">{{ tmpl.subject }}</p>
                 </button>
               </div>
 
@@ -584,7 +629,7 @@ const localePath = useLocalePath()
                   @click="showEmailPreview = !showEmailPreview"
                 >
                   <component :is="showEmailPreview ? X : Mail" class="size-3.5" />
-                  {{ showEmailPreview ? 'Hide Preview' : 'Preview Email' }}
+                  {{ showEmailPreview ? t('dashboard.interviews.detail.sections.hidePreview') : t('dashboard.interviews.detail.sections.previewEmail') }}
                 </button>
                 <Transition
                   enter-active-class="transition duration-200 ease-out"
@@ -596,11 +641,11 @@ const localePath = useLocalePath()
                 >
                   <div v-if="showEmailPreview" class="mt-3 rounded-xl border border-surface-200 dark:border-surface-700/80 bg-surface-50 dark:bg-surface-800/40 p-4">
                     <div class="mb-3">
-                      <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400">Subject</span>
+                      <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400">{{ t('dashboard.interviews.detail.sections.subject') }}</span>
                       <p class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ emailPreviewSubject }}</p>
                     </div>
                     <div class="border-t border-surface-200 dark:border-surface-700 pt-3">
-                      <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400">Body</span>
+                      <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-400">{{ t('dashboard.interviews.detail.sections.body') }}</span>
                       <p class="text-sm text-surface-700 dark:text-surface-300 whitespace-pre-wrap mt-1 leading-relaxed">{{ emailPreviewBody }}</p>
                     </div>
                   </div>
@@ -616,7 +661,7 @@ const localePath = useLocalePath()
                   class="flex-1 rounded-xl border border-surface-200 dark:border-surface-700 px-4 py-2.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all cursor-pointer"
                   @click="showSendInvitation = false"
                 >
-                  Cancel
+                  {{ t('common.cancel') }}
                 </button>
                 <button
                   type="button"
@@ -625,7 +670,7 @@ const localePath = useLocalePath()
                   @click="handleSendInvitation"
                 >
                   <Send class="size-4" />
-                  {{ isSendingEmail ? 'Sending…' : 'Send Invitation' }}
+                  {{ isSendingEmail ? t('dashboard.interviews.emailModal.sending') : t('dashboard.interviews.emailModal.sendInvitation') }}
                 </button>
               </div>
             </div>
@@ -639,32 +684,32 @@ const localePath = useLocalePath()
         <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <div class="flex items-center gap-2 mb-3">
             <Calendar class="size-4 text-surface-500 dark:text-surface-400" />
-            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Schedule</h2>
+            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">{{ t('dashboard.interviews.detail.sections.schedule') }}</h2>
           </div>
           <dl class="grid grid-cols-1 gap-3 text-sm">
             <div>
-              <dt class="text-surface-400">Date & Time</dt>
+              <dt class="text-surface-400">{{ t('dashboard.interviews.detail.sections.dateTime') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
                 <TimelineDateLink :date="interview.scheduledAt">{{ formatDateTime(interview.scheduledAt) }}</TimelineDateLink>
               </dd>
             </div>
             <div>
-              <dt class="text-surface-400">Duration</dt>
-              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interview.duration }} minutes</dd>
+              <dt class="text-surface-400">{{ t('dashboard.interviews.detail.sections.duration') }}</dt>
+              <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ t('dashboard.jobs.shared.minutes', { count: interview.duration }) }}</dd>
             </div>
             <div>
-              <dt class="text-surface-400">Type</dt>
+              <dt class="text-surface-400">{{ t('dashboard.interviews.detail.sections.type') }}</dt>
               <dd class="inline-flex items-center gap-1.5 text-surface-700 dark:text-surface-200 font-medium">
                 <component :is="typeIcons[interview.type] || Video" class="size-4 text-surface-400" />
                 {{ typeLabels[interview.type] ?? interview.type }}
               </dd>
             </div>
             <div v-if="interview.location">
-              <dt class="text-surface-400">Location / Link</dt>
+              <dt class="text-surface-400">{{ t('dashboard.interviews.detail.sections.locationLink') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium break-all">{{ interview.location }}</dd>
             </div>
             <div v-if="interview.googleCalendarEventId">
-              <dt class="text-surface-400">Calendar</dt>
+              <dt class="text-surface-400">{{ t('dashboard.interviews.detail.sections.calendar') }}</dt>
               <dd>
                 <a
                   v-if="interview.googleCalendarEventLink"
@@ -674,12 +719,12 @@ const localePath = useLocalePath()
                   class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-colors"
                 >
                   <CheckCircle2 class="size-3.5" />
-                  Open in Google Calendar
+                  {{ t('dashboard.interviews.detail.openInGoogleCalendar') }}
                   <ExternalLink class="size-3" />
                 </a>
                 <span v-else class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">
                   <CheckCircle2 class="size-3.5" />
-                  Synced to Google Calendar
+                  {{ t('dashboard.interviews.detail.syncedToGoogleCalendar') }}
                 </span>
               </dd>
             </div>
@@ -691,33 +736,33 @@ const localePath = useLocalePath()
           <div class="flex items-center justify-between gap-2 mb-3">
             <div class="flex items-center gap-2">
               <UserRound class="size-4 text-surface-500 dark:text-surface-400" />
-              <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Candidate</h2>
+              <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">{{ t('dashboard.interviews.detail.sections.candidate') }}</h2>
             </div>
             <NuxtLink
               :to="$localePath(`/dashboard/candidates/${interview.candidateId}`)"
               class="inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
             >
-              View Profile
+              {{ t('dashboard.interviews.detail.sections.viewProfile') }}
               <ExternalLink class="size-3" />
             </NuxtLink>
           </div>
           <dl class="grid grid-cols-1 gap-3 text-sm">
             <div>
-              <dt class="text-surface-400">Name</dt>
+              <dt class="text-surface-400">{{ t('common.fields.name') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
                 {{ formatPersonName(interview.candidateFirstName, interview.candidateLastName) }}
               </dd>
             </div>
             <div>
-              <dt class="text-surface-400">Email</dt>
+              <dt class="text-surface-400">{{ t('common.fields.email') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interview.candidateEmail }}</dd>
             </div>
             <div v-if="interview.candidatePhone">
-              <dt class="text-surface-400">Phone</dt>
+              <dt class="text-surface-400">{{ t('common.fields.phone') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">{{ interview.candidatePhone }}</dd>
             </div>
             <div>
-              <dt class="text-surface-400">Job</dt>
+              <dt class="text-surface-400">{{ t('dashboard.topBar.job') }}</dt>
               <dd>
                 <NuxtLink
                   :to="$localePath(`/dashboard/jobs/${interview.jobId}`)"
@@ -735,7 +780,7 @@ const localePath = useLocalePath()
         <div v-if="interview.interviewers?.length" class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 md:col-span-2">
           <div class="flex items-center gap-2 mb-3">
             <Users class="size-4 text-surface-500 dark:text-surface-400" />
-            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Interviewers</h2>
+            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">{{ t('dashboard.interviews.detail.sections.interviewers') }}</h2>
           </div>
           <div class="flex flex-wrap gap-2">
             <span
@@ -753,11 +798,11 @@ const localePath = useLocalePath()
         <div class="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 md:col-span-2">
           <dl class="flex flex-wrap gap-x-8 gap-y-2 text-sm">
             <div>
-              <dt class="text-surface-400 inline-flex items-center gap-1"><Clock class="size-3.5" /> Created</dt>
+              <dt class="text-surface-400 inline-flex items-center gap-1"><Clock class="size-3.5" /> {{ t('dashboard.interviews.detail.sections.created') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium"><TimelineDateLink :date="interview.createdAt">{{ formatDate(interview.createdAt) }}</TimelineDateLink></dd>
             </div>
             <div>
-              <dt class="text-surface-400 inline-flex items-center gap-1"><Clock class="size-3.5" /> Updated</dt>
+              <dt class="text-surface-400 inline-flex items-center gap-1"><Clock class="size-3.5" /> {{ t('dashboard.interviews.detail.sections.updated') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium"><TimelineDateLink :date="interview.updatedAt">{{ formatDate(interview.updatedAt) }}</TimelineDateLink></dd>
             </div>
           </dl>
@@ -769,14 +814,14 @@ const localePath = useLocalePath()
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
             <MessageSquare class="size-4 text-surface-500 dark:text-surface-400" />
-            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">Notes</h2>
+            <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">{{ t('dashboard.interviews.detail.sections.notes') }}</h2>
           </div>
           <button
             v-if="!isEditingNotes"
             class="cursor-pointer text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
             @click="startEditNotes"
           >
-            {{ interview.notes ? 'Edit' : 'Add Notes' }}
+            {{ interview.notes ? t('common.actions.edit') : t('dashboard.interviews.detail.sections.addNotes') }}
           </button>
         </div>
 
@@ -784,7 +829,7 @@ const localePath = useLocalePath()
           <textarea
             v-model="notesInput"
             rows="5"
-            placeholder="Add notes about this interview — topics to cover, feedback, impressions…"
+            :placeholder="t('dashboard.interviews.edit.notesPlaceholder')"
             class="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors resize-none"
           />
           <div class="flex items-center gap-2 mt-2">
@@ -793,13 +838,13 @@ const localePath = useLocalePath()
               class="cursor-pointer rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               @click="saveNotes"
             >
-              {{ isSavingNotes ? 'Saving…' : 'Save' }}
+              {{ isSavingNotes ? t('common.actions.saving') : t('common.save') }}
             </button>
             <button
               class="cursor-pointer rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
               @click="isEditingNotes = false"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
           </div>
         </div>
@@ -810,18 +855,18 @@ const localePath = useLocalePath()
         >
           {{ interview.notes }}
         </p>
-        <p v-else class="text-sm text-surface-400 italic">No notes yet.</p>
+        <p v-else class="text-sm text-surface-400 italic">{{ t('dashboard.interviews.detail.sections.noNotes') }}</p>
       </div>
 
       <!-- Danger zone -->
       <div class="rounded-xl border border-danger-200/60 dark:border-danger-900/40 bg-danger-50/30 dark:bg-danger-950/20 p-5">
-        <h3 class="text-sm font-semibold text-danger-700 dark:text-danger-400 mb-1">Danger Zone</h3>
-        <p class="text-xs text-danger-600/80 dark:text-danger-400/60 mb-3">Permanently delete this interview. This action cannot be undone.</p>
+        <h3 class="text-sm font-semibold text-danger-700 dark:text-danger-400 mb-1">{{ t('dashboard.interviews.detail.sections.dangerZone') }}</h3>
+        <p class="text-xs text-danger-600/80 dark:text-danger-400/60 mb-3">{{ t('dashboard.interviews.edit.deleteConfirm') }}</p>
         <button
           class="cursor-pointer rounded-lg bg-danger-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-700 transition-colors"
           @click="showDeleteConfirm = true"
         >
-          Delete Interview
+          {{ t('dashboard.interviews.detail.sections.deleteInterview') }}
         </button>
       </div>
     </template>
@@ -831,7 +876,7 @@ const localePath = useLocalePath()
       <div v-if="showReschedule" class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showReschedule = false" />
         <div class="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl shadow-surface-900/10 dark:shadow-black/30 ring-1 ring-surface-200/80 dark:ring-surface-700/60 p-6 max-w-md w-full mx-4">
-          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">Reschedule Interview</h3>
+          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">{{ t('dashboard.interviews.detail.sections.rescheduleInterview') }}</h3>
 
           <div v-if="rescheduleError" class="mb-4 rounded-lg border border-danger-200 bg-danger-50 p-3 text-sm text-danger-700 dark:border-danger-800 dark:bg-danger-950/40 dark:text-danger-300">
             {{ rescheduleError }}
@@ -840,7 +885,7 @@ const localePath = useLocalePath()
           <form class="space-y-4" @submit.prevent="handleReschedule">
             <div>
               <label for="reschedule-date" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                Date <span class="text-danger-500">*</span>
+                {{ t('dashboard.interviews.edit.date') }} <span class="text-danger-500">*</span>
               </label>
               <input
                 id="reschedule-date"
@@ -851,7 +896,7 @@ const localePath = useLocalePath()
             </div>
             <div>
               <label for="reschedule-time" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                Time <span class="text-danger-500">*</span>
+                {{ t('dashboard.interviews.edit.time') }} <span class="text-danger-500">*</span>
               </label>
               <input
                 id="reschedule-time"
@@ -861,7 +906,7 @@ const localePath = useLocalePath()
               />
             </div>
             <div>
-              <label for="reschedule-duration" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Duration (minutes)</label>
+              <label for="reschedule-duration" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.edit.durationMinutes') }}</label>
               <input
                 id="reschedule-duration"
                 v-model.number="rescheduleForm.duration"
@@ -878,14 +923,14 @@ const localePath = useLocalePath()
                 class="cursor-pointer rounded-lg border border-surface-300 dark:border-surface-700 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                 @click="showReschedule = false"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="submit"
                 :disabled="isRescheduling"
                 class="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {{ isRescheduling ? 'Saving…' : 'Reschedule' }}
+                {{ isRescheduling ? t('common.actions.saving') : t('dashboard.interviews.detail.rescheduleAction') }}
               </button>
             </div>
           </form>
@@ -898,7 +943,7 @@ const localePath = useLocalePath()
       <div v-if="showEditDetails" class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showEditDetails = false" />
         <div class="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl shadow-surface-900/10 dark:shadow-black/30 ring-1 ring-surface-200/80 dark:ring-surface-700/60 p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-5">Edit Interview Details</h3>
+          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-5">{{ t('dashboard.interviews.detail.sections.editDetails') }}</h3>
 
           <div v-if="editErrors.submit" class="mb-4 rounded-lg border border-danger-200 bg-danger-50 p-3 text-sm text-danger-700 dark:border-danger-800 dark:bg-danger-950/40 dark:text-danger-300">
             {{ editErrors.submit }}
@@ -907,7 +952,7 @@ const localePath = useLocalePath()
           <form class="space-y-4" @submit.prevent="handleSaveDetails">
             <div>
               <label for="edit-title" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                Title <span class="text-danger-500">*</span>
+                {{ t('dashboard.interviews.edit.fieldTitle') }} <span class="text-danger-500">*</span>
               </label>
               <input
                 id="edit-title"
@@ -920,40 +965,35 @@ const localePath = useLocalePath()
             </div>
 
             <div>
-              <label for="edit-type" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Type</label>
+              <label for="edit-type" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.edit.type') }}</label>
               <select
                 id="edit-type"
                 v-model="editForm.type"
                 class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
               >
-                <option value="video">Video</option>
-                <option value="phone">Phone</option>
-                <option value="in_person">In Person</option>
-                <option value="technical">Technical</option>
-                <option value="panel">Panel</option>
-                <option value="take_home">Take Home</option>
+                <option v-for="(label, key) in typeLabels" :key="key" :value="key">{{ label }}</option>
               </select>
             </div>
 
             <div>
-              <label for="edit-location" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Location / Link</label>
+              <label for="edit-location" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.edit.locationLink') }}</label>
               <input
                 id="edit-location"
                 v-model="editForm.location"
                 type="text"
-                placeholder="Zoom link, office address…"
+                :placeholder="t('dashboard.interviews.edit.locationPlaceholder')"
                 class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
               />
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Interviewers</label>
+              <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.interviews.detail.sections.interviewers') }}</label>
               <div class="space-y-2">
                 <div v-for="(_, idx) in editForm.interviewers" :key="idx" class="flex gap-2">
                   <input
                     v-model="editForm.interviewers[idx]"
                     type="text"
-                    placeholder="Interviewer name"
+                    :placeholder="t('common.fields.name')"
                     class="flex-1 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
                   />
                   <button
@@ -971,7 +1011,7 @@ const localePath = useLocalePath()
                   class="cursor-pointer text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
                   @click="editForm.interviewers.push('')"
                 >
-                  + Add interviewer
+                  + {{ t('dashboard.interviews.detail.sections.addInterviewer') }}
                 </button>
               </div>
             </div>
@@ -982,14 +1022,14 @@ const localePath = useLocalePath()
                 class="cursor-pointer rounded-lg border border-surface-300 dark:border-surface-700 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                 @click="showEditDetails = false"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="submit"
                 :disabled="isSavingEdit"
                 class="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {{ isSavingEdit ? 'Saving…' : 'Save Changes' }}
+                {{ isSavingEdit ? t('common.actions.saving') : t('common.actions.saveChanges') }}
               </button>
             </div>
           </form>
@@ -1002,9 +1042,10 @@ const localePath = useLocalePath()
       <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showDeleteConfirm = false" />
         <div class="relative bg-white dark:bg-surface-900 rounded-2xl shadow-2xl shadow-surface-900/10 dark:shadow-black/30 ring-1 ring-surface-200/80 dark:ring-surface-700/60 p-6 max-w-sm w-full mx-4">
-          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">Delete Interview</h3>
+          <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">{{ t('dashboard.interviews.edit.deleteInterview') }}</h3>
           <p class="text-sm text-surface-600 dark:text-surface-400 mb-4">
-            Are you sure you want to delete <strong>{{ interview?.title }}</strong>? This action cannot be undone.
+            {{ t('dashboard.interviews.edit.deleteConfirm') }}
+            <strong v-if="interview?.title" class="block mt-1">{{ interview.title }}</strong>
           </p>
           <div class="flex justify-end gap-2">
             <button
@@ -1012,14 +1053,14 @@ const localePath = useLocalePath()
               class="cursor-pointer rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
               @click="showDeleteConfirm = false"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
             <button
               :disabled="isDeleting"
               class="cursor-pointer rounded-lg bg-danger-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               @click="handleDelete"
             >
-              {{ isDeleting ? 'Deleting…' : 'Delete' }}
+              {{ isDeleting ? t('common.actions.deleting') : t('common.actions.delete') }}
             </button>
           </div>
         </div>

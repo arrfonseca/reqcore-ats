@@ -16,7 +16,7 @@ interface ChangelogEntry {
  * Requires authentication.
  */
 export default defineEventHandler(async (event) => {
-  await requireAuth(event)
+  await requireSaasAdmin(event)
 
   const changelogPath = resolve(process.cwd(), 'CHANGELOG.md')
   let raw: string

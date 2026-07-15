@@ -2,6 +2,20 @@
 import { Sun, Moon } from 'lucide-vue-next'
 const { isDark, toggle: toggleColorMode } = useColorMode()
 const { t } = useI18n()
+const { branding } = useOrgBranding()
+
+const brandName = computed(() => {
+  if (branding.value.orgName) {
+    return branding.value.orgName
+  }
+  return t('common.brand.name')
+})
+
+const brandTagline = computed(() => {
+  const subtitle = branding.value.brandSubtitle?.trim()
+  if (subtitle) return subtitle
+  return t('auth.tagline')
+})
 </script>
 
 <template>
@@ -10,7 +24,7 @@ const { t } = useI18n()
       <ClientOnly>
         <button
           class="inline-flex items-center justify-center size-8 rounded-lg text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 transition-all duration-200 cursor-pointer border-0 bg-transparent"
-          :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+          :title="isDark ? t('common.theme.switchToLight') : t('common.theme.switchToDark')"
           @click="toggleColorMode"
         >
           <Sun v-if="isDark" class="size-4" />
@@ -20,15 +34,14 @@ const { t } = useI18n()
           <div class="size-8" aria-hidden="true" />
         </template>
       </ClientOnly>
-      <LanguageSwitcher />
     </div>
     <div class="w-full max-w-[540px] bg-white dark:bg-surface-900 rounded-lg shadow-sm dark:shadow-none dark:border dark:border-surface-800 p-8">
       <div class="text-center mb-8">
         <div class="flex justify-center mb-3">
-          <img src="/eagle-mascot-logo.png" alt="Reqcore mascot" class="size-16 object-contain" />
+          <OrgBrandedLogo class="size-16 max-w-[180px]" />
         </div>
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">Reqcore</h1>
-        <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">{{ t('auth.tagline') }}</p>
+        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">{{ brandName }}</h1>
+        <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">{{ brandTagline }}</p>
       </div>
       <slot />
     </div>

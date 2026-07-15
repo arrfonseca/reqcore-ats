@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     },
     with: {
       applications: {
-        columns: { id: true, status: true, createdAt: true },
+        columns: { id: true, status: true, score: true, createdAt: true },
         with: {
           job: {
             columns: { id: true, title: true },

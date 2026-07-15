@@ -1,0 +1,3003 @@
+[
+  {
+    "id": "anthropic",
+    "name": "Anthropic",
+    "pricing_urls": [
+      "https://www.anthropic.com/pricing#api"
+    ],
+    "api_pattern": "https://api\\.anthropic\\.com",
+    "model_match": {
+      "contains": "claude"
+    },
+    "provider_match": {
+      "contains": "anthropic"
+    },
+    "extractors": [
+      {
+        "api_flavor": "default",
+        "root": "usage",
+        "model_path": "model",
+        "mappings": [
+          {
+            "path": "input_tokens",
+            "dest": "input_tokens",
+            "required": true
+          },
+          {
+            "path": "cache_creation_input_tokens",
+            "dest": "input_tokens",
+            "required": false
+          },
+          {
+            "path": "cache_read_input_tokens",
+            "dest": "input_tokens",
+            "required": false
+          },
+          {
+            "path": "cache_creation_input_tokens",
+            "dest": "cache_write_tokens",
+            "required": false
+          },
+          {
+            "path": "cache_read_input_tokens",
+            "dest": "cache_read_tokens",
+            "required": false
+          },
+          {
+            "path": "output_tokens",
+            "dest": "output_tokens",
+            "required": true
+          }
+        ]
+      },
+      {
+        "api_flavor": "chat",
+        "root": "usage",
+        "model_path": "model",
+        "mappings": [
+          {
+            "path": "prompt_tokens",
+            "dest": "input_tokens",
+            "required": true
+          },
+          {
+            "path": "cached_tokens",
+            "dest": "cache_read_tokens",
+            "required": false
+          },
+          {
+            "path": "completion_tokens",
+            "dest": "output_tokens",
+            "required": true
+          }
+        ]
+      }
+    ],
+    "models": [
+      {
+        "id": "claude-2",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-2"
+            },
+            {
+              "contains": "claude-v2"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 8,
+          "output_mtok": 24
+        }
+      },
+      {
+        "id": "claude-3-5-haiku-latest",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-3-5-haiku"
+            },
+            {
+              "starts_with": "claude-3.5-haiku"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 0.8,
+          "cache_write_mtok": 1,
+          "cache_read_mtok": 0.08,
+          "output_mtok": 4
+        }
+      },
+      {
+        "id": "claude-3-5-sonnet",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-3-5-sonnet"
+            },
+            {
+              "starts_with": "claude-3.5-sonnet"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 3,
+          "cache_write_mtok": 3.75,
+          "cache_read_mtok": 0.3,
+          "output_mtok": 15
+        }
+      },
+      {
+        "id": "claude-3-7-sonnet-latest",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-3-7-sonnet"
+            },
+            {
+              "starts_with": "claude-3.7-sonnet"
+            },
+            {
+              "starts_with": "claude-sonnet-3.7"
+            },
+            {
+              "starts_with": "claude-sonnet-3-7"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 3,
+          "cache_write_mtok": 3.75,
+          "cache_read_mtok": 0.3,
+          "output_mtok": 15
+        }
+      },
+      {
+        "id": "claude-3-haiku",
+        "match": {
+          "starts_with": "claude-3-haiku"
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 0.25,
+          "cache_write_mtok": 0.3,
+          "cache_read_mtok": 0.03,
+          "output_mtok": 1.25
+        }
+      },
+      {
+        "id": "claude-3-opus-latest",
+        "match": {
+          "starts_with": "claude-3-opus"
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 15,
+          "cache_write_mtok": 18.75,
+          "cache_read_mtok": 1.5,
+          "output_mtok": 75
+        }
+      },
+      {
+        "id": "claude-3-sonnet",
+        "match": {
+          "starts_with": "claude-3-sonnet"
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 3,
+          "cache_write_mtok": 3.75,
+          "cache_read_mtok": 0.3,
+          "output_mtok": 15
+        }
+      },
+      {
+        "id": "claude-haiku-4-5",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-haiku-4-5"
+            },
+            {
+              "starts_with": "claude-haiku-4.5"
+            },
+            {
+              "starts_with": "claude-4-5-haiku"
+            },
+            {
+              "starts_with": "claude-4.5-haiku"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 1,
+          "cache_write_mtok": 1.25,
+          "cache_read_mtok": 0.1,
+          "output_mtok": 5
+        }
+      },
+      {
+        "id": "claude-opus-4-0",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-opus-4-0"
+            },
+            {
+              "starts_with": "claude-4-opus"
+            },
+            {
+              "equals": "claude-opus-4"
+            },
+            {
+              "equals": "claude-opus-4-20250514"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 15,
+          "cache_write_mtok": 18.75,
+          "cache_read_mtok": 1.5,
+          "output_mtok": 75
+        }
+      },
+      {
+        "id": "claude-opus-4-1",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-opus-4-1"
+            },
+            {
+              "starts_with": "claude-opus-4.1"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 15,
+          "cache_write_mtok": 18.75,
+          "cache_read_mtok": 1.5,
+          "output_mtok": 75
+        }
+      },
+      {
+        "id": "claude-opus-4-5",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-opus-4-5"
+            },
+            {
+              "starts_with": "claude-opus-4.5"
+            },
+            {
+              "starts_with": "claude-4-5-opus"
+            },
+            {
+              "starts_with": "claude-4.5-opus"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 5,
+          "cache_write_mtok": 6.25,
+          "cache_read_mtok": 0.5,
+          "output_mtok": 25
+        }
+      },
+      {
+        "id": "claude-opus-4-6",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-opus-4-6"
+            },
+            {
+              "starts_with": "claude-opus-4.6"
+            },
+            {
+              "starts_with": "claude-4-6-opus"
+            },
+            {
+              "starts_with": "claude-4.6-opus"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": [
+          {
+            "prices": {
+              "input_mtok": {
+                "base": 5,
+                "tiers": [
+                  {
+                    "start": 200000,
+                    "price": 10
+                  }
+                ]
+              },
+              "cache_write_mtok": {
+                "base": 6.25,
+                "tiers": [
+                  {
+                    "start": 200000,
+                    "price": 12.5
+                  }
+                ]
+              },
+              "cache_read_mtok": {
+                "base": 0.5,
+                "tiers": [
+                  {
+                    "start": 200000,
+                    "price": 1
+                  }
+                ]
+              },
+              "output_mtok": {
+                "base": 25,
+                "tiers": [
+                  {
+                    "start": 200000,
+                    "price": 37.5
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "constraint": {
+              "start_date": "2026-03-13"
+            },
+            "prices": {
+              "input_mtok": 5,
+              "cache_write_mtok": 6.25,
+              "cache_read_mtok": 0.5,
+              "output_mtok": 25
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-opus-4-7",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-opus-4-7"
+            },
+            {
+              "starts_with": "claude-opus-4.7"
+            },
+            {
+              "starts_with": "claude-4-7-opus"
+            },
+            {
+              "starts_with": "claude-4.7-opus"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 5,
+          "cache_write_mtok": 6.25,
+          "cache_read_mtok": 0.5,
+          "output_mtok": 25
+        }
+      },
+      {
+        "id": "claude-opus-4-8",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-opus-4-8"
+            },
+            {
+              "starts_with": "claude-opus-4.8"
+            },
+            {
+              "starts_with": "claude-4-8-opus"
+            },
+            {
+              "starts_with": "claude-4.8-opus"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 5,
+          "cache_write_mtok": 6.25,
+          "cache_read_mtok": 0.5,
+          "output_mtok": 25
+        }
+      },
+      {
+        "id": "claude-sonnet-4-0",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-sonnet-4-2025"
+            },
+            {
+              "starts_with": "claude-sonnet-4-0"
+            },
+            {
+              "starts_with": "claude-sonnet-4@"
+            },
+            {
+              "equals": "claude-sonnet-4"
+            },
+            {
+              "starts_with": "claude-4-sonnet"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 3,
+          "cache_write_mtok": 3.75,
+          "cache_read_mtok": 0.3,
+          "output_mtok": 15
+        }
+      },
+      {
+        "id": "claude-sonnet-4-5",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-sonnet-4-5"
+            },
+            {
+              "starts_with": "claude-sonnet-4.5"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": {
+            "base": 3,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 6
+              }
+            ]
+          },
+          "cache_write_mtok": {
+            "base": 3.75,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 7.5
+              }
+            ]
+          },
+          "cache_read_mtok": {
+            "base": 0.3,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 0.6
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 15,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 22.5
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "claude-sonnet-4-6",
+        "match": {
+          "or": [
+            {
+              "starts_with": "claude-sonnet-4-6"
+            },
+            {
+              "starts_with": "claude-sonnet-4.6"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": [
+          {
+            "prices": {
+              "input_mtok": {
+                "base": 3,
+                "tiers": [
+                  {
+                    "start": 200000,
+                    "price": 6
+                  }
+                ]
+              },
+              "cache_write_mtok": {
+                "base": 3.75,
+                "tiers": [
+                  {
+                    "start": 200000,
+                    "price": 7.5
+                  }
+                ]
+              },
+              "cache_read_mtok": {
+                "base": 0.3,
+                "tiers": [
+                  {
+                    "start": 200000,
+                    "price": 0.6
+                  }
+                ]
+              },
+              "output_mtok": {
+                "base": 15,
+                "tiers": [
+                  {
+                    "start": 200000,
+                    "price": 22.5
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "constraint": {
+              "start_date": "2026-03-13"
+            },
+            "prices": {
+              "input_mtok": 3,
+              "cache_write_mtok": 3.75,
+              "cache_read_mtok": 0.3,
+              "output_mtok": 15
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-v1",
+        "match": {
+          "equals": "claude-v1"
+        },
+        "prices": {
+          "input_mtok": 8,
+          "output_mtok": 24
+        }
+      }
+    ]
+  },
+  {
+    "id": "google",
+    "name": "Google",
+    "pricing_urls": [
+      "https://ai.google.dev/gemini-api/docs/pricing",
+      "https://cloud.google.com/vertex-ai/generative-ai/pricing"
+    ],
+    "api_pattern": "https://(.*\\.)?googleapis\\.com",
+    "model_match": {
+      "contains": "gemini"
+    },
+    "provider_match": {
+      "or": [
+        {
+          "contains": "google"
+        },
+        {
+          "contains": "vertex"
+        },
+        {
+          "contains": "gemini"
+        }
+      ]
+    },
+    "extractors": [
+      {
+        "api_flavor": "default",
+        "root": "usageMetadata",
+        "model_path": "modelVersion",
+        "mappings": [
+          {
+            "path": "promptTokenCount",
+            "dest": "input_tokens",
+            "required": false
+          },
+          {
+            "path": "cachedContentTokenCount",
+            "dest": "cache_read_tokens",
+            "required": false
+          },
+          {
+            "path": [
+              "cacheTokensDetails",
+              {
+                "type": "array-match",
+                "field": "modality",
+                "match": {
+                  "equals": "AUDIO"
+                }
+              },
+              "tokenCount"
+            ],
+            "dest": "cache_audio_read_tokens",
+            "required": false
+          },
+          {
+            "path": [
+              "promptTokensDetails",
+              {
+                "type": "array-match",
+                "field": "modality",
+                "match": {
+                  "equals": "AUDIO"
+                }
+              },
+              "tokenCount"
+            ],
+            "dest": "input_audio_tokens",
+            "required": false
+          },
+          {
+            "path": [
+              "candidatesTokensDetails",
+              {
+                "type": "array-match",
+                "field": "modality",
+                "match": {
+                  "equals": "AUDIO"
+                }
+              },
+              "tokenCount"
+            ],
+            "dest": "output_audio_tokens",
+            "required": false
+          },
+          {
+            "path": "candidatesTokenCount",
+            "dest": "output_tokens",
+            "required": false
+          },
+          {
+            "path": "thoughtsTokenCount",
+            "dest": "output_tokens",
+            "required": false
+          },
+          {
+            "path": "toolUsePromptTokenCount",
+            "dest": "input_tokens",
+            "required": false
+          }
+        ]
+      },
+      {
+        "api_flavor": "anthropic",
+        "root": "usage",
+        "model_path": "model",
+        "mappings": [
+          {
+            "path": "input_tokens",
+            "dest": "input_tokens",
+            "required": true
+          },
+          {
+            "path": "cache_creation_input_tokens",
+            "dest": "input_tokens",
+            "required": false
+          },
+          {
+            "path": "cache_read_input_tokens",
+            "dest": "input_tokens",
+            "required": false
+          },
+          {
+            "path": "cache_creation_input_tokens",
+            "dest": "cache_write_tokens",
+            "required": false
+          },
+          {
+            "path": "cache_read_input_tokens",
+            "dest": "cache_read_tokens",
+            "required": false
+          },
+          {
+            "path": "output_tokens",
+            "dest": "output_tokens",
+            "required": true
+          }
+        ]
+      },
+      {
+        "api_flavor": "chat",
+        "root": "usage",
+        "model_path": "model",
+        "mappings": [
+          {
+            "path": "prompt_tokens",
+            "dest": "input_tokens",
+            "required": true
+          },
+          {
+            "path": [
+              "prompt_tokens_details",
+              "cached_tokens"
+            ],
+            "dest": "cache_read_tokens",
+            "required": false
+          },
+          {
+            "path": [
+              "prompt_tokens_details",
+              "audio_tokens"
+            ],
+            "dest": "input_audio_tokens",
+            "required": false
+          },
+          {
+            "path": [
+              "completion_tokens_details",
+              "audio_tokens"
+            ],
+            "dest": "output_audio_tokens",
+            "required": false
+          },
+          {
+            "path": "completion_tokens",
+            "dest": "output_tokens",
+            "required": true
+          }
+        ]
+      }
+    ],
+    "fallback_model_providers": [
+      "anthropic"
+    ],
+    "models": [
+      {
+        "id": "claude-3-5-haiku",
+        "match": {
+          "contains": "claude-3-5-haiku"
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 0.8,
+          "cache_write_mtok": 1,
+          "cache_read_mtok": 0.08,
+          "output_mtok": 4
+        }
+      },
+      {
+        "id": "claude-3-5-sonnet",
+        "match": {
+          "contains": "claude-3-5-sonnet"
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 3,
+          "cache_write_mtok": 3.75,
+          "cache_read_mtok": 0.3,
+          "output_mtok": 15
+        }
+      },
+      {
+        "id": "claude-3-7-sonnet",
+        "match": {
+          "contains": "claude-3-7-sonnet"
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 3,
+          "cache_write_mtok": 3.75,
+          "cache_read_mtok": 0.3,
+          "output_mtok": 15
+        }
+      },
+      {
+        "id": "claude-3-haiku",
+        "match": {
+          "contains": "claude-3-haiku"
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 0.25,
+          "cache_write_mtok": 0.3,
+          "cache_read_mtok": 0.03,
+          "output_mtok": 1.25
+        }
+      },
+      {
+        "id": "claude-3-opus",
+        "match": {
+          "contains": "claude-3-opus"
+        },
+        "prices": {
+          "input_mtok": 15,
+          "cache_write_mtok": 18.75,
+          "cache_read_mtok": 1.5,
+          "output_mtok": 75
+        }
+      },
+      {
+        "id": "claude-4-opus",
+        "match": {
+          "or": [
+            {
+              "contains": "claude-4-opus"
+            },
+            {
+              "contains": "claude-opus-4@"
+            },
+            {
+              "contains": "claude-opus-4-0"
+            },
+            {
+              "contains": "claude-opus-4-1"
+            },
+            {
+              "equals": "claude-opus-4"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 15,
+          "cache_write_mtok": 18.75,
+          "cache_read_mtok": 1.5,
+          "output_mtok": 75
+        }
+      },
+      {
+        "id": "claude-4-sonnet",
+        "match": {
+          "or": [
+            {
+              "contains": "claude-4-sonnet"
+            },
+            {
+              "contains": "claude-sonnet-4"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": 3,
+          "cache_write_mtok": 3.75,
+          "cache_read_mtok": 0.3,
+          "output_mtok": 15
+        }
+      },
+      {
+        "id": "claude-opus-4-6",
+        "match": {
+          "or": [
+            {
+              "contains": "claude-4-6-opus"
+            },
+            {
+              "contains": "claude-opus-4-6"
+            },
+            {
+              "contains": "claude-4.6-opus"
+            },
+            {
+              "contains": "claude-opus-4.6"
+            }
+          ]
+        },
+        "context_window": 200000,
+        "prices": {
+          "input_mtok": {
+            "base": 5,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 10
+              }
+            ]
+          },
+          "cache_write_mtok": {
+            "base": 6.25,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 12.5
+              }
+            ]
+          },
+          "cache_read_mtok": {
+            "base": 0.5,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 1
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 25,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 37.5
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "claude-opus-4-7",
+        "match": {
+          "or": [
+            {
+              "contains": "claude-4-7-opus"
+            },
+            {
+              "contains": "claude-opus-4-7"
+            },
+            {
+              "contains": "claude-4.7-opus"
+            },
+            {
+              "contains": "claude-opus-4.7"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 5,
+          "cache_write_mtok": 6.25,
+          "cache_read_mtok": 0.5,
+          "output_mtok": 25
+        }
+      },
+      {
+        "id": "claude-opus-4-8",
+        "match": {
+          "or": [
+            {
+              "contains": "claude-4-8-opus"
+            },
+            {
+              "contains": "claude-opus-4-8"
+            },
+            {
+              "contains": "claude-4.8-opus"
+            },
+            {
+              "contains": "claude-opus-4.8"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 5,
+          "cache_write_mtok": 6.25,
+          "cache_read_mtok": 0.5,
+          "output_mtok": 25
+        }
+      },
+      {
+        "id": "gemini-1.0-pro-vision-001",
+        "match": {
+          "equals": "gemini-1.0-pro-vision-001"
+        },
+        "context_window": 32768,
+        "prices": {
+          "input_mtok": 0.125,
+          "output_mtok": 0.375
+        }
+      },
+      {
+        "id": "gemini-1.5-flash",
+        "match": {
+          "contains": "gemini-1.5-flash"
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": {
+            "base": 0.075,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 0.15
+              }
+            ]
+          },
+          "cache_read_mtok": {
+            "base": 0.01875,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 0.0375
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 0.3,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 0.6
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "gemini-1.5-pro",
+        "match": {
+          "contains": "gemini-1.5-pro"
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": {
+            "base": 1.25,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 2.5
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 5,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 10
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "gemini-2.0-flash",
+        "match": {
+          "or": [
+            {
+              "ends_with": "gemini-2.0-flash"
+            },
+            {
+              "contains": "gemini-2.0-flash-0"
+            },
+            {
+              "contains": "gemini-2.0-flash-exp"
+            },
+            {
+              "contains": "gemini-2.0-flash-thinking"
+            },
+            {
+              "contains": "gemini-2.0-flash-latest"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 0.1,
+          "cache_read_mtok": 0.025,
+          "output_mtok": 0.4,
+          "input_audio_mtok": 0.7,
+          "cache_audio_read_mtok": 0.175
+        }
+      },
+      {
+        "id": "gemini-2.0-flash-lite",
+        "match": {
+          "contains": "gemini-2.0-flash-lite"
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 0.075,
+          "output_mtok": 0.3
+        }
+      },
+      {
+        "id": "gemini-2.5-flash",
+        "match": {
+          "or": [
+            {
+              "equals": "gemini-2.5-flash"
+            },
+            {
+              "equals": "gemini-2.5-flash-latest"
+            },
+            {
+              "equals": "gemini-2.5-flash-preview-09-2025"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 0.3,
+          "cache_read_mtok": 0.03,
+          "output_mtok": 2.5,
+          "input_audio_mtok": 1,
+          "cache_audio_read_mtok": 0.1
+        }
+      },
+      {
+        "id": "gemini-2.5-flash-image",
+        "match": {
+          "or": [
+            {
+              "equals": "gemini-2.5-flash-image"
+            },
+            {
+              "equals": "gemini-2.5-flash-image-preview"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 0.3,
+          "output_mtok": 30
+        }
+      },
+      {
+        "id": "gemini-2.5-flash-lite",
+        "match": {
+          "or": [
+            {
+              "equals": "gemini-2.5-flash-lite"
+            },
+            {
+              "starts_with": "gemini-2.5-flash-lite-preview"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 0.1,
+          "cache_read_mtok": 0.01,
+          "output_mtok": 0.4,
+          "input_audio_mtok": 0.3,
+          "cache_audio_read_mtok": 0.03
+        }
+      },
+      {
+        "id": "gemini-2.5-flash-preview",
+        "match": {
+          "or": [
+            {
+              "contains": "gemini-2.5-flash-preview-05-20"
+            },
+            {
+              "contains": "gemini-2.5-flash-preview-04-17"
+            },
+            {
+              "equals": "gemini-2.5-flash-preview-05-20:thinking"
+            },
+            {
+              "equals": "gemini-2.5-flash-preview"
+            },
+            {
+              "equals": "gemini-2.5-flash-preview:thinking"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 0.15,
+          "output_mtok": 0.6
+        },
+        "deprecated": true
+      },
+      {
+        "id": "gemini-2.5-pro",
+        "match": {
+          "starts_with": "gemini-2.5-pro"
+        },
+        "prices": {
+          "input_mtok": {
+            "base": 1.25,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 2.5
+              }
+            ]
+          },
+          "cache_read_mtok": {
+            "base": 0.125,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 0.25
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 10,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 15
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "gemini-3-flash-preview",
+        "match": {
+          "or": [
+            {
+              "equals": "gemini-3-flash-preview"
+            },
+            {
+              "starts_with": "gemini-3-flash-preview-"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 0.5,
+          "cache_read_mtok": 0.05,
+          "output_mtok": 3,
+          "input_audio_mtok": 1,
+          "cache_audio_read_mtok": 0.1
+        }
+      },
+      {
+        "id": "gemini-3-pro-image-preview",
+        "match": {
+          "or": [
+            {
+              "starts_with": "gemini-3-pro-image-preview"
+            },
+            {
+              "equals": "gemini-3-pro-image-preview"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 2,
+          "output_mtok": 120
+        }
+      },
+      {
+        "id": "gemini-3-pro-preview",
+        "match": {
+          "or": [
+            {
+              "starts_with": "gemini-3-pro-preview"
+            },
+            {
+              "equals": "gemini-3-pro-text-preview"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": {
+            "base": 2,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 4
+              }
+            ]
+          },
+          "cache_read_mtok": {
+            "base": 0.2,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 0.4
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 12,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 18
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "gemini-3.1-flash-image-preview",
+        "match": {
+          "starts_with": "gemini-3.1-flash-image-preview"
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 0.5,
+          "output_mtok": 60
+        }
+      },
+      {
+        "id": "gemini-3.1-flash-lite",
+        "match": {
+          "starts_with": "gemini-3.1-flash-lite"
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 0.25,
+          "cache_read_mtok": 0.025,
+          "output_mtok": 1.5,
+          "input_audio_mtok": 0.5,
+          "cache_audio_read_mtok": 0.05
+        }
+      },
+      {
+        "id": "gemini-3.1-pro-preview",
+        "match": {
+          "starts_with": "gemini-3.1-pro-preview"
+        },
+        "prices": {
+          "input_mtok": {
+            "base": 2,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 4
+              }
+            ]
+          },
+          "cache_read_mtok": {
+            "base": 0.2,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 0.4
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 12,
+            "tiers": [
+              {
+                "start": 200000,
+                "price": 18
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "gemini-3.5-flash",
+        "match": {
+          "starts_with": "gemini-3.5-flash"
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 1.5,
+          "cache_read_mtok": 0.15,
+          "output_mtok": 9
+        }
+      },
+      {
+        "id": "gemini-embedding-001",
+        "match": {
+          "equals": "gemini-embedding-001"
+        },
+        "prices": {
+          "input_mtok": 0.15
+        }
+      },
+      {
+        "id": "gemini-flash-1.5",
+        "match": {
+          "equals": "gemini-flash-1.5"
+        },
+        "prices": {
+          "input_mtok": {
+            "base": 0.075,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 0.15
+              }
+            ]
+          },
+          "cache_read_mtok": {
+            "base": 0.01875,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 0.0375
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 0.3,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 0.6
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "gemini-flash-1.5-8b",
+        "match": {
+          "equals": "gemini-flash-1.5-8b"
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": {
+            "base": 0.0375,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 0.075
+              }
+            ]
+          },
+          "cache_read_mtok": {
+            "base": 0.01,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 0.02
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 0.15,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 0.3
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "gemini-live-2.5-flash-preview",
+        "match": {
+          "or": [
+            {
+              "starts_with": "gemini-live-2.5-flash-preview"
+            },
+            {
+              "starts_with": "gemini-2.5-flash-native-audio-preview"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 0.5,
+          "output_mtok": 2,
+          "input_audio_mtok": 3,
+          "output_audio_mtok": 12
+        }
+      },
+      {
+        "id": "gemini-pro",
+        "match": {
+          "or": [
+            {
+              "equals": "gemini-pro"
+            },
+            {
+              "equals": "gemini-1.0-pro"
+            }
+          ]
+        },
+        "context_window": 32768,
+        "prices": {
+          "input_mtok": 0.125,
+          "output_mtok": 0.375
+        }
+      },
+      {
+        "id": "gemini-pro-1.5",
+        "match": {
+          "equals": "gemini-pro-1.5"
+        },
+        "context_window": 2000000,
+        "prices": {
+          "input_mtok": {
+            "base": 1.25,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 2.5
+              }
+            ]
+          },
+          "cache_read_mtok": {
+            "base": 0.3125,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 0.625
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 5,
+            "tiers": [
+              {
+                "start": 128000,
+                "price": 10
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "openai",
+    "name": "OpenAI",
+    "pricing_urls": [
+      "https://platform.openai.com/docs/pricing",
+      "https://openai.com/api/pricing/",
+      "https://platform.openai.com/docs/models",
+      "https://help.openai.com/en/articles/7127956-how-much-does-gpt-4-cost"
+    ],
+    "api_pattern": "https://api\\.openai\\.com",
+    "model_match": {
+      "or": [
+        {
+          "starts_with": "gpt-"
+        },
+        {
+          "regex": "^o[134]"
+        }
+      ]
+    },
+    "provider_match": {
+      "contains": "openai"
+    },
+    "extractors": [
+      {
+        "api_flavor": "chat",
+        "root": "usage",
+        "model_path": "model",
+        "mappings": [
+          {
+            "path": "prompt_tokens",
+            "dest": "input_tokens",
+            "required": true
+          },
+          {
+            "path": [
+              "prompt_tokens_details",
+              "cached_tokens"
+            ],
+            "dest": "cache_read_tokens",
+            "required": false
+          },
+          {
+            "path": [
+              "prompt_tokens_details",
+              "audio_tokens"
+            ],
+            "dest": "input_audio_tokens",
+            "required": false
+          },
+          {
+            "path": [
+              "completion_tokens_details",
+              "audio_tokens"
+            ],
+            "dest": "output_audio_tokens",
+            "required": false
+          },
+          {
+            "path": "completion_tokens",
+            "dest": "output_tokens",
+            "required": true
+          }
+        ]
+      },
+      {
+        "api_flavor": "responses",
+        "root": "usage",
+        "model_path": "model",
+        "mappings": [
+          {
+            "path": "input_tokens",
+            "dest": "input_tokens",
+            "required": true
+          },
+          {
+            "path": [
+              "input_tokens_details",
+              "cached_tokens"
+            ],
+            "dest": "cache_read_tokens",
+            "required": false
+          },
+          {
+            "path": "output_tokens",
+            "dest": "output_tokens",
+            "required": true
+          }
+        ]
+      },
+      {
+        "api_flavor": "embeddings",
+        "root": "usage",
+        "model_path": "model",
+        "mappings": [
+          {
+            "path": "prompt_tokens",
+            "dest": "input_tokens",
+            "required": true
+          }
+        ]
+      }
+    ],
+    "models": [
+      {
+        "id": "ada",
+        "match": {
+          "or": [
+            {
+              "equals": "ada"
+            },
+            {
+              "equals": "text-ada-001"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 0.4,
+          "output_mtok": 0.4
+        }
+      },
+      {
+        "id": "babbage",
+        "match": {
+          "equals": "babbage"
+        },
+        "prices": {
+          "input_mtok": 0.5,
+          "output_mtok": 0.5
+        }
+      },
+      {
+        "id": "chatgpt-4o-latest",
+        "match": {
+          "equals": "chatgpt-4o-latest"
+        },
+        "prices": {
+          "input_mtok": 5,
+          "output_mtok": 15
+        }
+      },
+      {
+        "id": "codex-mini",
+        "match": {
+          "or": [
+            {
+              "equals": "codex-mini"
+            },
+            {
+              "equals": "codex-mini-latest"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 1.5,
+          "cache_read_mtok": 0.375,
+          "output_mtok": 6
+        }
+      },
+      {
+        "id": "computer-use",
+        "match": {
+          "starts_with": "computer-use"
+        },
+        "prices": {
+          "input_mtok": 3,
+          "output_mtok": 12
+        }
+      },
+      {
+        "id": "curie",
+        "match": {
+          "or": [
+            {
+              "equals": "curie"
+            },
+            {
+              "equals": "text-curie-001"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 2,
+          "output_mtok": 2
+        }
+      },
+      {
+        "id": "davinci",
+        "match": {
+          "or": [
+            {
+              "equals": "davinci"
+            },
+            {
+              "equals": "text-davinci-001"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 20,
+          "output_mtok": 20
+        }
+      },
+      {
+        "id": "ft:gpt-3.5-turbo-",
+        "match": {
+          "starts_with": "ft:gpt-3.5-turbo"
+        },
+        "prices": {
+          "input_mtok": 3,
+          "output_mtok": 6
+        }
+      },
+      {
+        "id": "ft:gpt-4o",
+        "match": {
+          "starts_with": "ft:gpt-4o-2024-"
+        },
+        "prices": {
+          "input_mtok": 3.75,
+          "output_mtok": 15
+        }
+      },
+      {
+        "id": "ft:gpt-4o-mini",
+        "match": {
+          "starts_with": "ft:gpt-4o-mini-2024-"
+        },
+        "prices": {
+          "input_mtok": 0.3,
+          "output_mtok": 1.2
+        }
+      },
+      {
+        "id": "gpt-3.5-0301",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-3.5-turbo-0301"
+            },
+            {
+              "equals": "gpt-3.5-0301"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 1.5,
+          "output_mtok": 2
+        }
+      },
+      {
+        "id": "gpt-3.5-turbo",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-3.5-turbo"
+            },
+            {
+              "equals": "gpt-35-turbo"
+            },
+            {
+              "equals": "gpt-3.5-turbo-0125"
+            }
+          ]
+        },
+        "context_window": 16385,
+        "prices": {
+          "input_mtok": 0.5,
+          "output_mtok": 1.5
+        }
+      },
+      {
+        "id": "gpt-3.5-turbo-0613",
+        "match": {
+          "equals": "gpt-3.5-turbo-0613"
+        },
+        "context_window": 16385,
+        "prices": {
+          "input_mtok": 1.5,
+          "output_mtok": 2
+        }
+      },
+      {
+        "id": "gpt-3.5-turbo-1106",
+        "match": {
+          "equals": "gpt-3.5-turbo-1106"
+        },
+        "context_window": 16385,
+        "prices": {
+          "input_mtok": 1,
+          "output_mtok": 2
+        }
+      },
+      {
+        "id": "gpt-3.5-turbo-16k",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-3.5-turbo-16k"
+            },
+            {
+              "equals": "gpt-3.5-turbo-16k-0613"
+            },
+            {
+              "equals": "gpt-35-turbo-16k-0613"
+            },
+            {
+              "equals": "gpt-35-turbo-16k"
+            }
+          ]
+        },
+        "context_window": 16385,
+        "prices": {
+          "input_mtok": 3,
+          "output_mtok": 4
+        }
+      },
+      {
+        "id": "gpt-3.5-turbo-instruct",
+        "match": {
+          "or": [
+            {
+              "starts_with": "gpt-3.5-turbo-instruct"
+            },
+            {
+              "equals": "gpt-3.5-turbo-instruct-0914"
+            }
+          ]
+        },
+        "context_window": 16385,
+        "prices": {
+          "input_mtok": 1.5,
+          "output_mtok": 2
+        }
+      },
+      {
+        "id": "gpt-4",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4"
+            },
+            {
+              "equals": "gpt-4-0314"
+            },
+            {
+              "equals": "gpt-4-0613"
+            },
+            {
+              "starts_with": "ft:gpt-4-0"
+            }
+          ]
+        },
+        "context_window": 8192,
+        "prices": {
+          "input_mtok": 30,
+          "output_mtok": 60
+        }
+      },
+      {
+        "id": "gpt-4-32k",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4-32k"
+            },
+            {
+              "equals": "gpt-4-32k-0314"
+            },
+            {
+              "equals": "gpt-4-32k-0613"
+            }
+          ]
+        },
+        "context_window": 32000,
+        "prices": {
+          "input_mtok": 60,
+          "output_mtok": 120
+        }
+      },
+      {
+        "id": "gpt-4-turbo",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4-turbo"
+            },
+            {
+              "equals": "gpt-4-turbo-2024-04-09"
+            },
+            {
+              "equals": "gpt-4-turbo-0125-preview"
+            },
+            {
+              "equals": "gpt-4-0125-preview"
+            },
+            {
+              "equals": "gpt-4-1106-preview"
+            },
+            {
+              "equals": "gpt-4-turbo-preview"
+            }
+          ]
+        },
+        "context_window": 128000,
+        "prices": {
+          "input_mtok": 10,
+          "output_mtok": 30
+        }
+      },
+      {
+        "id": "gpt-4-vision-preview",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4-vision-preview"
+            },
+            {
+              "equals": "gpt-4-1106-vision-preview"
+            }
+          ]
+        },
+        "context_window": 128000,
+        "prices": {
+          "input_mtok": 10,
+          "output_mtok": 30
+        }
+      },
+      {
+        "id": "gpt-4.1",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4.1"
+            },
+            {
+              "equals": "gpt-4.1-2025-04-14"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 2,
+          "cache_read_mtok": 0.5,
+          "output_mtok": 8
+        }
+      },
+      {
+        "id": "gpt-4.1-mini",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4.1-mini"
+            },
+            {
+              "equals": "gpt-4.1-mini-2025-04-14"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 0.4,
+          "cache_read_mtok": 0.1,
+          "output_mtok": 1.6
+        }
+      },
+      {
+        "id": "gpt-4.1-nano",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4.1-nano"
+            },
+            {
+              "equals": "gpt-4.1-nano-2025-04-14"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 0.1,
+          "cache_read_mtok": 0.025,
+          "output_mtok": 0.4
+        }
+      },
+      {
+        "id": "gpt-4.5-preview",
+        "match": {
+          "starts_with": "gpt-4.5-preview"
+        },
+        "prices": {
+          "input_mtok": 75,
+          "cache_read_mtok": 37.5,
+          "output_mtok": 150
+        }
+      },
+      {
+        "id": "gpt-4o",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4o"
+            },
+            {
+              "equals": "gpt-4o-2024-05-13"
+            },
+            {
+              "equals": "gpt-4o-2024-08-06"
+            },
+            {
+              "equals": "gpt-4o-2024-11-20"
+            }
+          ]
+        },
+        "context_window": 128000,
+        "prices": {
+          "input_mtok": 2.5,
+          "cache_read_mtok": 1.25,
+          "output_mtok": 10
+        }
+      },
+      {
+        "id": "gpt-4o-audio-preview",
+        "match": {
+          "starts_with": "gpt-4o-audio-preview"
+        },
+        "context_window": 128000,
+        "prices": {
+          "input_mtok": 2.5,
+          "output_mtok": 10,
+          "input_audio_mtok": 2.5
+        }
+      },
+      {
+        "id": "gpt-4o-mini",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4o-mini"
+            },
+            {
+              "equals": "gpt-4o-mini-2024-07-18"
+            },
+            {
+              "equals": "gpt-4o-mini-search-preview"
+            },
+            {
+              "equals": "gpt-4o-mini-search-preview-2025-03-11"
+            }
+          ]
+        },
+        "context_window": 128000,
+        "prices": {
+          "input_mtok": 0.15,
+          "cache_read_mtok": 0.075,
+          "output_mtok": 0.6
+        }
+      },
+      {
+        "id": "gpt-4o-mini-2024-07-18.ft-",
+        "match": {
+          "starts_with": "gpt-4o-mini-2024-07-18.ft-"
+        },
+        "prices": {
+          "input_mtok": 0.3,
+          "output_mtok": 1.2
+        }
+      },
+      {
+        "id": "gpt-4o-mini-audio-preview",
+        "match": {
+          "starts_with": "gpt-4o-mini-audio"
+        },
+        "prices": {
+          "input_mtok": 0.15,
+          "output_mtok": 0.6,
+          "input_audio_mtok": 0.15
+        }
+      },
+      {
+        "id": "gpt-4o-mini-realtime-preview",
+        "match": {
+          "starts_with": "gpt-4o-mini-realtime"
+        },
+        "prices": {
+          "input_mtok": 0.6,
+          "cache_read_mtok": 0.3,
+          "output_mtok": 2.4,
+          "input_audio_mtok": 10,
+          "cache_audio_read_mtok": 0.3,
+          "output_audio_mtok": 20
+        }
+      },
+      {
+        "id": "gpt-4o-mini-transcribe",
+        "match": {
+          "equals": "gpt-4o-mini-transcribe"
+        },
+        "prices": {
+          "input_mtok": 1.25,
+          "output_mtok": 5,
+          "input_audio_mtok": 3
+        }
+      },
+      {
+        "id": "gpt-4o-mini-tts",
+        "match": {
+          "equals": "gpt-4o-mini-tts"
+        },
+        "prices": {
+          "input_mtok": 0.6,
+          "output_mtok": 12,
+          "output_audio_mtok": 12
+        }
+      },
+      {
+        "id": "gpt-4o-realtime-preview",
+        "match": {
+          "starts_with": "gpt-4o-realtime"
+        },
+        "prices": {
+          "input_mtok": 5,
+          "cache_read_mtok": 2.5,
+          "output_mtok": 20,
+          "input_audio_mtok": 40,
+          "cache_audio_read_mtok": 2.5,
+          "output_audio_mtok": 80
+        }
+      },
+      {
+        "id": "gpt-4o-search-preview",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4o-search-preview"
+            },
+            {
+              "equals": "gpt-4o-search-preview-2025-03-11"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 2.5,
+          "output_mtok": 10
+        }
+      },
+      {
+        "id": "gpt-4o-transcribe",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-4o-transcribe"
+            },
+            {
+              "equals": "gpt-4o-transcribe-diarize"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 2.5,
+          "output_mtok": 10,
+          "input_audio_mtok": 6
+        }
+      },
+      {
+        "id": "gpt-4o:extended",
+        "match": {
+          "equals": "gpt-4o:extended"
+        },
+        "prices": {
+          "input_mtok": 6,
+          "output_mtok": 18
+        }
+      },
+      {
+        "id": "gpt-5",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5"
+            },
+            {
+              "equals": "gpt-5-2025-08-07"
+            },
+            {
+              "equals": "gpt-5-chat"
+            },
+            {
+              "equals": "gpt-5-chat-latest"
+            },
+            {
+              "equals": "gpt-5-codex"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 1.25,
+          "cache_read_mtok": 0.125,
+          "output_mtok": 10
+        }
+      },
+      {
+        "id": "gpt-5-image",
+        "match": {
+          "equals": "gpt-5-image"
+        },
+        "prices": {
+          "input_mtok": 10,
+          "cache_read_mtok": 1.25,
+          "output_mtok": 10
+        }
+      },
+      {
+        "id": "gpt-5-image-mini",
+        "match": {
+          "equals": "gpt-5-image-mini"
+        },
+        "prices": {
+          "input_mtok": 2.5,
+          "cache_read_mtok": 0.25,
+          "output_mtok": 2
+        }
+      },
+      {
+        "id": "gpt-5-mini",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5-mini"
+            },
+            {
+              "equals": "gpt-5-mini-2025-08-07"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 0.25,
+          "cache_read_mtok": 0.025,
+          "output_mtok": 2
+        }
+      },
+      {
+        "id": "gpt-5-nano",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5-nano"
+            },
+            {
+              "starts_with": "gpt-5-nano-"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 0.05,
+          "cache_read_mtok": 0.005,
+          "output_mtok": 0.4
+        }
+      },
+      {
+        "id": "gpt-5-pro",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5-pro"
+            },
+            {
+              "equals": "gpt-5-pro-2025-10-06"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 15,
+          "output_mtok": 120
+        }
+      },
+      {
+        "id": "gpt-5.1",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.1"
+            },
+            {
+              "equals": "gpt-5.1-2025-11-13"
+            },
+            {
+              "equals": "gpt-5.1-codex"
+            },
+            {
+              "equals": "gpt-5.1-codex-max"
+            },
+            {
+              "equals": "gpt-5.1-chat"
+            },
+            {
+              "equals": "gpt-5.1-chat-latest"
+            },
+            {
+              "equals": "gpt-5-1"
+            },
+            {
+              "equals": "gpt-5-1-2025-11-13"
+            },
+            {
+              "equals": "gpt-5-1-codex"
+            },
+            {
+              "equals": "gpt-5-1-codex-max"
+            },
+            {
+              "equals": "gpt-5-1-chat"
+            },
+            {
+              "equals": "gpt-5-1-chat-latest"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 1.25,
+          "cache_read_mtok": 0.125,
+          "output_mtok": 10
+        }
+      },
+      {
+        "id": "gpt-5.1-codex-mini",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.1-codex-mini"
+            },
+            {
+              "equals": "gpt-5.1-mini"
+            },
+            {
+              "equals": "gpt-5-1-codex-mini"
+            },
+            {
+              "equals": "gpt-5-1-mini"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 0.25,
+          "cache_read_mtok": 0.025,
+          "output_mtok": 2
+        }
+      },
+      {
+        "id": "gpt-5.2",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.2"
+            },
+            {
+              "equals": "gpt-5.2-2025-12-11"
+            },
+            {
+              "equals": "gpt-5-2"
+            },
+            {
+              "equals": "gpt-5-2-2025-12-11"
+            },
+            {
+              "equals": "gpt-5.2-chat"
+            },
+            {
+              "equals": "gpt-5.2-chat-latest"
+            },
+            {
+              "equals": "gpt-5-2-chat"
+            },
+            {
+              "equals": "gpt-5-2-chat-latest"
+            },
+            {
+              "equals": "gpt-5.2-codex"
+            },
+            {
+              "equals": "gpt-5-2-codex"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 1.75,
+          "cache_read_mtok": 0.175,
+          "output_mtok": 14
+        }
+      },
+      {
+        "id": "gpt-5.2-pro",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.2-pro"
+            },
+            {
+              "equals": "gpt-5.2-pro-2025-12-11"
+            },
+            {
+              "equals": "gpt-5-2-pro-2025-12-11"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 21,
+          "output_mtok": 168
+        }
+      },
+      {
+        "id": "gpt-5.3",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.3"
+            },
+            {
+              "equals": "gpt-5-3"
+            },
+            {
+              "equals": "gpt-5.3-chat"
+            },
+            {
+              "equals": "gpt-5.3-chat-latest"
+            },
+            {
+              "equals": "gpt-5-3-chat"
+            },
+            {
+              "equals": "gpt-5-3-chat-latest"
+            }
+          ]
+        },
+        "context_window": 128000,
+        "prices": {
+          "input_mtok": 1.75,
+          "cache_read_mtok": 0.175,
+          "output_mtok": 14
+        }
+      },
+      {
+        "id": "gpt-5.3-codex",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.3-codex"
+            },
+            {
+              "equals": "gpt-5-3-codex"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 1.75,
+          "cache_read_mtok": 0.175,
+          "output_mtok": 14
+        }
+      },
+      {
+        "id": "gpt-5.4",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.4"
+            },
+            {
+              "equals": "gpt-5.4-2026-03-05"
+            },
+            {
+              "equals": "gpt-5-4"
+            },
+            {
+              "equals": "gpt-5-4-2026-03-05"
+            }
+          ]
+        },
+        "context_window": 1050000,
+        "prices": {
+          "input_mtok": {
+            "base": 2.5,
+            "tiers": [
+              {
+                "start": 272000,
+                "price": 5
+              }
+            ]
+          },
+          "cache_read_mtok": {
+            "base": 0.25,
+            "tiers": [
+              {
+                "start": 272000,
+                "price": 0.5
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 15,
+            "tiers": [
+              {
+                "start": 272000,
+                "price": 22.5
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "gpt-5.4-mini",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.4-mini"
+            },
+            {
+              "equals": "gpt-5.4-mini-2026-03-17"
+            },
+            {
+              "equals": "gpt-5-4-mini"
+            },
+            {
+              "equals": "gpt-5-4-mini-2026-03-17"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 0.75,
+          "cache_read_mtok": 0.075,
+          "output_mtok": 4.5
+        }
+      },
+      {
+        "id": "gpt-5.4-nano",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.4-nano"
+            },
+            {
+              "equals": "gpt-5.4-nano-2026-03-17"
+            },
+            {
+              "equals": "gpt-5-4-nano"
+            },
+            {
+              "equals": "gpt-5-4-nano-2026-03-17"
+            }
+          ]
+        },
+        "context_window": 400000,
+        "prices": {
+          "input_mtok": 0.2,
+          "cache_read_mtok": 0.02,
+          "output_mtok": 1.25
+        }
+      },
+      {
+        "id": "gpt-5.4-pro",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.4-pro"
+            },
+            {
+              "equals": "gpt-5.4-pro-2026-03-05"
+            },
+            {
+              "equals": "gpt-5-4-pro"
+            },
+            {
+              "equals": "gpt-5-4-pro-2026-03-05"
+            }
+          ]
+        },
+        "context_window": 1050000,
+        "prices": {
+          "input_mtok": {
+            "base": 30,
+            "tiers": [
+              {
+                "start": 272000,
+                "price": 60
+              }
+            ]
+          },
+          "output_mtok": {
+            "base": 180,
+            "tiers": [
+              {
+                "start": 272000,
+                "price": 270
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "gpt-5.5",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.5"
+            },
+            {
+              "equals": "gpt-5.5-2026-04-23"
+            },
+            {
+              "equals": "gpt-5.5-2026-04-24"
+            },
+            {
+              "equals": "gpt-5-5"
+            },
+            {
+              "equals": "gpt-5-5-2026-04-23"
+            },
+            {
+              "equals": "gpt-5-5-2026-04-24"
+            },
+            {
+              "equals": "gpt-5.5-chat"
+            },
+            {
+              "equals": "gpt-5.5-chat-latest"
+            },
+            {
+              "equals": "gpt-5-5-chat"
+            },
+            {
+              "equals": "gpt-5-5-chat-latest"
+            },
+            {
+              "equals": "gpt-5.5-codex"
+            },
+            {
+              "equals": "gpt-5-5-codex"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 5,
+          "cache_read_mtok": 0.5,
+          "output_mtok": 30
+        }
+      },
+      {
+        "id": "gpt-5.5-pro",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-5.5-pro"
+            },
+            {
+              "equals": "gpt-5.5-pro-2026-04-23"
+            },
+            {
+              "equals": "gpt-5-5-pro"
+            },
+            {
+              "equals": "gpt-5-5-pro-2026-04-23"
+            }
+          ]
+        },
+        "context_window": 1000000,
+        "prices": {
+          "input_mtok": 30,
+          "output_mtok": 180
+        }
+      },
+      {
+        "id": "gpt-realtime",
+        "match": {
+          "or": [
+            {
+              "equals": "gpt-realtime"
+            },
+            {
+              "equals": "gpt-realtime-2025-08-28"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 4,
+          "cache_read_mtok": 0.4,
+          "output_mtok": 16,
+          "input_audio_mtok": 32,
+          "cache_audio_read_mtok": 0.4,
+          "output_audio_mtok": 64
+        }
+      },
+      {
+        "id": "gpt-realtime-mini",
+        "match": {
+          "equals": "gpt-realtime-mini"
+        },
+        "prices": {
+          "input_mtok": 0.6,
+          "cache_read_mtok": 0.06,
+          "output_mtok": 2.4,
+          "input_audio_mtok": 10,
+          "cache_audio_read_mtok": 0.3,
+          "output_audio_mtok": 20
+        }
+      },
+      {
+        "id": "o1",
+        "match": {
+          "or": [
+            {
+              "equals": "o1"
+            },
+            {
+              "equals": "o1-2024-12-17"
+            },
+            {
+              "equals": "o1-preview"
+            },
+            {
+              "equals": "o1-preview-2024-09-12"
+            }
+          ]
+        },
+        "context_window": 128000,
+        "prices": {
+          "input_mtok": 15,
+          "cache_read_mtok": 7.5,
+          "output_mtok": 60
+        }
+      },
+      {
+        "id": "o1-mini",
+        "match": {
+          "or": [
+            {
+              "equals": "o1-mini"
+            },
+            {
+              "equals": "o1-mini-2024-09-12"
+            }
+          ]
+        },
+        "context_window": 128000,
+        "prices": {
+          "input_mtok": 1.1,
+          "cache_read_mtok": 0.55,
+          "output_mtok": 4.4
+        }
+      },
+      {
+        "id": "o1-pro",
+        "match": {
+          "or": [
+            {
+              "equals": "o1-pro"
+            },
+            {
+              "equals": "o1-pro-2025-03-19"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 150,
+          "output_mtok": 600
+        }
+      },
+      {
+        "id": "o3",
+        "match": {
+          "or": [
+            {
+              "equals": "o3"
+            },
+            {
+              "equals": "o3-2025-04-16"
+            }
+          ]
+        },
+        "prices": [
+          {
+            "prices": {
+              "input_mtok": 10,
+              "cache_read_mtok": 0.5,
+              "output_mtok": 40
+            }
+          },
+          {
+            "constraint": {
+              "start_date": "2025-06-10"
+            },
+            "prices": {
+              "input_mtok": 2,
+              "cache_read_mtok": 0.5,
+              "output_mtok": 8
+            }
+          }
+        ]
+      },
+      {
+        "id": "o3-deep-research",
+        "match": {
+          "or": [
+            {
+              "equals": "o3-deep-research"
+            },
+            {
+              "equals": "o3-deep-research-2025-06-26"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 10,
+          "cache_read_mtok": 2.5,
+          "output_mtok": 40
+        }
+      },
+      {
+        "id": "o3-mini",
+        "match": {
+          "or": [
+            {
+              "equals": "o3-mini"
+            },
+            {
+              "equals": "o3-mini-2025-01-31"
+            },
+            {
+              "equals": "o3-mini-high"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 1.1,
+          "cache_read_mtok": 0.55,
+          "output_mtok": 4.4
+        }
+      },
+      {
+        "id": "o3-pro",
+        "match": {
+          "or": [
+            {
+              "equals": "o3-pro"
+            },
+            {
+              "equals": "o3-pro-2025-06-10"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 20,
+          "output_mtok": 80
+        }
+      },
+      {
+        "id": "o4-mini",
+        "match": {
+          "or": [
+            {
+              "equals": "o4-mini-2025-04-16"
+            },
+            {
+              "equals": "o4-mini-high"
+            },
+            {
+              "equals": "o4-mini"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 1.1,
+          "cache_read_mtok": 0.275,
+          "output_mtok": 4.4
+        }
+      },
+      {
+        "id": "o4-mini-deep-research",
+        "match": {
+          "or": [
+            {
+              "equals": "o4-mini-deep-research"
+            },
+            {
+              "equals": "o4-mini-deep-research-2025-06-26"
+            }
+          ]
+        },
+        "prices": {
+          "input_mtok": 2,
+          "cache_read_mtok": 0.5,
+          "output_mtok": 8
+        }
+      },
+      {
+        "id": "text-davinci-002",
+        "match": {
+          "equals": "text-davinci-002"
+        },
+        "prices": {
+          "input_mtok": 20,
+          "output_mtok": 20
+        }
+      },
+      {
+        "id": "text-davinci-003",
+        "match": {
+          "equals": "text-davinci-003"
+        },
+        "prices": {
+          "input_mtok": 20,
+          "output_mtok": 20
+        }
+      },
+      {
+        "id": "text-embedding-3-large",
+        "match": {
+          "equals": "text-embedding-3-large"
+        },
+        "context_window": 8192,
+        "prices": {
+          "input_mtok": 0.13
+        }
+      },
+      {
+        "id": "text-embedding-3-small",
+        "match": {
+          "equals": "text-embedding-3-small"
+        },
+        "context_window": 8192,
+        "prices": {
+          "input_mtok": 0.02
+        }
+      },
+      {
+        "id": "text-embedding-ada-002",
+        "match": {
+          "or": [
+            {
+              "equals": "text-embedding-ada"
+            },
+            {
+              "equals": "text-embedding-ada-002"
+            },
+            {
+              "equals": "text-embedding-ada-002-v2"
+            }
+          ]
+        },
+        "context_window": 8192,
+        "prices": {
+          "input_mtok": 0.1
+        }
+      }
+    ]
+  }
+]

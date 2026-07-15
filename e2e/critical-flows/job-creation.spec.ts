@@ -22,7 +22,7 @@ test.describe('Job Creation Flow', () => {
     const page = authenticatedPage
 
     // ── Navigate to Create Job ───────────────────────────
-    await page.goto('/dashboard/jobs/new')
+    await page.goto(`/${testAccount.orgSlug}/admin/jobs/new`)
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: 'New Job' })).toBeVisible()
 
@@ -58,13 +58,13 @@ test.describe('Job Creation Flow', () => {
 
     // ── Extract job slug from the application link ────────
     const applicationLink = await page.locator('input[readonly]').inputValue()
-    expect(applicationLink).toMatch(/\/jobs\/[^/]+\/apply(?:$|[?#])/)
-    const slugMatch = applicationLink.match(/\/jobs\/([^/]+)\/apply(?:$|[?#])/)
+    expect(applicationLink).toMatch(/\/[^/]+\/[^/]+\/apply(?:$|[?#])/)
+    const slugMatch = applicationLink.match(/\/[^/]+\/([^/]+)\/apply(?:$|[?#])/)
     const jobSlug = slugMatch?.[1] ?? ''
     expect(jobSlug.length, 'Job slug must not be empty').toBeGreaterThan(0)
 
     // ── Verify on public jobs page ───────────────────────
-    await page.goto(`/jobs/${jobSlug}`)
+    await page.goto(`/${testAccount.orgSlug}/${jobSlug}`)
     await expect(page.getByRole('heading', { name: JOB_TITLE })).toBeVisible()
     await expect(page.getByText(JOB_LOCATION)).toBeVisible()
 

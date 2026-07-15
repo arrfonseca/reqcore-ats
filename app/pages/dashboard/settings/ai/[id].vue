@@ -6,11 +6,15 @@
  */
 import { Loader2, AlertTriangle } from 'lucide-vue-next'
 
-definePageMeta({})
+const { t } = useI18n()
+
+definePageMeta({
+  middleware: ['require-own-llm-ai'],
+})
 
 useSeoMeta({
-  title: 'Edit AI model — Reqcore',
-  description: 'Update an existing AI provider configuration.',
+  title: t('settings.ai.detail.seoTitle'),
+  description: t('settings.ai.detail.seoDescription'),
 })
 
 interface AiConfigRow {
@@ -35,7 +39,6 @@ interface ProviderInfo {
   signupUrl?: string
   supportsBaseUrl: boolean
   defaultModel: string
-  models: { id: string, label: string, description: string, inputPricePer1m?: number, outputPricePer1m?: number, badge?: 'recommended' | 'fast' | 'powerful' | 'cheap' }[]
 }
 
 const route = useRoute()
@@ -64,6 +67,7 @@ const isReady = computed(() =>
 const notFound = computed(() => isReady.value && !config.value)
 
 async function onSaved() {
+  await refreshNuxtData(['ai-configs', 'ai-config-check', 'ai-configs-analysis-picker'])
   await navigateTo('/dashboard/settings/ai')
 }
 function onCancel() {
@@ -83,8 +87,8 @@ function onCancel() {
     >
       <AlertTriangle class="size-5 shrink-0 mt-0.5" />
       <div>
-        <p class="font-semibold mb-1">Insufficient permissions</p>
-        <p>You don't have permission to manage AI settings.</p>
+        <p class="font-semibold mb-1">{{ t('settings.ai.insufficientPermissions') }}</p>
+        <p>{{ t('settings.ai.detail.noPermission') }}</p>
       </div>
     </div>
 
@@ -98,13 +102,13 @@ function onCancel() {
     >
       <AlertTriangle class="size-5 shrink-0 mt-0.5" />
       <div>
-        <p class="font-semibold mb-1">Configuration not found</p>
-        <p class="mb-3">This AI configuration no longer exists or you don't have access to it.</p>
+        <p class="font-semibold mb-1">{{ t('settings.ai.detail.notFoundTitle') }}</p>
+        <p class="mb-3">{{ t('settings.ai.detail.notFoundBody') }}</p>
         <NuxtLink
           to="/dashboard/settings/ai"
           class="inline-flex items-center gap-1.5 rounded-lg bg-danger-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-danger-700 transition-colors"
         >
-          Back to AI configuration
+          {{ t('settings.ai.detail.backToAi') }}
         </NuxtLink>
       </div>
     </div>

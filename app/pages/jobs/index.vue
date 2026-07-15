@@ -6,6 +6,7 @@ definePageMeta({
 })
 
 const route = useRoute()
+const { locale, t } = useI18n()
 
 /** Forward source-tracking query params (?ref=, utm_*) through navigation */
 const sourceQuery = computed(() => {
@@ -20,18 +21,15 @@ const sourceQuery = computed(() => {
 })
 
 useSeoMeta({
-  title: 'Open Positions — Job Board',
-  description:
-    'Browse open job positions on Reqcore and apply directly. Find your next career opportunity with companies that value transparency.',
-  ogTitle: 'Open Positions — Reqcore Job Board',
-  ogDescription:
-    'Browse open job positions and apply directly. Powered by the open-source ATS you actually own.',
+  title: t('jobs.index.seoTitle'),
+  description: t('jobs.index.seoDescription'),
+  ogTitle: t('jobs.index.ogTitle'),
+  ogDescription: t('jobs.index.ogDescription'),
   ogType: 'website',
   ogImage: '/reqcore-banner-github.jpeg',
   twitterCard: 'summary_large_image',
-  twitterTitle: 'Open Positions — Reqcore Job Board',
-  twitterDescription:
-    'Browse open job positions and apply directly.',
+  twitterTitle: t('jobs.index.ogTitle'),
+  twitterDescription: t('jobs.index.twitterDescription'),
 })
 
 // ─────────────────────────────────────────────
@@ -78,22 +76,14 @@ const totalPages = computed(() => Math.ceil(total.value / 20))
 // ─────────────────────────────────────────────
 // i18n-aware display helpers
 // ─────────────────────────────────────────────
-const { locale } = useI18n()
+const { contractTypeOptions, allTypeLabels } = useJobTypes()
 
-const typeLabels: Record<string, string> = {
-  full_time: 'Full-time',
-  part_time: 'Part-time',
-  contract: 'Contract',
-  internship: 'Internship',
-}
+const typeLabels = allTypeLabels
 
-const typeOptions = [
-  { label: 'All types', value: undefined },
-  { label: 'Full-time', value: 'full_time' },
-  { label: 'Part-time', value: 'part_time' },
-  { label: 'Contract', value: 'contract' },
-  { label: 'Internship', value: 'internship' },
-] as const
+const typeOptions = computed(() => [
+  { label: t('jobs.shared.types.all'), value: undefined },
+  ...contractTypeOptions.value,
+] as const)
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString(locale.value, {
@@ -102,15 +92,19 @@ function formatDate(dateStr: string) {
     year: 'numeric',
   })
 }
+
+function formatOpenPositionCount(count: number) {
+  return t('jobs.index.openPositionCount', count, { count })
+}
 </script>
 
 <template>
   <div>
     <!-- Page header -->
     <div class="mb-8">
-      <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">Open Positions</h1>
+      <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">{{ t('jobs.index.title') }}</h1>
       <p class="text-sm text-surface-500 mt-1">
-        Browse our current openings and find your next opportunity.
+        {{ t('jobs.index.subtitle') }}
       </p>
     </div>
 
@@ -122,7 +116,7 @@ function formatDate(dateStr: string) {
         <input
           v-model="searchInput"
           type="text"
-          placeholder="Search jobs by title or location…"
+          :placeholder="t('jobs.index.searchPlaceholder')"
           class="w-full rounded-lg border border-surface-300 dark:border-surface-700 pl-9 pr-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
         />
       </div>
@@ -141,7 +135,7 @@ function formatDate(dateStr: string) {
 
     <!-- Loading state -->
     <div v-if="fetchStatus === 'pending'" class="text-center py-16 text-surface-400">
-      Loading positions…
+      {{ t('jobs.index.loading') }}
     </div>
 
     <!-- Error state -->
@@ -149,8 +143,8 @@ function formatDate(dateStr: string) {
       v-else-if="error"
       class="rounded-lg border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-950 p-4 text-sm text-danger-700 dark:text-danger-400"
     >
-      Failed to load jobs. Please try again.
-      <button class="underline ml-1 cursor-pointer" @click="refresh()">Retry</button>
+      {{ t('jobs.index.loadError') }}
+      <button class="underline ml-1 cursor-pointer" @click="refresh()">{{ t('common.actions.retry') }}</button>
     </div>
 
     <!-- Empty state -->
@@ -159,13 +153,13 @@ function formatDate(dateStr: string) {
       class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-12 text-center"
     >
       <Briefcase class="size-10 text-surface-300 mx-auto mb-3" />
-      <h3 class="text-base font-semibold text-surface-700 dark:text-surface-300 mb-1">No open positions</h3>
+      <h3 class="text-base font-semibold text-surface-700 dark:text-surface-300 mb-1">{{ t('jobs.index.noOpenPositions') }}</h3>
       <p class="text-sm text-surface-500">
         <template v-if="searchQuery || typeFilter">
-          No jobs match your current filters. Try adjusting your search.
+          {{ t('jobs.index.emptyFiltered') }}
         </template>
         <template v-else>
-          There are no open positions right now. Check back soon!
+          {{ t('jobs.index.empty') }}
         </template>
       </p>
     </div>
@@ -196,7 +190,7 @@ function formatDate(dateStr: string) {
                 {{ j.location }}
               </span>
               <span class="text-surface-400">
-                Posted {{ formatDate(j.createdAt) }}
+                {{ t('jobs.index.posted', { date: formatDate(j.createdAt) }) }}
               </span>
             </div>
 
@@ -219,11 +213,11 @@ function formatDate(dateStr: string) {
           @click="page--"
         >
           <ChevronLeft class="size-4" />
-          Previous
+          {{ t('common.actions.previous') }}
         </button>
 
         <span class="text-sm text-surface-500">
-          Page {{ page }} of {{ totalPages }}
+          {{ t('jobs.index.pageOf', { page, totalPages }) }}
         </span>
 
         <button
@@ -231,14 +225,14 @@ function formatDate(dateStr: string) {
           class="inline-flex items-center gap-1 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
           @click="page++"
         >
-          Next
+          {{ t('common.actions.next') }}
           <ChevronRight class="size-4" />
         </button>
       </div>
 
       <!-- Total count -->
       <p class="text-xs text-surface-400 pt-1">
-        {{ total }} open position{{ total === 1 ? '' : 's' }}
+        {{ formatOpenPositionCount(total) }}
       </p>
     </div>
   </div>

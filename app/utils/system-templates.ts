@@ -1,4 +1,4 @@
-export { SYSTEM_TEMPLATES } from '~~/shared/system-templates'
+export { SYSTEM_TEMPLATES, getSystemTemplates } from '~~/shared/system-templates'
 export type { SystemTemplate } from '~~/shared/system-templates'
 
 export const AVAILABLE_VARIABLES = [

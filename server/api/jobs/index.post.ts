@@ -7,6 +7,8 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, createJobSchema.parse)
 
+  assertJobSlugAllowed(body.slug)
+
   // Generate a deterministic ID upfront so we can build the slug
   const jobId = crypto.randomUUID()
   const slug = generateJobSlug(body.title, jobId, body.slug)
@@ -30,6 +32,7 @@ export default defineEventHandler(async (event) => {
     requireCoverLetter: body.requireCoverLetter,
     autoScoreOnApply: body.autoScoreOnApply,
     experienceLevel: body.experienceLevel,
+    iscoCategoryId: body.iscoCategoryId,
   }).returning({
     id: job.id,
     title: job.title,
@@ -49,6 +52,7 @@ export default defineEventHandler(async (event) => {
     requireCoverLetter: job.requireCoverLetter,
     autoScoreOnApply: job.autoScoreOnApply,
     experienceLevel: job.experienceLevel,
+    iscoCategoryId: job.iscoCategoryId,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   })

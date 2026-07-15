@@ -1,5 +1,7 @@
 import type { H3Event } from 'h3'
 import type { statements } from '~~/shared/permissions'
+import type { SessionUserWithPlatformRole } from './saasAdmin'
+import { assertTenantOperationalForSession } from './tenantAccess'
 
 /**
  * Permission descriptor — maps a resource to the actions being requested.
@@ -54,11 +56,30 @@ export async function requirePermission(
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }
 
+  const sessionUser = session.user as SessionUserWithPlatformRole
+  await syncSaasAdminRole(sessionUser)
+
   // ── Step 2: Active organization ──
   const activeOrganizationId = (session.session as { activeOrganizationId?: string }).activeOrganizationId
 
   if (!activeOrganizationId) {
-    throw createError({ statusCode: 403, statusMessage: 'No active organization' })
+    const message = (await resolveIsSaasAdmin(sessionUser))
+      ? 'Select a tenant to manage or use the platform console'
+      : 'No active organization'
+    throw createError({ statusCode: 403, statusMessage: message })
+  }
+
+  await assertTenantOperationalForSession(activeOrganizationId, sessionUser)
+
+  // SaaS admins impersonating a tenant get owner-equivalent access.
+  if (await resolveIsSaasAdmin(sessionUser)) {
+    return {
+      ...session,
+      session: {
+        ...session.session,
+        activeOrganizationId,
+      },
+    } as AuthSessionWithActiveOrg
   }
 
   // ── Step 3: Permission check (Better Auth AC) ──

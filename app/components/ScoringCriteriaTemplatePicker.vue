@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { t } = useI18n()
+
 const emit = defineEmits<{
   select: [templateId: string]
 }>()
@@ -59,7 +61,7 @@ function selectCategoryTemplate(templateId: string) {
           <span class="block text-sm font-medium text-surface-900 dark:text-surface-100">{{ tmpl.label }}</span>
           <span class="text-xs text-surface-500 dark:text-surface-400 mt-0.5 block">{{ tmpl.description }}</span>
           <span class="text-[10px] text-surface-400 mt-1 block">
-            {{ tmpl.criteria.length }} {{ tmpl.criteria.length === 1 ? 'criterion' : 'criteria' }}
+            {{ tmpl.criteria.length }} {{ tmpl.criteria.length === 1 ? t('scoring.criterion') : t('scoring.criteria') }}
           </span>
         </button>
       </div>
@@ -105,7 +107,7 @@ function selectCategoryTemplate(templateId: string) {
             <span class="block text-sm font-medium text-surface-900 dark:text-surface-100">{{ tmpl.label }}</span>
             <span class="text-xs text-surface-500 dark:text-surface-400 mt-0.5 block">{{ tmpl.description }}</span>
             <span class="text-[10px] text-surface-400 mt-1 block">
-              {{ tmpl.criteria.length }} {{ tmpl.criteria.length === 1 ? 'criterion' : 'criteria' }}
+              {{ tmpl.criteria.length }} {{ tmpl.criteria.length === 1 ? t('scoring.criterion') : t('scoring.criteria') }}
             </span>
           </button>
         </div>

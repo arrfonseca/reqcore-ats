@@ -117,6 +117,7 @@ export function useTrackingLinks(options?: {
   channel?: Ref<string | undefined> | string
 }) {
   const toast = useToast()
+  const { t } = useI18n()
 
   const jobId = computed(() => toValue(options?.jobId))
   const channel = computed(() => toValue(options?.channel))
@@ -164,7 +165,7 @@ export function useTrackingLinks(options?: {
       body: payload,
     })
     await refresh()
-    toast.success('Tracking link created')
+    toast.success(t('sourceTracking.toasts.created'))
     return created
   }
 
@@ -189,12 +190,12 @@ export function useTrackingLinks(options?: {
   async function deleteLink(id: string) {
     await $fetch(`/api/tracking-links/${id}`, { method: 'DELETE' })
     await refresh()
-    toast.success('Tracking link deleted')
+    toast.success(t('sourceTracking.toasts.deleted'))
   }
 
   async function toggleLink(id: string, isActive: boolean) {
     await updateLink(id, { isActive })
-    toast.success(isActive ? 'Link activated' : 'Link deactivated')
+    toast.success(isActive ? t('sourceTracking.toasts.activated') : t('sourceTracking.toasts.deactivated'))
   }
 
   return {

@@ -14,6 +14,8 @@ import {
 } from 'lucide-vue-next'
 import type { ChatbotConversationSummary, ChatbotFolder } from '~~/shared/chatbot'
 
+const { t } = useI18n()
+
 const props = defineProps<{
   conversation: ChatbotConversationSummary
   active: boolean
@@ -83,7 +85,7 @@ watch(() => props.isEditing, (v) => {
       </span>
       <button
         class="absolute right-0 size-6 flex items-center justify-center rounded text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-700 invisible group-hover:visible cursor-pointer border-0 bg-transparent"
-        title="Actions"
+        :title="t('dashboard.chatbot.conversation.actions')"
         @click.stop="(e) => emit('toggleMenu', e)"
       >
         <MoreHorizontal class="size-4" />
@@ -101,19 +103,19 @@ watch(() => props.isEditing, (v) => {
         @click="emit('togglePin', conversation)"
       >
         <component :is="conversation.pinned ? PinOff : Pin" class="size-3.5" />
-        {{ conversation.pinned ? 'Unpin' : 'Pin' }}
+        {{ conversation.pinned ? t('dashboard.chatbot.conversation.unpin') : t('dashboard.chatbot.conversation.pin') }}
       </button>
       <button
         class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-surface-700 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer border-0 bg-transparent"
         @click="emit('startRename', conversation)"
       >
         <Pencil class="size-3.5" />
-        Rename
+        {{ t('dashboard.chatbot.conversation.rename') }}
       </button>
 
       <div class="my-1 border-t border-surface-200 dark:border-surface-800" />
       <div class="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-surface-400">
-        Move to
+        {{ t('dashboard.chatbot.conversation.moveTo') }}
       </div>
       <button
         v-if="conversation.folderId !== null"
@@ -121,7 +123,7 @@ watch(() => props.isEditing, (v) => {
         @click="emit('move', conversation, null)"
       >
         <Inbox class="size-3.5" />
-        Uncategorised
+        {{ t('dashboard.chatbot.conversation.uncategorised') }}
       </button>
       <button
         v-for="f in folders.filter((x) => x.id !== conversation.folderId)"
@@ -139,7 +141,7 @@ watch(() => props.isEditing, (v) => {
         @click="emit('delete', conversation)"
       >
         <Trash2 class="size-3.5" />
-        Delete
+        {{ t('dashboard.chatbot.conversation.delete') }}
       </button>
     </div>
   </div>

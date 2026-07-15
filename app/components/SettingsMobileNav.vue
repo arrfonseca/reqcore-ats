@@ -4,57 +4,60 @@ import {
 } from 'lucide-vue-next'
 
 const route = useRoute()
-const localePath = useLocalePath()
+const { t } = useI18n()
+const { tenantPath } = useTenantPaths()
+const { allowOwnLlm } = useOrgSettings()
 
-const settingsNav = [
+const settingsNav = computed(() => [
   {
-    label: 'General',
-    to: '/dashboard/settings',
+    label: t('settings.nav.general'),
+    to: tenantPath('settings'),
     icon: Building2,
     exact: true,
   },
   {
-    label: 'Localization',
-    to: '/dashboard/settings/localization',
+    label: t('settings.nav.domain'),
+    to: tenantPath('settings/domain'),
     icon: Globe,
     exact: true,
   },
   {
-    label: 'Members',
-    to: '/dashboard/settings/members',
+    label: t('settings.nav.members'),
+    to: tenantPath('settings/members'),
     icon: Users,
     exact: true,
   },
   {
-    label: 'Integrations',
-    to: '/dashboard/settings/integrations',
+    label: t('settings.nav.integrations'),
+    to: tenantPath('settings/integrations'),
     icon: Plug,
     exact: true,
   },
+  ...(allowOwnLlm.value
+    ? [{
+        label: t('settings.nav.aiAnalysisShort'),
+        to: tenantPath('settings/ai-analysis'),
+        icon: Brain,
+        exact: true,
+      }]
+    : []),
   {
-    label: 'AI',
-    to: '/dashboard/settings/ai',
-    icon: Brain,
-    exact: true,
-  },
-  {
-    label: 'SSO',
-    to: '/dashboard/settings/sso',
+    label: t('settings.nav.ssoShort'),
+    to: tenantPath('settings/sso'),
     icon: ShieldCheck,
     exact: true,
   },
   {
-    label: 'Account',
-    to: '/dashboard/settings/account',
+    label: t('settings.nav.account'),
+    to: tenantPath('settings/account'),
     icon: UserCircle,
     exact: true,
   },
-]
+])
 
 function isActive(to: string, exact: boolean) {
-  const localizedTo = localePath(to)
-  if (exact) return route.path === localizedTo
-  return route.path === localizedTo || route.path.startsWith(`${localizedTo}/`)
+  if (exact) return route.path === to
+  return route.path === to || route.path.startsWith(`${to}/`)
 }
 </script>
 
@@ -63,14 +66,14 @@ function isActive(to: string, exact: boolean) {
     <!-- Back link + title -->
     <div class="flex items-center gap-3 px-4 pt-3 pb-2">
       <NuxtLink
-        :to="$localePath('/dashboard')"
+        :to="tenantPath('jobs')"
         class="inline-flex items-center gap-1 text-xs font-medium text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors no-underline"
       >
         <ChevronLeft class="size-3.5" />
-        Back
+        {{ t('settings.backToDashboard') }}
       </NuxtLink>
       <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">
-        Settings
+        {{ t('settings.title') }}
       </h2>
     </div>
 
@@ -79,7 +82,7 @@ function isActive(to: string, exact: boolean) {
       <NuxtLink
         v-for="item in settingsNav"
         :key="item.to"
-        :to="$localePath(item.to)"
+        :to="item.to"
         class="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors no-underline shrink-0"
         :class="isActive(item.to, item.exact)
           ? 'bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300'

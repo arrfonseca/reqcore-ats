@@ -15,11 +15,11 @@ import { test, expect } from '../fixtures'
 const INVITED_EMAIL = 'invited-member@test.local'
 
 test.describe('Invitation Management Flow', () => {
-  test('owner can invite, resend, and cancel an invitation', async ({ authenticatedPage }) => {
+  test('owner can invite, resend, and cancel an invitation', async ({ authenticatedPage, testAccount }) => {
     const page = authenticatedPage
 
     // ── Navigate to Members page ──────────────────────────
-    await page.goto('/dashboard/settings/members')
+    await page.goto(`/${testAccount.orgSlug}/admin/settings/members`)
     await page.waitForLoadState('networkidle')
 
     // Wait for the page to fully load

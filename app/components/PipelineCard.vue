@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const { tenantPath, platformPath } = useTenantPaths()
 import { User, Calendar } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -16,14 +17,16 @@ const emit = defineEmits<{
   (e: 'transition', status: string): void
 }>()
 
-const transitionLabels: Record<string, string> = {
-  new: 'Re-open',
-  screening: 'Screening',
-  interview: 'Interview',
-  offer: 'Offer',
-  hired: 'Hired',
-  rejected: 'Reject',
-}
+const { t } = useI18n()
+
+const transitionLabels = computed<Record<string, string>>(() => ({
+  new: t('dashboard.jobs.pipeline.transitions.new'),
+  screening: t('common.stages.screening'),
+  interview: t('common.stages.interview'),
+  offer: t('common.stages.offer'),
+  hired: t('common.stages.hired'),
+  rejected: t('dashboard.jobs.pipeline.transitions.rejected'),
+}))
 
 const transitionClasses: Record<string, string> = {
   new: 'text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-700',
@@ -40,7 +43,7 @@ const { formatPersonName, formatDateTime } = useOrgSettings()
 <template>
   <div class="rounded-xl border border-surface-200/80 dark:border-surface-800/60 bg-white dark:bg-surface-900 p-3 shadow-sm shadow-surface-900/[0.03] dark:shadow-none">
     <NuxtLink
-      :to="$localePath(`/dashboard/applications/${id}`)"
+      :to="tenantPath(`applications/${id}`)"
       class="block mb-2 group"
     >
       <h4 class="text-sm font-semibold text-surface-900 dark:text-surface-100 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors truncate">
@@ -71,7 +74,7 @@ const { formatPersonName, formatDateTime } = useOrgSettings()
             ? 'bg-warning-50 text-warning-700 ring-warning-200 dark:bg-warning-950 dark:text-warning-300 dark:ring-warning-800'
             : 'bg-danger-50 text-danger-700 ring-danger-200 dark:bg-danger-950 dark:text-danger-300 dark:ring-danger-800'"
       >
-        {{ score }}pts
+        {{ t('dashboard.jobs.shared.pts', { count: score }) }}
       </span>
     </div>
 

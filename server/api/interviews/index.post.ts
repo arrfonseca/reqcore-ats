@@ -1,7 +1,10 @@
 import { and, eq } from 'drizzle-orm'
-import { interview, application, candidate, job, organization } from '../../database/schema'
+import { interview, application, organization } from '../../database/schema'
 import { createInterviewSchema } from '../../utils/schemas/interview'
 import { createCalendarEvent } from '../../utils/google-calendar'
+import { notifyInterviewers } from '../../utils/email'
+import { resolveOrgLocaleSettings } from '../../utils/resolveOrgLocale'
+import { APP_BRAND_NAME } from '~~/shared/brand'
 
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { interview: ['create'] })
@@ -48,12 +51,12 @@ export default defineEventHandler(async (event) => {
   let calendarEventLink: string | null = null
   let calendarEventId: string | null = null
 
-  if (body.calendarSync !== false && app.candidate && app.job) {
-    const org = await db.query.organization.findFirst({
-      where: eq(organization.id, orgId),
-      columns: { name: true },
-    })
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.id, orgId),
+    columns: { name: true },
+  })
 
+  if (body.calendarSync === true && app.candidate && app.job) {
     const candidateName = `${app.candidate.firstName} ${app.candidate.lastName}`
     const calendarTitle = body.calendarEventTitle?.trim() || body.title
     const calendarDescription = body.calendarEventDescription?.trim() || [
@@ -64,7 +67,7 @@ export default defineEventHandler(async (event) => {
       ...(body.location ? [`Location: ${body.location}`] : []),
       ...(body.notes ? [`\nNotes: ${body.notes}`] : []),
       '',
-      `Scheduled via ${org?.name || 'Reqcore'}`,
+      `Scheduled via ${org?.name || APP_BRAND_NAME}`,
     ].join('\n')
     const addCandidate = body.calendarAddCandidateAttendee !== false
     const sendUpdates = body.calendarSendUpdates !== false
@@ -92,6 +95,36 @@ export default defineEventHandler(async (event) => {
       }
     } catch (err) {
       logError('interview.calendar_sync_failed', {
+        posthog_distinct_id: session.user.id,
+        org_id: orgId,
+        interview_id: created.id,
+        error_message: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  // Email interviewers when their addresses were provided (independent of candidate invite / Google Calendar)
+  if (body.interviewers?.length && app.candidate && app.job) {
+    try {
+      const orgLocale = await resolveOrgLocaleSettings(orgId)
+      await notifyInterviewers({
+        interviewId: created.id,
+        interviewerEmails: body.interviewers,
+        candidateName: `${app.candidate.firstName} ${app.candidate.lastName}`,
+        candidateEmail: app.candidate.email,
+        jobTitle: app.job.title,
+        interviewTitle: body.title,
+        scheduledAt: new Date(body.scheduledAt),
+        durationMinutes: body.duration,
+        interviewType: body.type,
+        location: body.location ?? null,
+        organizationName: org?.name || APP_BRAND_NAME,
+        timezone: body.timezone ?? 'UTC',
+        locale: orgLocale.defaultLanguage,
+      })
+    }
+    catch (err) {
+      logError('interview.interviewer_notify_failed', {
         posthog_distinct_id: session.user.id,
         org_id: orgId,
         interview_id: created.id,

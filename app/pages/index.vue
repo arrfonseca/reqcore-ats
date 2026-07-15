@@ -4,9 +4,11 @@ definePageMeta({
   middleware: ['guest'],
 })
 
+const { t } = useI18n()
+
 useSeoMeta({
-  title: 'Sign In — Reqcore',
-  description: 'Sign in to your Reqcore account',
+  title: t('auth.signIn.seoTitle'),
+  description: t('auth.signIn.seoDescription'),
   robots: 'noindex, nofollow',
 })
 </script>

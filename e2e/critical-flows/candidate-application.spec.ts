@@ -136,12 +136,12 @@ async function addCustomQuestion(
 }
 
 test.describe('Candidate Application Flow — All Custom Question Field Types', () => {
-  test('all nine custom field types render and accept input on the public application form', async ({ authenticatedPage, browser }, testInfo) => {
+  test('all nine custom field types render and accept input on the public application form', async ({ authenticatedPage, testAccount, browser }, testInfo) => {
     const page = authenticatedPage
 
     // ── Step 1: Fill in job details ───────────────────────────────────────────
 
-    await page.goto('/dashboard/jobs/new')
+    await page.goto(`/${testAccount.orgSlug}/admin/jobs/new`)
     await page.waitForLoadState('networkidle')
     await page.getByLabel('Job title').waitFor({ state: 'visible', timeout: 15_000 })
     await page.getByLabel('Job title').fill(JOB_TITLE)
@@ -194,8 +194,8 @@ test.describe('Candidate Application Flow — All Custom Question Field Types', 
     // Read the application link from the readonly input in the success card.
     // The link has the form: https://<host>/jobs/<slug>/apply
     const applicationLink = await page.locator('input[readonly]').inputValue()
-    expect(applicationLink).toMatch(/\/jobs\/[^/]+\/apply(?:$|[?#])/)
-    const slugMatch = applicationLink.match(/\/jobs\/([^/]+)\/apply(?:$|[?#])/)
+    expect(applicationLink).toMatch(/\/[^/]+\/[^/]+\/apply(?:$|[?#])/)
+    const slugMatch = applicationLink.match(/\/[^/]+\/([^/]+)\/apply(?:$|[?#])/)
     const jobSlug = slugMatch?.[1] ?? ''
     expect(jobSlug.length, 'Job slug must not be empty').toBeGreaterThan(0)
 
@@ -256,9 +256,10 @@ test.describe('Candidate Application Flow — All Custom Question Field Types', 
     // 7. url — URL input
     await candidatePage.getByLabel('GitHub profile URL').fill('https://github.com/jane-doe')
 
-    // 8. checkbox — boolean toggle (required): check "Yes"
-    await candidatePage.getByLabel('Agree to background check').check()
-    await expect(candidatePage.getByLabel('Agree to background check')).toBeChecked()
+    // 8. checkbox — yes/no (required): select "Yes"
+    const bgCheckQuestion = candidatePage.locator('div').filter({ hasText: 'Agree to background check' }).first()
+    await bgCheckQuestion.getByRole('radio', { name: 'Yes' }).check()
+    await expect(bgCheckQuestion.getByRole('radio', { name: 'Yes' })).toBeChecked()
 
     // 9. file_upload — hidden <input type="file"> triggered by a styled button.
     // Scope to the specific custom question container so the selector remains
@@ -304,7 +305,7 @@ test.describe('Candidate Application Flow — All Custom Question Field Types', 
 
     // ── Verify the confirmation page ──────────────────────────────────────────
 
-    await candidatePage.waitForURL(`**/jobs/${jobSlug}/confirmation`, {
+    await candidatePage.waitForURL(`**/${testAccount.orgSlug}/${jobSlug}/confirmation`, {
       waitUntil: 'commit',
       timeout: 15_000,
     })
@@ -320,19 +321,19 @@ test.describe('Candidate Application Flow — All Custom Question Field Types', 
     // stored and rendered in the dashboard.
 
     // Navigate to the dashboard jobs list
-    await page.goto('/dashboard')
+    await page.goto(`/${testAccount.orgSlug}/admin`)
     await page.waitForLoadState('networkidle')
 
     // Find the job card by title and extract the job ID from its href
     const jobCardLink = page.getByRole('link', { name: JOB_TITLE }).first()
     await expect(jobCardLink).toBeVisible({ timeout: 15_000 })
     const jobHref = await jobCardLink.getAttribute('href')
-    expect(jobHref, 'Job card link must contain /jobs/').toContain('/jobs/')
-    const jobId = jobHref!.split('/jobs/')[1]!.split('/')[0]
+    expect(jobHref, 'Job card link must contain job path').toMatch(/\/admin\/jobs\//)
+    const jobId = jobHref!.match(/\/admin\/jobs\/([^/]+)/)?.[1] ?? ''
     expect(jobId.length, 'Job ID must not be empty').toBeGreaterThan(0)
 
     // ── Navigate to the job's candidates table ────────────────────────────────
-    await page.goto(`/dashboard/jobs/${jobId}/candidates`)
+    await page.goto(`/${testAccount.orgSlug}/admin/jobs/${jobId}/candidates`)
     await page.waitForLoadState('networkidle')
 
     // The pipeline badge in the "Needs attention" section and the table should
@@ -436,7 +437,7 @@ test.describe('Candidate Application Flow — All Custom Question Field Types', 
     // ── Navigate to the full application detail page ───────────────────────────
     // Close the sidebar and navigate directly to /dashboard/applications/<id>
     // by using the applications list and finding Jane's entry.
-    await page.goto('/dashboard/applications')
+    await page.goto(`/${testAccount.orgSlug}/admin/applications`)
     await page.waitForLoadState('networkidle')
 
     // Find and click on Jane Doe's application entry
@@ -474,11 +475,11 @@ test.describe('Candidate Application — Required Cover Letter Validation', () =
    * - Client-side validation blocks submission when the textarea is empty
    * - The error message "Cover letter is required" is displayed
    */
-  test('form shows and enforces required cover letter', async ({ authenticatedPage, browser }, testInfo) => {
+  test('form shows and enforces required cover letter', async ({ authenticatedPage, testAccount, browser }, testInfo) => {
     const page = authenticatedPage
 
     // ── Create a job with cover letter required ────────────────────────────────
-    await page.goto('/dashboard/jobs/new')
+    await page.goto(`/${testAccount.orgSlug}/admin/jobs/new`)
     await page.waitForLoadState('networkidle')
     await page.getByLabel('Job title').waitFor({ state: 'visible', timeout: 15_000 })
     await page.getByLabel('Job title').fill('Cover Letter Required Job')
@@ -509,7 +510,7 @@ test.describe('Candidate Application — Required Cover Letter Validation', () =
 
     // Capture the application link
     const applicationLink = await page.locator('input[readonly]').inputValue()
-    expect(applicationLink).toMatch(/\/jobs\/[^/]+\/apply(?:$|[?#])/)
+    expect(applicationLink).toMatch(/\/[^/]+\/[^/]+\/apply(?:$|[?#])/)
 
     // ── Candidate flow ────────────────────────────────────────────────────────
     const candidateContext = await browser.newContext()

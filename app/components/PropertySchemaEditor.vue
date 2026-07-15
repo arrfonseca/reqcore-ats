@@ -3,7 +3,6 @@ import { GripVertical, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
 import {
   PROPERTY_COLOR_CLASSES,
   PROPERTY_OPTION_COLORS,
-  PROPERTY_TYPE_LABELS,
   PROPERTY_TYPES,
   type PropertyDefinition,
   type PropertyEntityType,
@@ -24,7 +23,22 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'close'): void; (e: 'changed'): void }>()
 
+const { t } = useI18n()
 const toast = useToast()
+
+const propertyTypeLabels = computed((): Record<PropertyType, string> => ({
+  text: t('properties.schema.types.text'),
+  long_text: t('properties.schema.types.long_text'),
+  number: t('properties.schema.types.number'),
+  select: t('properties.schema.types.select'),
+  multi_select: t('properties.schema.types.multi_select'),
+  date: t('properties.schema.types.date'),
+  checkbox: t('properties.schema.types.checkbox'),
+  url: t('properties.schema.types.url'),
+  email: t('properties.schema.types.email'),
+  person: t('properties.schema.types.person'),
+  file: t('properties.schema.types.file'),
+}))
 
 const {
   definitions,
@@ -119,7 +133,7 @@ function buildConfig() {
 async function submitForm() {
   formError.value = null
   if (!formName.value.trim()) {
-    formError.value = 'Name is required'
+    formError.value = t('properties.schema.errors.nameRequired')
     return
   }
   isSaving.value = true
@@ -146,7 +160,7 @@ async function submitForm() {
   } catch (err: unknown) {
     const message = (err as { data?: { statusMessage?: string }; statusMessage?: string })?.data?.statusMessage
       ?? (err as { statusMessage?: string }).statusMessage
-      ?? 'Failed to save property'
+      ?? t('properties.schema.errors.saveFailed')
     formError.value = message
   } finally {
     isSaving.value = false
@@ -164,7 +178,7 @@ async function confirmDelete() {
     confirmDeleteId.value = null
     emit('changed')
   } catch (err: unknown) {
-    const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? 'Failed to delete'
+    const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? t('properties.schema.errors.deleteFailed')
     toast.error(message)
   } finally {
     isDeleting.value = false
@@ -190,16 +204,19 @@ async function onDrop(targetId: string) {
     await reorderDefinitions(ids)
     emit('changed')
   } catch (err: unknown) {
-    const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? 'Failed to reorder'
+    const message = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? t('properties.schema.errors.reorderFailed')
     toast.error(message)
   }
 }
 
 const overlayTitle = computed(() => {
   if (props.title) return props.title
-  const scope = props.jobId ? 'Job-specific' : 'Organization'
-  const noun = props.entityType === 'candidate' ? 'candidate' : 'application'
-  return `${scope} ${noun} properties`
+  const entity = props.entityType === 'candidate'
+    ? t('properties.schema.entityCandidate')
+    : t('properties.schema.entityApplication')
+  return props.jobId
+    ? t('properties.schema.titleJobSpecific', { entity })
+    : t('properties.schema.titleOrganization', { entity })
 })
 </script>
 
@@ -217,7 +234,7 @@ const overlayTitle = computed(() => {
           <div class="min-w-0">
             <h2 class="text-base font-semibold text-surface-900 dark:text-surface-50 truncate">{{ overlayTitle }}</h2>
             <p class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-              {{ jobId ? 'Visible only on applications to this job.' : 'Visible everywhere in your workspace.' }}
+              {{ jobId ? t('properties.schema.visibilityJobOnly') : t('properties.schema.visibilityWorkspace') }}
             </p>
           </div>
           <button class="rounded p-1.5 text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer" @click="emit('close')">
@@ -242,7 +259,7 @@ const overlayTitle = computed(() => {
                 <div class="flex items-center gap-2">
                   <span class="text-sm font-medium text-surface-800 dark:text-surface-100 truncate">{{ def.name }}</span>
                   <span class="rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-surface-500 dark:text-surface-400">
-                    {{ PROPERTY_TYPE_LABELS[def.type] }}
+                    {{ propertyTypeLabels[def.type] }}
                   </span>
                 </div>
                 <p v-if="def.description" class="text-xs text-surface-500 dark:text-surface-400 truncate mt-0.5">{{ def.description }}</p>
@@ -257,19 +274,19 @@ const overlayTitle = computed(() => {
           </ul>
 
           <div v-if="definitions.length === 0 && formMode !== 'create'" class="px-5 py-10 text-center">
-            <p class="text-sm text-surface-500 dark:text-surface-400">No properties yet.</p>
-            <p class="text-xs text-surface-400 dark:text-surface-500 mt-1">Add one to start tracking custom data.</p>
+            <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('properties.schema.emptyTitle') }}</p>
+            <p class="text-xs text-surface-400 dark:text-surface-500 mt-1">{{ t('properties.schema.emptyHint') }}</p>
           </div>
 
           <!-- Add / edit form -->
           <div v-if="formMode" class="border-t border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-950/50 px-5 py-4">
             <h3 class="text-sm font-semibold text-surface-900 dark:text-surface-100 mb-3">
-              {{ formMode === 'create' ? 'New property' : 'Edit property' }}
+              {{ formMode === 'create' ? t('properties.schema.newProperty') : t('properties.schema.editProperty') }}
             </h3>
 
             <div class="space-y-3">
               <div>
-                <label class="block text-xs font-medium text-surface-600 dark:text-surface-300 mb-1">Name</label>
+                <label class="block text-xs font-medium text-surface-600 dark:text-surface-300 mb-1">{{ t('properties.schema.name') }}</label>
                 <input
                   v-model="formName"
                   type="text"
@@ -279,18 +296,18 @@ const overlayTitle = computed(() => {
               </div>
 
               <div v-if="formMode === 'create'">
-                <label class="block text-xs font-medium text-surface-600 dark:text-surface-300 mb-1">Type</label>
+                <label class="block text-xs font-medium text-surface-600 dark:text-surface-300 mb-1">{{ t('properties.schema.type') }}</label>
                 <select
                   v-model="formType"
                   class="w-full rounded border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 px-2.5 py-1.5 text-sm text-surface-900 dark:text-surface-50 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
                 >
-                  <option v-for="t in PROPERTY_TYPES" :key="t" :value="t">{{ PROPERTY_TYPE_LABELS[t] }}</option>
+                  <option v-for="propType in PROPERTY_TYPES" :key="propType" :value="propType">{{ propertyTypeLabels[propType] }}</option>
                 </select>
-                <p class="text-[11px] text-surface-400 mt-1">Type cannot be changed after creation.</p>
+                <p class="text-[11px] text-surface-400 mt-1">{{ t('properties.schema.typeLockedHint') }}</p>
               </div>
 
               <div>
-                <label class="block text-xs font-medium text-surface-600 dark:text-surface-300 mb-1">Description (optional)</label>
+                <label class="block text-xs font-medium text-surface-600 dark:text-surface-300 mb-1">{{ t('properties.schema.descriptionOptional') }}</label>
                 <input
                   v-model="formDescription"
                   type="text"
@@ -301,15 +318,15 @@ const overlayTitle = computed(() => {
 
               <!-- Number format -->
               <div v-if="supportsNumberFormat">
-                <label class="block text-xs font-medium text-surface-600 dark:text-surface-300 mb-1">Format</label>
+                <label class="block text-xs font-medium text-surface-600 dark:text-surface-300 mb-1">{{ t('properties.schema.format') }}</label>
                 <div class="flex items-center gap-2">
                   <select
                     v-model="formNumberFormat"
                     class="rounded border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 px-2 py-1 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
                   >
-                    <option value="plain">Plain</option>
-                    <option value="percent">Percent</option>
-                    <option value="currency">Currency</option>
+                    <option value="plain">{{ t('properties.schema.formatPlain') }}</option>
+                    <option value="percent">{{ t('properties.schema.formatPercent') }}</option>
+                    <option value="currency">{{ t('properties.schema.formatCurrency') }}</option>
                   </select>
                   <input
                     v-if="formNumberFormat === 'currency'"
@@ -324,7 +341,7 @@ const overlayTitle = computed(() => {
 
               <!-- Options editor -->
               <div v-if="supportsOptions">
-                <label class="block text-xs font-medium text-surface-600 dark:text-surface-300 mb-1">Options</label>
+                <label class="block text-xs font-medium text-surface-600 dark:text-surface-300 mb-1">{{ t('properties.schema.options') }}</label>
                 <ul class="space-y-1.5">
                   <li v-for="opt in formOptions" :key="opt.id" class="flex items-center gap-1.5">
                     <select
@@ -338,7 +355,7 @@ const overlayTitle = computed(() => {
                       type="text"
                       maxlength="80"
                       class="flex-1 min-w-0 rounded border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 px-2 py-1 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
-                      placeholder="Option label"
+                      :placeholder="t('properties.schema.optionLabelPlaceholder')"
                     />
                     <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" :class="PROPERTY_COLOR_CLASSES[opt.color as PropertyOptionColor].chip">
                       {{ opt.label || '—' }}
@@ -353,7 +370,7 @@ const overlayTitle = computed(() => {
                   class="mt-2 inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 cursor-pointer"
                   @click="addOption"
                 >
-                  <Plus class="size-3.5" /> Add option
+                  <Plus class="size-3.5" /> {{ t('properties.schema.addOption') }}
                 </button>
               </div>
 
@@ -364,13 +381,13 @@ const overlayTitle = computed(() => {
                   type="button"
                   class="rounded px-3 py-1.5 text-xs text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer"
                   @click="cancelForm"
-                >Cancel</button>
+                >{{ t('common.actions.cancel') }}</button>
                 <button
                   type="button"
                   :disabled="isSaving"
                   class="rounded bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   @click="submitForm"
-                >{{ isSaving ? 'Saving…' : (formMode === 'create' ? 'Create' : 'Save') }}</button>
+                >{{ isSaving ? t('properties.schema.saving') : (formMode === 'create' ? t('properties.schema.create') : t('common.actions.save')) }}</button>
               </div>
             </div>
           </div>
@@ -382,7 +399,7 @@ const overlayTitle = computed(() => {
             class="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 px-3 py-2 text-sm font-medium text-surface-600 dark:text-surface-300 hover:border-brand-400 hover:text-brand-700 dark:hover:text-brand-300 cursor-pointer"
             @click="openCreate"
           >
-            <Plus class="size-4" /> Add property
+            <Plus class="size-4" /> {{ t('properties.schema.addProperty') }}
           </button>
         </footer>
       </aside>
@@ -393,21 +410,21 @@ const overlayTitle = computed(() => {
       <div v-if="confirmDeleteId" class="fixed inset-0 z-[80] flex items-center justify-center">
         <div class="absolute inset-0 bg-black/50" @click="confirmDeleteId = null" />
         <div class="relative bg-white dark:bg-surface-900 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-          <h3 class="text-base font-semibold text-surface-900 dark:text-surface-50 mb-2">Delete property?</h3>
+          <h3 class="text-base font-semibold text-surface-900 dark:text-surface-50 mb-2">{{ t('properties.schema.deleteTitle') }}</h3>
           <p class="text-sm text-surface-600 dark:text-surface-300 mb-4">
-            This deletes the property and removes it from all rows. This cannot be undone.
+            {{ t('properties.schema.deleteBody') }}
           </p>
           <div class="flex justify-end gap-2">
             <button
               class="rounded px-3 py-1.5 text-sm text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer"
               :disabled="isDeleting"
               @click="confirmDeleteId = null"
-            >Cancel</button>
+            >{{ t('common.actions.cancel') }}</button>
             <button
               class="rounded bg-danger-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-50 cursor-pointer"
               :disabled="isDeleting"
               @click="confirmDelete"
-            >{{ isDeleting ? 'Deleting…' : 'Delete' }}</button>
+            >{{ isDeleting ? t('properties.schema.deleting') : t('common.actions.delete') }}</button>
           </div>
         </div>
       </div>

@@ -650,6 +650,32 @@ The SSO button appears automatically on the sign-in and sign-up pages.
 
 ---
 
+## Platform admin vs organization roles
+
+Reqcore separates **platform operators** from **tenant (organization) users**:
+
+| Layer | Role | What they can do |
+|-------|------|------------------|
+| **Platform** | SaaS Owner (`platform_role = saas_owner` or `saas_admin`) | Platform console at `/dashboard/saas`: tenants, billing (stub), integrations, global AI, platform team, localization, analytics. **Impersonation** opens a tenant with full owner access for support. |
+| **Organization** | Owner / Admin / Member | Manage hiring inside **their** organization only — no org switcher, no creating a second org after the first |
+
+### Bootstrap a SaaS admin
+
+1. **Migration / database** — set `user.platform_role = 'saas_owner'` for the operator email.
+2. **Environment variable** — comma-separated list (also persisted on login):
+
+```bash
+SAAS_ADMIN_EMAILS=you@company.com
+```
+
+After deploy, sign in to land on the **platform console**. Use **Open tenant** on a tenant detail page (or the user menu) to impersonate with full access. **Exit to platform** clears org context.
+
+Suspended tenants block org-member API access; SaaS operators can still impersonate to recover a tenant.
+
+Organization owners invited into a tenant still manage that tenant’s jobs, candidates, and settings — they cannot browse other tenants. Localization (name/date formats) is configured per country in the platform console, not in tenant settings.
+
+---
+
 ## Feature Flags
 
 Reqcore ships some features behind **feature flags** so they can be tested in production before being released to everyone. The full list of flags lives in [`shared/feature-flags.ts`](shared/feature-flags.ts).

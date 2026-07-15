@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { aiConfig } from '../../database/schema'
+import { requireTenantOwnLlm } from '../../utils/ai/tenantAiPolicy'
 
 /**
  * GET /api/ai-config
@@ -11,6 +12,8 @@ import { aiConfig } from '../../database/schema'
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['read'] })
   const orgId = session.session.activeOrganizationId
+
+  await requireTenantOwnLlm(orgId)
 
   const rows = await db.query.aiConfig.findMany({
     where: eq(aiConfig.organizationId, orgId),

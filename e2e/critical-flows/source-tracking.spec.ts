@@ -23,12 +23,12 @@ import { test, expect } from '../fixtures'
 const JOB_TITLE = 'Source Tracking Test Job'
 
 test.describe('Source Tracking — Query Parameter Propagation', () => {
-  test('ref and utm params propagate from job listing → detail → apply → submission', async ({ authenticatedPage, browser }, testInfo) => {
+  test('ref and utm params propagate from job listing → detail → apply → submission', async ({ authenticatedPage, testAccount, browser }, testInfo) => {
     const page = authenticatedPage
 
     // ── Step 1: Create and publish a minimal job ───────────────────────────────
 
-    await page.goto('/dashboard/jobs/new')
+    await page.goto(`/${testAccount.orgSlug}/admin/jobs/new`)
     await page.waitForLoadState('networkidle')
     await page.getByLabel('Job title').waitFor({ state: 'visible', timeout: 15_000 })
     await page.getByLabel('Job title').fill(JOB_TITLE)
@@ -60,7 +60,7 @@ test.describe('Source Tracking — Query Parameter Propagation', () => {
 
     // Capture the slug from the application link
     const applicationLink = await page.locator('input[readonly]').inputValue()
-    const slugMatch = applicationLink.match(/\/jobs\/([^/]+)\/apply/)
+    const slugMatch = applicationLink.match(/\/[^/]+\/([^/]+)\/apply/)
     const jobSlug = slugMatch?.[1] ?? ''
     expect(jobSlug.length, 'Job slug must not be empty').toBeGreaterThan(0)
 
@@ -73,7 +73,7 @@ test.describe('Source Tracking — Query Parameter Propagation', () => {
     const UTM_SOURCE = 'linkedin'
 
     // Simulate arriving via an org-wide tracking link → /jobs?ref=...&utm_source=...
-    await candidatePage.goto(`/jobs?ref=${REF_CODE}&utm_source=${UTM_SOURCE}`)
+    await candidatePage.goto(`/${testAccount.orgSlug}?ref=${REF_CODE}&utm_source=${UTM_SOURCE}`)
     await candidatePage.waitForLoadState('networkidle')
 
     // Find the job listing and click on it
@@ -83,7 +83,7 @@ test.describe('Source Tracking — Query Parameter Propagation', () => {
 
     // ── Verify: job detail page URL contains ref + utm_source ──────────────────
 
-    await candidatePage.waitForURL(`**/jobs/${jobSlug}**`, { waitUntil: 'commit', timeout: 10_000 })
+    await candidatePage.waitForURL(`**/${testAccount.orgSlug}/${jobSlug}**`, { waitUntil: 'commit', timeout: 10_000 })
     const detailUrl = new URL(candidatePage.url())
     expect(detailUrl.searchParams.get('ref'), 'ref param must survive navigation to job detail').toBe(REF_CODE)
     expect(detailUrl.searchParams.get('utm_source'), 'utm_source must survive navigation to job detail').toBe(UTM_SOURCE)
@@ -93,7 +93,7 @@ test.describe('Source Tracking — Query Parameter Propagation', () => {
 
     // ── Verify: apply page URL contains ref + utm_source ───────────────────────
 
-    await candidatePage.waitForURL(`**/jobs/${jobSlug}/apply**`, { waitUntil: 'commit', timeout: 10_000 })
+    await candidatePage.waitForURL(`**/${testAccount.orgSlug}/${jobSlug}/apply**`, { waitUntil: 'commit', timeout: 10_000 })
     const applyUrl = new URL(candidatePage.url())
     expect(applyUrl.searchParams.get('ref'), 'ref param must survive navigation to apply page').toBe(REF_CODE)
     expect(applyUrl.searchParams.get('utm_source'), 'utm_source must survive navigation to apply page').toBe(UTM_SOURCE)
@@ -133,7 +133,7 @@ test.describe('Source Tracking — Query Parameter Propagation', () => {
     expect(requestBody.utmSource, 'POST body must include utmSource').toBe(UTM_SOURCE)
 
     // Verify confirmation page
-    await candidatePage.waitForURL(`**/jobs/${jobSlug}/confirmation`, {
+    await candidatePage.waitForURL(`**/${testAccount.orgSlug}/${jobSlug}/confirmation`, {
       waitUntil: 'commit',
       timeout: 15_000,
     })

@@ -1,3 +1,5 @@
+import { isReservedJobSlug } from '~~/shared/tenant-routing'
+
 // ─────────────────────────────────────────────
 // URL slug generation for public-facing job pages
 // ─────────────────────────────────────────────
@@ -22,4 +24,14 @@ export function generateJobSlug(title: string, id: string, customSlug?: string):
 
   const shortId = id.replace(/-/g, '').slice(0, 8)
   return `${base}-${shortId}`
+}
+
+export function assertJobSlugAllowed(customSlug?: string): void {
+  const trimmed = customSlug?.trim()
+  if (trimmed && isReservedJobSlug(trimmed)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'This job URL slug is reserved and cannot be used',
+    })
+  }
 }

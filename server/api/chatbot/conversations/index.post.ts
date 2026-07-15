@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { aiConfig, chatbotAgent, chatbotConversation, chatbotFolder, job } from '../../../database/schema'
 import { requireChatbotAccess } from '../../../utils/chatbotAccess'
+import { getTenantAiPolicy } from '../../../utils/ai/tenantAiPolicy'
 import type { ChatbotConversationSummary, ChatbotScope } from '../../../../shared/chatbot'
 
 const bodySchema = z.object({
@@ -25,6 +26,9 @@ export default defineEventHandler(async (event): Promise<{ conversation: Chatbot
   const userId = session.user.id
 
   const body = await readValidatedBody(event, bodySchema.parse)
+
+  const { allowOwnLlm } = await getTenantAiPolicy(orgId)
+  const aiConfigIdToStore = allowOwnLlm ? (body.aiConfigId ?? null) : null
 
   // Validate folder ownership.
   if (body.folderId) {
@@ -52,8 +56,8 @@ export default defineEventHandler(async (event): Promise<{ conversation: Chatbot
     if (!a) throw createError({ statusCode: 404, statusMessage: 'Agent not found.' })
   }
 
-  // Validate AI config ownership.
-  if (body.aiConfigId) {
+  // Validate AI config ownership (delegated tenants only).
+  if (allowOwnLlm && body.aiConfigId) {
     const c = await db.query.aiConfig.findFirst({
       where: and(eq(aiConfig.id, body.aiConfigId), eq(aiConfig.organizationId, orgId)),
       columns: { id: true },
@@ -78,7 +82,7 @@ export default defineEventHandler(async (event): Promise<{ conversation: Chatbot
     userId,
     folderId: body.folderId ?? null,
     agentId: body.agentId ?? null,
-    aiConfigId: body.aiConfigId ?? null,
+    aiConfigId: aiConfigIdToStore,
     title: body.title ?? 'New chat',
     scope: body.scope,
     thinking: body.thinking === true,

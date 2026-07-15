@@ -6,6 +6,9 @@ import { eq } from "drizzle-orm";
 import { ac, owner, admin, member } from "~~/shared/permissions";
 import { sendOrgInvitationEmail, sendPasswordResetEmail } from "./email";
 import * as schema from "../database/schema";
+import { member as memberTable } from "../database/schema";
+import { syncSaasAdminRole, resolveIsSaasAdmin } from "./saasAdmin";
+import type { SessionUserWithPlatformRole } from "./saasAdmin";
 
 type Auth = ReturnType<typeof betterAuth>;
 let _auth: Auth | undefined;
@@ -163,6 +166,21 @@ function resolveTrustedOrigins(baseUrl: string): (request?: Request) => Promise<
       // Table may not exist yet (pre-migration)
     }
 
+    // Load verified custom domain hostnames for auth trusted origins
+    try {
+      const domains = await db
+        .select({ hostname: schema.organizationCustomDomain.hostname })
+        .from(schema.organizationCustomDomain)
+        .where(eq(schema.organizationCustomDomain.status, 'verified'))
+
+      for (const d of domains) {
+        allOrigins.push(`https://${d.hostname}`)
+        allOrigins.push(`http://${d.hostname}`)
+      }
+    } catch {
+      // Table may not exist yet (pre-migration)
+    }
+
     return Array.from(new Set(allOrigins));
   };
 }
@@ -210,6 +228,17 @@ function getAuth(): Auth {
         schema,
       }),
       secret: env.BETTER_AUTH_SECRET,
+
+      user: {
+        additionalFields: {
+          platformRole: {
+            type: "string",
+            required: false,
+            input: false,
+            fieldName: "platform_role",
+          },
+        },
+      },
 
       // ── Session Hardening ────────────────────────────────────
       // Explicit session duration for an ATS handling sensitive hiring data.
@@ -296,13 +325,36 @@ function getAuth(): Auth {
             member,
           },
 
+          allowUserToCreateOrganization: async (user) => {
+            const platformUser = user as SessionUserWithPlatformRole;
+            if (await resolveIsSaasAdmin(platformUser)) return true;
+
+            const membershipCount = await db.$count(
+              memberTable,
+              eq(memberTable.userId, user.id),
+            );
+            return membershipCount === 0;
+          },
+
           // ── Invitation Email ────────────────────────────────────
           // Required for Better Auth's built-in invitation flow.
           // Constructs a link the invitee clicks to accept.
           // Uses Resend when RESEND_API_KEY is configured, otherwise logs to console.
           async sendInvitationEmail(data) {
             const inviteLink = `${baseURL}/auth/accept-invitation/${data.id}`;
-            await sendOrgInvitationEmail(data, inviteLink);
+            let locale: string | undefined
+            try {
+              const orgId = (data.organization as { id?: string }).id
+              if (orgId) {
+                const { resolveOrgLocaleSettings } = await import('./resolveOrgLocale')
+                const settings = await resolveOrgLocaleSettings(orgId)
+                locale = settings.defaultLanguage
+              }
+            }
+            catch {
+              // fall through — default email locale applies
+            }
+            await sendOrgInvitationEmail(data, inviteLink, locale);
           },
 
           // ── Security Hardening ──────────────────────────────────

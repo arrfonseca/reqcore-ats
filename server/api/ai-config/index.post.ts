@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { aiConfig } from '../../database/schema'
 import { createAiConfigSchema } from '../../utils/schemas/scoring'
 import { encrypt } from '../../utils/encryption'
+import { requireTenantOwnLlm } from '../../utils/ai/tenantAiPolicy'
 
 /**
  * POST /api/ai-config
@@ -14,6 +15,7 @@ import { encrypt } from '../../utils/encryption'
 export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, { scoring: ['create'] })
   const orgId = session.session.activeOrganizationId
+  await requireTenantOwnLlm(orgId)
   const body = await readValidatedBody(event, createAiConfigSchema.parse)
 
   const apiKeyEncrypted = encrypt(body.apiKey, env.BETTER_AUTH_SECRET)

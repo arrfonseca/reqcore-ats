@@ -8,7 +8,8 @@ export const sourceChannels = [
   'linkedin', 'indeed', 'glassdoor', 'ziprecruiter', 'monster',
   'handshake', 'angellist', 'wellfound', 'dice', 'stackoverflow',
   'weworkremotely', 'remoteok', 'builtin', 'hired', 'lever',
-  'greenhouse_board', 'google_jobs', 'facebook', 'twitter', 'instagram',
+  'greenhouse_board', 'google_jobs', 'vagas_com', 'catho', 'infojobs',
+  'adecco', 'manpower', 'facebook', 'twitter', 'instagram',
   'tiktok', 'reddit', 'referral', 'career_site', 'email',
   'event', 'agency', 'direct', 'other', 'custom',
 ] as const

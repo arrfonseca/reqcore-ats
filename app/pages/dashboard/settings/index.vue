@@ -1,23 +1,49 @@
 <script setup lang="ts">
 import { Building2, Save, AlertTriangle, Trash2, Loader2 } from 'lucide-vue-next'
 
+const { t } = useI18n()
+
 definePageMeta({})
 
 useSeoMeta({
-  title: 'Organization Settings — Reqcore',
-  description: 'Manage your organization settings',
+  title: t('settings.organization.seoTitle'),
+  description: t('settings.organization.seoDescription'),
 })
 
 const { activeOrg } = useCurrentOrg()
 const { allowed: canUpdateOrg } = usePermission({ organization: ['update'] })
 const { allowed: canDeleteOrg } = usePermission({ organization: ['delete'] })
 const { track } = useTrack()
+const { companyWebsiteUrl: savedCompanyWebsiteUrl, brandSubtitle: savedBrandSubtitle, updateSettings } = useOrgSettings()
+const { adminBranding, refreshAdminBranding } = useOrgBranding()
+const { refreshTenantContext } = useTenantContext()
+
+const logoCacheBust = ref(0)
+
+const logoLightPreviewUrl = computed(() => {
+  const url = adminBranding.value?.logoLightUrl
+  return url ? `${url}?v=${logoCacheBust.value}` : null
+})
+
+const logoDarkPreviewUrl = computed(() => {
+  const url = adminBranding.value?.logoDarkUrl
+  return url ? `${url}?v=${logoCacheBust.value}` : null
+})
+
+async function onLogoChanged() {
+  logoCacheBust.value = Date.now()
+  await refreshAdminBranding()
+  const { refreshTenantContext } = useTenantContext()
+  await refreshTenantContext(useRoute().path)
+}
 
 // ─────────────────────────────────────────────
 // Org name/slug editing
 // ─────────────────────────────────────────────
 const orgName = ref('')
 const orgSlug = ref('')
+const companyWebsiteUrl = ref('')
+const brandSubtitle = ref('')
 const isSaving = ref(false)
 const saveSuccess = ref(false)
 const saveError = ref('')
@@ -28,7 +54,7 @@ const slugPattern = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/
 const slugError = computed(() => {
   const s = orgSlug.value.trim()
   if (!s) return ''
-  if (!slugPattern.test(s)) return 'Only lowercase letters, numbers, and hyphens. Must start and end with a letter or number.'
+  if (!slugPattern.test(s)) return t('settings.organization.slugError')
   return ''
 })
 
@@ -39,6 +65,21 @@ watch(activeOrg, (org) => {
   }
 }, { immediate: true })
 
+watch(savedCompanyWebsiteUrl, (url) => {
+  companyWebsiteUrl.value = url ?? ''
+}, { immediate: true })
+
+watch(savedBrandSubtitle, (subtitle) => {
+  brandSubtitle.value = subtitle ?? ''
+}, { immediate: true })
+
+const companyWebsiteError = computed(() => {
+  const value = companyWebsiteUrl.value.trim()
+  if (!value) return ''
+  if (/^https?:\/\/.+/i.test(value)) return ''
+  return t('settings.organization.companyWebsiteError')
+})
+
 async function handleSaveOrg() {
   if (!canUpdateOrg.value) return
 
@@ -47,11 +88,15 @@ async function handleSaveOrg() {
 
   // Prevent saving empty or invalid values
   if (!trimmedName) {
-    saveError.value = 'Organization name cannot be empty.'
+    saveError.value = t('settings.organization.errors.nameEmpty')
     return
   }
   if (!trimmedSlug || slugError.value) {
-    saveError.value = slugError.value || 'URL slug cannot be empty.'
+    saveError.value = slugError.value || t('settings.organization.errors.slugEmpty')
+    return
+  }
+  if (companyWebsiteError.value) {
+    saveError.value = companyWebsiteError.value
     return
   }
 
@@ -60,18 +105,28 @@ async function handleSaveOrg() {
   saveSuccess.value = false
 
   try {
-    await authClient.organization.update({
-      data: {
-        name: trimmedName,
-        slug: trimmedSlug,
-      },
-    })
+    await Promise.all([
+      authClient.organization.update({
+        data: {
+          name: trimmedName,
+          slug: trimmedSlug,
+        },
+      }),
+      updateSettings({
+        companyWebsiteUrl: companyWebsiteUrl.value.trim() || null,
+        brandSubtitle: brandSubtitle.value.trim() || null,
+      }),
+    ])
+    await Promise.all([
+      refreshAdminBranding(),
+      refreshTenantContext(useRoute().path),
+    ])
     track('org_settings_saved')
     saveSuccess.value = true
     setTimeout(() => { saveSuccess.value = false }, 3000)
   }
   catch (err: unknown) {
-    saveError.value = err instanceof Error ? err.message : 'Failed to update organization'
+    saveError.value = err instanceof Error ? err.message : t('settings.organization.errors.updateFailed')
   }
   finally {
     isSaving.value = false
@@ -107,7 +162,7 @@ async function handleDeleteOrg() {
     await navigateTo(localePath('/onboarding/create-org'), { external: true })
   }
   catch (err: unknown) {
-    deleteError.value = err instanceof Error ? err.message : 'Failed to delete organization'
+    deleteError.value = err instanceof Error ? err.message : t('settings.organization.errors.deleteFailed')
   }
   finally {
     isDeleting.value = false
@@ -120,10 +175,10 @@ async function handleDeleteOrg() {
     <!-- Page title -->
     <div class="mb-6">
       <h1 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
-        General
+        {{ t('settings.organization.title') }}
       </h1>
       <p class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
-        Manage your organization's profile and configuration.
+        {{ brandSubtitle.trim() || t('settings.organization.subtitle') }}
       </p>
     </div>
 
@@ -135,8 +190,8 @@ async function handleDeleteOrg() {
             <Building2 class="size-5" />
           </div>
           <div>
-            <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">Organization profile</h2>
-            <p class="text-sm text-surface-500 dark:text-surface-400">Basic information about your organization.</p>
+            <h2 class="text-base font-semibold text-surface-900 dark:text-surface-100">{{ t('settings.organization.profileTitle') }}</h2>
+            <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('settings.organization.profileSubtitle') }}</p>
           </div>
         </div>
       </div>
@@ -144,7 +199,7 @@ async function handleDeleteOrg() {
       <div class="px-4 sm:px-6 py-5 space-y-5">
         <div>
           <label for="org-name" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-            Organization name
+            {{ t('settings.organization.orgName') }}
           </label>
           <input
             id="org-name"
@@ -152,17 +207,17 @@ async function handleDeleteOrg() {
             type="text"
             :disabled="!canUpdateOrg"
             class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            placeholder="My Company"
+            :placeholder="t('settings.organization.orgNamePlaceholder')"
           />
         </div>
 
         <div>
           <label for="org-slug" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-            URL slug
+            {{ t('settings.organization.urlSlug') }}
           </label>
           <div class="flex items-center rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 overflow-hidden focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500 transition-colors">
             <span class="px-3 text-sm text-surface-400 dark:text-surface-500 select-none bg-surface-50 dark:bg-surface-800/50 border-r border-surface-200 dark:border-surface-700 py-2">
-              reqcore.com/
+              {{ t('settings.organization.slugPrefix') }}
             </span>
             <input
               id="org-slug"
@@ -170,15 +225,80 @@ async function handleDeleteOrg() {
               type="text"
               :disabled="!canUpdateOrg"
               class="flex-1 bg-transparent px-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
-              placeholder="my-company"
+              :placeholder="t('settings.organization.slugPlaceholder')"
             />
           </div>
           <p class="mt-1.5 text-xs text-surface-400 dark:text-surface-500">
-            Used in your public job board URL. Only lowercase letters, numbers, and hyphens.
+            {{ t('settings.organization.slugHelp') }}
           </p>
           <p v-if="slugError" class="mt-1 text-xs text-danger-500">
             {{ slugError }}
           </p>
+        </div>
+
+        <div>
+          <label for="org-website" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+            {{ t('settings.organization.companyWebsite') }}
+          </label>
+          <input
+            id="org-website"
+            v-model="companyWebsiteUrl"
+            type="url"
+            :disabled="!canUpdateOrg"
+            class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            :placeholder="t('settings.organization.companyWebsitePlaceholder')"
+          />
+          <p class="mt-1.5 text-xs text-surface-400 dark:text-surface-500">
+            {{ t('settings.organization.companyWebsiteHelp') }}
+          </p>
+          <p v-if="companyWebsiteError" class="mt-1 text-xs text-danger-500">
+            {{ companyWebsiteError }}
+          </p>
+        </div>
+
+        <div>
+          <label for="org-subtitle" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+            {{ t('settings.organization.brandSubtitle') }}
+          </label>
+          <input
+            id="org-subtitle"
+            v-model="brandSubtitle"
+            type="text"
+            maxlength="200"
+            :disabled="!canUpdateOrg"
+            class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            :placeholder="t('settings.organization.brandSubtitlePlaceholder')"
+          />
+          <p class="mt-1.5 text-xs text-surface-400 dark:text-surface-500">
+            {{ t('settings.organization.brandSubtitleHelp') }}
+          </p>
+        </div>
+
+        <div class="pt-2 border-t border-surface-200 dark:border-surface-800 space-y-5">
+          <div>
+            <h3 class="text-sm font-semibold text-surface-900 dark:text-surface-100">
+              {{ t('settings.organization.logoSectionTitle') }}
+            </h3>
+            <p class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
+              {{ t('settings.organization.logoSectionSubtitle') }}
+            </p>
+          </div>
+
+          <OrgLogoUploadField
+            variant="light"
+            :logo-url="logoLightPreviewUrl"
+            :disabled="!canUpdateOrg"
+            @uploaded="onLogoChanged"
+            @removed="onLogoChanged"
+          />
+
+          <OrgLogoUploadField
+            variant="dark"
+            :logo-url="logoDarkPreviewUrl"
+            :disabled="!canUpdateOrg"
+            @uploaded="onLogoChanged"
+            @removed="onLogoChanged"
+          />
         </div>
 
         <!-- Save button & feedback -->
@@ -190,7 +310,7 @@ async function handleDeleteOrg() {
           >
             <Loader2 v-if="isSaving" class="size-4 animate-spin" />
             <Save v-else class="size-4" />
-            {{ isSaving ? 'Saving…' : 'Save changes' }}
+            {{ isSaving ? t('settings.organization.saving') : t('settings.organization.saveChanges') }}
           </button>
 
           <Transition
@@ -200,7 +320,7 @@ async function handleDeleteOrg() {
             leave-to-class="opacity-0"
           >
             <span v-if="saveSuccess" class="text-sm text-success-600 dark:text-success-400 font-medium">
-              Changes saved
+              {{ t('settings.organization.changesSaved') }}
             </span>
           </Transition>
         </div>
@@ -219,8 +339,8 @@ async function handleDeleteOrg() {
             <AlertTriangle class="size-5" />
           </div>
           <div>
-            <h2 class="text-base font-semibold text-danger-700 dark:text-danger-300">Danger zone</h2>
-            <p class="text-sm text-danger-600/80 dark:text-danger-400/80">Irreversible and destructive actions.</p>
+            <h2 class="text-base font-semibold text-danger-700 dark:text-danger-300">{{ t('settings.organization.dangerZone') }}</h2>
+            <p class="text-sm text-danger-600/80 dark:text-danger-400/80">{{ t('settings.organization.dangerSubtitle') }}</p>
           </div>
         </div>
       </div>
@@ -228,9 +348,9 @@ async function handleDeleteOrg() {
       <div class="px-4 sm:px-6 py-5">
         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h3 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Delete organization</h3>
+            <h3 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('settings.organization.deleteOrg') }}</h3>
             <p class="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
-              Permanently delete this organization and all its data. This action cannot be undone.
+              {{ t('settings.organization.deleteOrgDescription') }}
             </p>
           </div>
           <button
@@ -238,7 +358,7 @@ async function handleDeleteOrg() {
             @click="showDeleteConfirm = true"
           >
             <Trash2 class="size-4" />
-            Delete
+            {{ t('settings.organization.delete') }}
           </button>
         </div>
 
@@ -251,7 +371,7 @@ async function handleDeleteOrg() {
         >
           <div v-if="showDeleteConfirm" class="mt-5 rounded-lg border border-danger-200 dark:border-danger-800 bg-danger-50/50 dark:bg-danger-950/30 px-4 py-4 space-y-3">
             <p class="text-sm text-surface-700 dark:text-surface-300">
-              Type <strong class="text-surface-900 dark:text-surface-100 font-semibold">{{ activeOrg?.name }}</strong> to confirm deletion:
+              {{ t('settings.organization.deleteConfirm', { name: activeOrg?.name }) }}
             </p>
             <input
               v-model="deleteConfirmText"
@@ -267,13 +387,13 @@ async function handleDeleteOrg() {
               >
                 <Loader2 v-if="isDeleting" class="size-4 animate-spin" />
                 <Trash2 v-else class="size-4" />
-                {{ isDeleting ? 'Deleting…' : 'Permanently delete' }}
+                {{ isDeleting ? t('settings.organization.deleting') : t('settings.organization.permanentlyDelete') }}
               </button>
               <button
                 class="rounded-lg px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100 transition-colors"
                 @click="showDeleteConfirm = false; deleteConfirmText = ''"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
             </div>
             <div v-if="deleteError" class="text-sm text-danger-600 dark:text-danger-400">
@@ -286,7 +406,7 @@ async function handleDeleteOrg() {
 
     <!-- Read-only notice for non-admin users -->
     <div v-if="!canUpdateOrg" class="mt-6 rounded-lg bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-800 px-4 py-3 text-sm text-surface-500 dark:text-surface-400">
-      You don't have permission to modify organization settings. Contact an admin or owner for changes.
+      {{ t('settings.organization.readOnlyNotice') }}
     </div>
   </div>
 </template>

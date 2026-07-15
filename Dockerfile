@@ -21,6 +21,9 @@ ENV POSTHOG_PUBLIC_KEY=${POSTHOG_PUBLIC_KEY}
 ARG POSTHOG_HOST
 ENV POSTHOG_HOST=${POSTHOG_HOST}
 
+# Nuxt/Nitro production build needs more heap than the default ~2GB in Docker.
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
 RUN npm run build
 
 # ─── Stage 2: Run ────────────────────────────────────────────────────────────
@@ -50,6 +53,7 @@ COPY --chown=reqcore:reqcore --from=builder /app/package.json ./package.json
 COPY --chown=reqcore:reqcore --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 COPY --chown=reqcore:reqcore --from=builder /app/node_modules ./node_modules
 COPY --chown=reqcore:reqcore --from=builder /app/server ./server
+COPY --chown=reqcore:reqcore --from=builder /app/shared ./shared
 
 USER reqcore
 

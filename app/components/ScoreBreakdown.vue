@@ -19,6 +19,9 @@ const emit = defineEmits<{
 }>()
 
 const { track } = useTrack()
+const { t } = useI18n()
+const { allowOwnLlm, analysis, formatPurposeLabel } = useEffectiveAi()
+const { resolveCriterionDisplay } = useScoringCriteriaTemplates()
 const isAnalyzing = ref(false)
 const analyzeError = ref<string | null>(null)
 const parseFailedDocId = ref<string | null>(null)
@@ -35,12 +38,16 @@ const { data: scoreData, status, refresh } = useFetch(
 )
 
 // Available AI configurations the user can pick from for this analysis run.
-// `selectedAiConfigId === null` means "use the org's default analysis config".
-const { data: aiConfigsData } = useFetch<AiConfigOption[]>('/api/ai-config', {
+// Platform-managed tenants use the effective config without a picker.
+const { data: aiConfigsData, execute: loadAiConfigs } = useFetch<AiConfigOption[]>('/api/ai-config', {
   key: 'ai-configs-analysis-picker',
   headers: useRequestHeaders(['cookie']),
   default: () => [],
+  immediate: false,
 })
+watch(allowOwnLlm, (allowed) => {
+  if (allowed) loadAiConfigs()
+}, { immediate: true })
 const aiConfigOptions = computed<AiConfigOption[]>(() =>
   (aiConfigsData.value ?? []).filter((c) => c.hasApiKey),
 )
@@ -48,6 +55,21 @@ const defaultAnalysisConfig = computed(() =>
   aiConfigOptions.value.find((c) => c.isDefaultAnalysis) ?? null,
 )
 const selectedAiConfigId = ref<string | null>(null)
+
+const selectedModelLabel = computed(() => {
+  if (!allowOwnLlm.value) return null
+  if (selectedAiConfigId.value) {
+    const picked = aiConfigOptions.value.find((c) => c.id === selectedAiConfigId.value)
+    return picked?.name ?? picked?.model ?? null
+  }
+  if (defaultAnalysisConfig.value) {
+    return defaultAnalysisConfig.value.name
+  }
+  if (analysis.value?.configured) {
+    return formatPurposeLabel(analysis.value)
+  }
+  return null
+})
 
 // Cache last successful data so switching candidates doesn't flash "Loading scores…"
 const cachedScoreData = ref(scoreData.value)
@@ -74,9 +96,9 @@ function barColor(score: number, max: number): string {
 }
 
 function confidenceLabel(confidence: number): string {
-  if (confidence >= 80) return 'High'
-  if (confidence >= 50) return 'Medium'
-  return 'Low'
+  if (confidence >= 80) return t('components.scoreBreakdown.confidenceHigh')
+  if (confidence >= 50) return t('components.scoreBreakdown.confidenceMedium')
+  return t('components.scoreBreakdown.confidenceLow')
 }
 
 function confidenceColor(confidence: number): string {
@@ -97,17 +119,17 @@ async function runAnalysis() {
     await $fetch(`/api/applications/${props.applicationId}/analyze`, {
       method: 'POST',
       headers: useRequestHeaders(['cookie']),
-      body: { aiConfigId: selectedAiConfigId.value },
+      body: allowOwnLlm.value ? { aiConfigId: selectedAiConfigId.value } : {},
     })
     await refresh()
-    track('ai_analysis_run', { application_id: props.applicationId, ai_config_id: selectedAiConfigId.value })
+    track('ai_analysis_run', { application_id: props.applicationId, ai_config_id: allowOwnLlm.value ? selectedAiConfigId.value : null })
     emit('scored')
   } catch (err: any) {
     const data = err?.data?.data
     if (data?.code === 'PARSE_FAILED' && data?.documentId) {
       parseFailedDocId.value = data.documentId
     }
-    analyzeError.value = err?.data?.statusMessage ?? 'Analysis failed. Make sure AI is configured in settings.'
+    analyzeError.value = err?.data?.statusMessage ?? t('components.scoreBreakdown.errors.analysisFailed')
   } finally {
     isAnalyzing.value = false
   }
@@ -126,7 +148,7 @@ async function retryParse() {
     // Automatically re-run analysis after successful parse
     await runAnalysis()
   } catch (err: any) {
-    analyzeError.value = err?.data?.statusMessage ?? 'Failed to re-parse the resume. The file may be corrupted or image-based.'
+    analyzeError.value = err?.data?.statusMessage ?? t('components.scoreBreakdown.errors.parseFailed')
     parseFailedDocId.value = null
   } finally {
     isRetryingParse.value = false
@@ -144,18 +166,25 @@ async function retryParse() {
             <Brain class="size-3.5 text-brand-600 dark:text-brand-400" />
           </div>
           <div>
-            <p class="text-sm font-medium text-surface-600 dark:text-surface-300">No AI analysis yet</p>
+            <p class="text-sm font-medium text-surface-600 dark:text-surface-300">{{ t('components.scoreBreakdown.noAnalysis') }}</p>
           </div>
         </div>
         <div class="flex items-center gap-1.5">
+          <span
+            v-if="allowOwnLlm && selectedModelLabel && aiConfigOptions.length <= 1"
+            class="text-[11px] text-surface-500 dark:text-surface-400 max-w-[160px] truncate"
+            :title="selectedModelLabel"
+          >
+            {{ selectedModelLabel }}
+          </span>
           <select
-            v-if="aiConfigOptions.length > 1"
+            v-if="allowOwnLlm && aiConfigOptions.length > 1"
             v-model="selectedAiConfigId"
             :disabled="isAnalyzing"
             class="rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-2 py-1.5 text-xs text-surface-700 dark:text-surface-300 focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer max-w-[140px] truncate"
-            :title="selectedAiConfigId ?? 'Use org default'"
+            :title="selectedAiConfigId ?? t('components.scoreBreakdown.useOrgDefault')"
           >
-            <option :value="null">Default{{ defaultAnalysisConfig ? ` (${defaultAnalysisConfig.name})` : '' }}</option>
+            <option :value="null">{{ t('components.scoreBreakdown.defaultOption') }}{{ defaultAnalysisConfig ? ` (${defaultAnalysisConfig.name})` : '' }}</option>
             <option v-for="c in aiConfigOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
           <button
@@ -165,7 +194,7 @@ async function retryParse() {
           >
             <Loader2 v-if="isAnalyzing" class="size-3.5 animate-spin" />
             <Sparkles v-else class="size-3.5" />
-            {{ isAnalyzing ? 'Analyzing…' : 'Run Analysis' }}
+            {{ isAnalyzing ? t('components.scoreBreakdown.analyzing') : t('components.scoreBreakdown.runAnalysis') }}
           </button>
         </div>
       </div>
@@ -173,7 +202,7 @@ async function retryParse() {
 
     <!-- Loading (only on very first load with no cached data) -->
     <div v-else-if="isInitialLoad" class="text-center py-8 text-surface-400">
-      Loading scores…
+      {{ t('components.scoreBreakdown.loadingScores') }}
     </div>
 
     <!-- Score breakdown -->
@@ -185,16 +214,23 @@ async function retryParse() {
             <div class="flex size-7 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950/40">
               <BarChart3 class="size-3.5 text-brand-600 dark:text-brand-400" />
             </div>
-            <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Composite Score</h3>
+            <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ t('components.scoreBreakdown.compositeScore') }}</h3>
           </div>
           <div class="flex items-center gap-1.5">
+            <span
+              v-if="allowOwnLlm && selectedModelLabel && aiConfigOptions.length <= 1"
+              class="text-[11px] text-surface-500 dark:text-surface-400 max-w-[140px] truncate"
+              :title="selectedModelLabel"
+            >
+              {{ selectedModelLabel }}
+            </span>
             <select
-              v-if="aiConfigOptions.length > 1"
+              v-if="allowOwnLlm && aiConfigOptions.length > 1"
               v-model="selectedAiConfigId"
               :disabled="isAnalyzing"
               class="rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-2 py-1 text-[11px] text-surface-700 dark:text-surface-300 focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer max-w-[140px] truncate"
             >
-              <option :value="null">Default{{ defaultAnalysisConfig ? ` (${defaultAnalysisConfig.name})` : '' }}</option>
+              <option :value="null">{{ t('components.scoreBreakdown.defaultOption') }}{{ defaultAnalysisConfig ? ` (${defaultAnalysisConfig.name})` : '' }}</option>
               <option v-for="c in aiConfigOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
             <button
@@ -202,7 +238,7 @@ async function retryParse() {
               class="text-xs text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50"
               @click="runAnalysis"
             >
-              {{ isAnalyzing ? 'Re-scoring…' : 'Re-score' }}
+              {{ isAnalyzing ? t('components.scoreBreakdown.rescoring') : t('components.scoreBreakdown.rescore') }}
             </button>
           </div>
         </div>
@@ -219,7 +255,7 @@ async function retryParse() {
 
         <!-- Run metadata -->
         <div v-if="resolvedScoreData!.latestRun" class="mt-3 pt-3 border-t border-surface-100 dark:border-surface-800 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-surface-400">
-          <span>{{ resolvedScoreData!.latestRun.provider }} · {{ resolvedScoreData!.latestRun.model }}</span>
+          <span v-if="allowOwnLlm && resolvedScoreData!.latestRun.model">{{ resolvedScoreData!.latestRun.model }}</span>
           <span>{{ new Date(resolvedScoreData!.latestRun.createdAt).toLocaleString() }}</span>
         </div>
       </div>
@@ -240,13 +276,7 @@ async function retryParse() {
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
                 <span class="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">
-                  {{ cs.criterionName ?? cs.criterionKey }}
-                </span>
-                <span
-                  v-if="cs.category"
-                  class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium ring-1 ring-inset text-surface-500 ring-surface-200 dark:ring-surface-700 bg-surface-50 dark:bg-surface-800"
-                >
-                  {{ cs.category }}
+                  {{ resolveCriterionDisplay({ key: cs.criterionKey, name: cs.criterionName }).name }}
                 </span>
               </div>
               <!-- Progress bar -->
@@ -273,7 +303,7 @@ async function retryParse() {
           <div v-if="expandedCriterion === cs.criterionKey" class="px-3 pb-3 space-y-3 border-t border-surface-100 dark:border-surface-800 pt-3">
             <!-- Confidence -->
             <div class="flex items-center gap-2 text-xs">
-              <span class="text-surface-400">Confidence:</span>
+              <span class="text-surface-400">{{ t('components.scoreBreakdown.confidence') }}</span>
               <span class="font-semibold" :class="confidenceColor(cs.confidence)">
                 {{ confidenceLabel(cs.confidence) }} ({{ cs.confidence }}%)
               </span>
@@ -281,13 +311,13 @@ async function retryParse() {
 
             <!-- Evidence -->
             <div v-if="cs.evidence">
-              <h4 class="text-xs font-semibold text-surface-500 dark:text-surface-400 mb-1 uppercase tracking-wider">Evidence</h4>
+              <h4 class="text-xs font-semibold text-surface-500 dark:text-surface-400 mb-1 uppercase tracking-wider">{{ t('components.scoreBreakdown.evidence') }}</h4>
               <p class="text-xs text-surface-600 dark:text-surface-300 leading-relaxed">{{ cs.evidence }}</p>
             </div>
 
             <!-- Strengths -->
             <div v-if="cs.strengths?.length">
-              <h4 class="text-xs font-semibold text-success-600 dark:text-success-400 mb-1">Strengths</h4>
+              <h4 class="text-xs font-semibold text-success-600 dark:text-success-400 mb-1">{{ t('components.scoreBreakdown.strengths') }}</h4>
               <ul class="space-y-0.5">
                 <li v-for="s in cs.strengths" :key="s" class="text-xs text-surface-600 dark:text-surface-300 flex items-start gap-1.5">
                   <span class="text-success-500 mt-0.5 shrink-0">✓</span>
@@ -298,18 +328,13 @@ async function retryParse() {
 
             <!-- Gaps -->
             <div v-if="cs.gaps?.length">
-              <h4 class="text-xs font-semibold text-warning-600 dark:text-warning-400 mb-1">Gaps</h4>
+              <h4 class="text-xs font-semibold text-warning-600 dark:text-warning-400 mb-1">{{ t('components.scoreBreakdown.gaps') }}</h4>
               <ul class="space-y-0.5">
                 <li v-for="g in cs.gaps" :key="g" class="text-xs text-surface-600 dark:text-surface-300 flex items-start gap-1.5">
                   <span class="text-warning-500 mt-0.5 shrink-0">△</span>
                   {{ g }}
                 </li>
               </ul>
-            </div>
-
-            <!-- Weight -->
-            <div class="text-[11px] text-surface-400">
-              Weight: {{ cs.weight }}%
             </div>
           </div>
         </div>
@@ -333,9 +358,9 @@ async function retryParse() {
           >
             <Loader2 v-if="isRetryingParse" class="size-3 animate-spin" />
             <RefreshCw v-else class="size-3" />
-            {{ isRetryingParse ? 'Re-parsing…' : 'Retry CV Parse' }}
+            {{ isRetryingParse ? t('components.scoreBreakdown.reparsing') : t('components.scoreBreakdown.retryParse') }}
           </button>
-          <button class="underline" @click="analyzeError = null; parseFailedDocId = null">Dismiss</button>
+          <button class="underline" @click="analyzeError = null; parseFailedDocId = null">{{ t('common.actions.dismiss') }}</button>
         </div>
       </div>
     </div>

@@ -1,6 +1,14 @@
 import { Resend } from 'resend'
 import nodemailer from 'nodemailer'
 import type { Transporter } from 'nodemailer'
+import { APP_BRAND_NAME } from '~~/shared/brand'
+import {
+  DEFAULT_EMAIL_LOCALE,
+  getEmailMessages,
+  resolveEmailLocale,
+  type EmailLocale,
+} from '~~/shared/emails'
+import { generateInterviewICS } from './ical'
 
 // ─── Resend client ────────────────────────────────────────────────────────────
 
@@ -134,13 +142,15 @@ export async function sendVerificationEmail(data: {
   user: { email: string; name: string }
   url: string
   token: string
+  locale?: string | null
 }): Promise<void> {
   try {
+    const locale = resolveEmailLocale(data.locale)
     await sendEmail({
       to: data.user.email,
-      subject: 'Verify your email address — Reqcore',
-      html: buildVerificationHtml({ url: data.url }),
-      text: buildVerificationText({ url: data.url }),
+      subject: getEmailMessages(locale).verification.subject.replace('{brand}', APP_BRAND_NAME),
+      html: buildVerificationHtml({ url: data.url, locale }),
+      text: buildVerificationText({ url: data.url, locale }),
       resendTags: [{ name: 'category', value: 'verification' }],
       logFallback: 'Verification email suppressed — no email provider configured (set SMTP_HOST or RESEND_API_KEY)',
       errorCategory: 'email.verification_send_failed',
@@ -160,13 +170,15 @@ export async function sendPasswordResetEmail(data: {
   user: { email: string; name: string }
   url: string
   token: string
+  locale?: string | null
 }): Promise<void> {
   try {
+    const locale = resolveEmailLocale(data.locale)
     await sendEmail({
       to: data.user.email,
-      subject: 'Reset your password — Reqcore',
-      html: buildPasswordResetHtml({ url: data.url }),
-      text: buildPasswordResetText({ url: data.url }),
+      subject: getEmailMessages(locale).passwordReset.subject.replace('{brand}', APP_BRAND_NAME),
+      html: buildPasswordResetHtml({ url: data.url, locale }),
+      text: buildPasswordResetText({ url: data.url, locale }),
       resendTags: [{ name: 'category', value: 'password-reset' }],
       logFallback: 'Password reset email suppressed — no email provider configured (set SMTP_HOST or RESEND_API_KEY)',
       errorCategory: 'email.password_reset_send_failed',
@@ -185,12 +197,18 @@ export async function sendOrgInvitationEmail(data: {
   id: string
   email: string
   inviter: { user: { name: string; email: string } }
-  organization: { name: string }
+  organization: { name: string; id?: string }
   role: string
-}, inviteLink: string): Promise<void> {
+}, inviteLink: string, locale?: string | null): Promise<void> {
+  const resolvedLocale = resolveEmailLocale(locale)
+  const m = getEmailMessages(resolvedLocale)
+  const subject = m.invitation.subject
+    .replace('{organizationName}', data.organization.name)
+    .replace('{brand}', APP_BRAND_NAME)
+
   await sendEmail({
     to: data.email,
-    subject: `You're invited to join ${data.organization.name} on Reqcore`,
+    subject,
     html: buildInvitationHtml({
       inviteeName: data.email,
       inviterName: data.inviter.user.name,
@@ -198,12 +216,14 @@ export async function sendOrgInvitationEmail(data: {
       organizationName: data.organization.name,
       role: data.role,
       inviteLink,
+      locale: resolvedLocale,
     }),
     text: buildInvitationText({
       inviterName: data.inviter.user.name,
       organizationName: data.organization.name,
       role: data.role,
       inviteLink,
+      locale: resolvedLocale,
     }),
     resendTags: [
       { name: 'category', value: 'invitation' },
@@ -230,15 +250,22 @@ function buildInvitationHtml(params: {
   organizationName: string
   role: string
   inviteLink: string
+  locale: EmailLocale
 }): string {
-  const { inviterName, organizationName, role, inviteLink } = params
+  const { inviterName, organizationName, role, inviteLink, locale } = params
+  const m = getEmailMessages(locale)
+  const title = m.invitation.htmlTitle.replace('{organizationName}', organizationName)
+  const body = m.invitation.body
+    .replace('{inviterName}', escapeHtml(inviterName))
+    .replace('{organizationName}', escapeHtml(organizationName))
+    .replace('{role}', escapeHtml(role))
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>You're invited to ${escapeHtml(organizationName)}</title>
+  <title>${escapeHtml(title)}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
@@ -248,19 +275,18 @@ function buildInvitationHtml(params: {
           <!-- Header -->
           <tr>
             <td style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
-              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Reqcore</h1>
+              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">${escapeHtml(APP_BRAND_NAME)}</h1>
             </td>
           </tr>
           <!-- Body -->
           <tr>
             <td style="padding:32px;">
-              <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#09090b;">You've been invited</h2>
+              <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#09090b;">${escapeHtml(m.invitation.heading)}</h2>
               <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#3f3f46;">
-                <strong>${escapeHtml(inviterName)}</strong> has invited you to join
-                <strong>${escapeHtml(organizationName)}</strong> as a <strong>${escapeHtml(role)}</strong>.
+                ${body}
               </p>
               <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#3f3f46;">
-                Click the button below to accept the invitation. You'll need to sign in or create an account first.
+                ${escapeHtml(m.invitation.bodyCta)}
               </p>
               <!-- CTA Button -->
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -268,13 +294,13 @@ function buildInvitationHtml(params: {
                   <td align="center">
                     <a href="${escapeHtml(inviteLink)}" target="_blank" rel="noopener noreferrer"
                        style="display:inline-block;padding:12px 32px;background-color:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;border-radius:8px;line-height:1;">
-                      Accept Invitation
+                      ${escapeHtml(m.invitation.cta)}
                     </a>
                   </td>
                 </tr>
               </table>
               <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#71717a;">
-                This invitation expires in 48 hours. If you didn't expect this email, you can safely ignore it.
+                ${escapeHtml(m.invitation.expires)}
               </p>
             </td>
           </tr>
@@ -282,7 +308,7 @@ function buildInvitationHtml(params: {
           <tr>
             <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
               <p style="margin:0;font-size:12px;color:#a1a1aa;">
-                Sent by Reqcore &mdash; Open-source applicant tracking
+                ${escapeHtml(m.common.sentByFooter.replace('{brand}', APP_BRAND_NAME))} &mdash; ${escapeHtml(m.common.productTagline)}
               </p>
             </td>
           </tr>
@@ -299,19 +325,24 @@ function buildInvitationText(params: {
   organizationName: string
   role: string
   inviteLink: string
+  locale: EmailLocale
 }): string {
+  const m = getEmailMessages(params.locale)
   return [
-    `You've been invited to join ${params.organizationName}`,
+    m.invitation.textTitle.replace('{organizationName}', params.organizationName),
     '',
-    `${params.inviterName} has invited you to join ${params.organizationName} as a ${params.role}.`,
+    m.invitation.textBody
+      .replace('{inviterName}', params.inviterName)
+      .replace('{organizationName}', params.organizationName)
+      .replace('{role}', params.role),
     '',
-    'Accept the invitation by visiting the link below:',
+    m.invitation.textAccept,
     params.inviteLink,
     '',
-    'This invitation expires in 48 hours.',
-    'If you didn\'t expect this email, you can safely ignore it.',
+    m.invitation.textExpires,
+    m.invitation.textIgnore,
     '',
-    '— Reqcore',
+    `— ${APP_BRAND_NAME}`,
   ].join('\n')
 }
 
@@ -331,13 +362,14 @@ function escapeHtml(str: string): string {
 // Email verification & password reset templates
 // ─────────────────────────────────────────────
 
-function buildVerificationHtml(params: { url: string }): string {
+function buildVerificationHtml(params: { url: string, locale: EmailLocale }): string {
+  const m = getEmailMessages(params.locale)
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${params.locale}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Verify your email</title>
+  <title>${escapeHtml(m.verification.title)}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
@@ -346,33 +378,33 @@ function buildVerificationHtml(params: { url: string }): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
           <tr>
             <td style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
-              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Reqcore</h1>
+              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">${escapeHtml(APP_BRAND_NAME)}</h1>
             </td>
           </tr>
           <tr>
             <td style="padding:32px;">
-              <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#09090b;">Verify your email</h2>
+              <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#09090b;">${escapeHtml(m.verification.title)}</h2>
               <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#3f3f46;">
-                Click the button below to verify your email address and activate your account.
+                ${escapeHtml(m.verification.body)}
               </p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
                     <a href="${escapeHtml(params.url)}" target="_blank" rel="noopener noreferrer"
                        style="display:inline-block;padding:12px 32px;background-color:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;border-radius:8px;line-height:1;">
-                      Verify Email
+                      ${escapeHtml(m.verification.cta)}
                     </a>
                   </td>
                 </tr>
               </table>
               <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#71717a;">
-                If you didn't create an account, you can safely ignore this email.
+                ${escapeHtml(m.verification.ignore)}
               </p>
             </td>
           </tr>
           <tr>
             <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
-              <p style="margin:0;font-size:12px;color:#a1a1aa;">Sent by Reqcore &mdash; Open-source applicant tracking</p>
+              <p style="margin:0;font-size:12px;color:#a1a1aa;">${escapeHtml(m.common.sentByFooter.replace('{brand}', APP_BRAND_NAME))} &mdash; ${escapeHtml(m.common.productTagline)}</p>
             </td>
           </tr>
         </table>
@@ -383,26 +415,28 @@ function buildVerificationHtml(params: { url: string }): string {
 </html>`
 }
 
-function buildVerificationText(params: { url: string }): string {
+function buildVerificationText(params: { url: string, locale: EmailLocale }): string {
+  const m = getEmailMessages(params.locale)
   return [
-    'Verify your email address',
+    m.verification.textTitle,
     '',
-    'Click the link below to verify your email and activate your Reqcore account:',
+    m.verification.textBody.replace('{brand}', APP_BRAND_NAME),
     params.url,
     '',
-    'If you didn\'t create an account, you can safely ignore this email.',
+    m.verification.ignore,
     '',
-    '— Reqcore',
+    `— ${APP_BRAND_NAME}`,
   ].join('\n')
 }
 
-function buildPasswordResetHtml(params: { url: string }): string {
+function buildPasswordResetHtml(params: { url: string, locale: EmailLocale }): string {
+  const m = getEmailMessages(params.locale)
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${params.locale}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Reset your password</title>
+  <title>${escapeHtml(m.passwordReset.title)}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
@@ -411,33 +445,33 @@ function buildPasswordResetHtml(params: { url: string }): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
           <tr>
             <td style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
-              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">Reqcore</h1>
+              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">${escapeHtml(APP_BRAND_NAME)}</h1>
             </td>
           </tr>
           <tr>
             <td style="padding:32px;">
-              <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#09090b;">Reset your password</h2>
+              <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#09090b;">${escapeHtml(m.passwordReset.title)}</h2>
               <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#3f3f46;">
-                Click the button below to reset your password. This link will expire shortly.
+                ${escapeHtml(m.passwordReset.body)}
               </p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
                     <a href="${escapeHtml(params.url)}" target="_blank" rel="noopener noreferrer"
                        style="display:inline-block;padding:12px 32px;background-color:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;border-radius:8px;line-height:1;">
-                      Reset Password
+                      ${escapeHtml(m.passwordReset.cta)}
                     </a>
                   </td>
                 </tr>
               </table>
               <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#71717a;">
-                If you didn't request a password reset, you can safely ignore this email.
+                ${escapeHtml(m.passwordReset.ignore)}
               </p>
             </td>
           </tr>
           <tr>
             <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
-              <p style="margin:0;font-size:12px;color:#a1a1aa;">Sent by Reqcore &mdash; Open-source applicant tracking</p>
+              <p style="margin:0;font-size:12px;color:#a1a1aa;">${escapeHtml(m.common.sentByFooter.replace('{brand}', APP_BRAND_NAME))} &mdash; ${escapeHtml(m.common.productTagline)}</p>
             </td>
           </tr>
         </table>
@@ -448,16 +482,17 @@ function buildPasswordResetHtml(params: { url: string }): string {
 </html>`
 }
 
-function buildPasswordResetText(params: { url: string }): string {
+function buildPasswordResetText(params: { url: string, locale: EmailLocale }): string {
+  const m = getEmailMessages(params.locale)
   return [
-    'Reset your password',
+    m.passwordReset.textTitle,
     '',
-    'Click the link below to reset your Reqcore password:',
+    m.passwordReset.textBody.replace('{brand}', APP_BRAND_NAME),
     params.url,
     '',
-    'If you didn\'t request this, you can safely ignore this email.',
+    m.passwordReset.ignore,
     '',
-    '— Reqcore',
+    `— ${APP_BRAND_NAME}`,
   ].join('\n')
 }
 
@@ -493,7 +528,13 @@ export interface InterviewEmailData {
  * Replace {{variable}} placeholders in a template string with actual values.
  * Only replaces known variables to prevent injection of unexpected content.
  */
-export function renderTemplate(template: string, data: InterviewEmailData): string {
+export function renderTemplate(
+  template: string,
+  data: InterviewEmailData,
+  locale: string | null = DEFAULT_EMAIL_LOCALE,
+): string {
+  const m = getEmailMessages(locale)
+  const toBeConfirmed = m.common.toBeConfirmed
   const variables: Record<string, string> = {
     candidateName: data.candidateName,
     candidateFirstName: data.candidateFirstName,
@@ -505,8 +546,8 @@ export function renderTemplate(template: string, data: InterviewEmailData): stri
     interviewTime: data.interviewTime,
     interviewDuration: String(data.interviewDuration),
     interviewType: data.interviewType,
-    interviewLocation: data.interviewLocation ?? 'To be confirmed',
-    interviewers: data.interviewers?.join(', ') ?? 'To be confirmed',
+    interviewLocation: data.interviewLocation ?? toBeConfirmed,
+    interviewers: data.interviewers?.join(', ') ?? toBeConfirmed,
     organizationName: data.organizationName,
   }
 
@@ -524,17 +565,19 @@ export async function sendInterviewInvitationEmail(params: {
   subject: string
   body: string
   data: InterviewEmailData
+  locale?: string | null
 }): Promise<void> {
-  const renderedSubject = renderTemplate(params.subject, params.data)
-  const renderedBody = renderTemplate(params.body, params.data)
+  const locale = resolveEmailLocale(params.locale)
+  const renderedSubject = renderTemplate(params.subject, params.data, locale)
+  const renderedBody = renderTemplate(params.body, params.data, locale)
 
   const icsBuffer = params.data.icsContent ? Buffer.from(params.data.icsContent) : undefined
 
   await sendEmail({
     to: params.data.candidateEmail,
     subject: renderedSubject,
-    html: buildInterviewInvitationHtml(renderedSubject, renderedBody, params.data),
-    text: buildInterviewInvitationText(renderedBody, params.data.responseUrls),
+    html: buildInterviewInvitationHtml(renderedSubject, renderedBody, params.data, locale),
+    text: buildInterviewInvitationText(renderedBody, params.data.responseUrls, locale),
     icsAttachment: icsBuffer,
     resendTags: [
       { name: 'category', value: 'interview-invitation' },
@@ -551,7 +594,13 @@ export async function sendInterviewInvitationEmail(params: {
   })
 }
 
-function buildInterviewInvitationHtml(subject: string, bodyText: string, data: InterviewEmailData): string {
+function buildInterviewInvitationHtml(
+  subject: string,
+  bodyText: string,
+  data: InterviewEmailData,
+  locale: EmailLocale,
+): string {
+  const m = getEmailMessages(locale)
   const bodyHtml = escapeHtml(bodyText).replace(/\n/g, '<br />')
 
   // Build response buttons HTML when URLs are available
@@ -562,7 +611,7 @@ function buildInterviewInvitationHtml(subject: string, bodyText: string, data: I
             <td style="padding:0 32px 32px;">
               <div style="border-top:1px solid #e4e4e7;padding-top:24px;">
                 <p style="margin:0 0 16px;font-size:14px;font-weight:600;color:#09090b;text-align:center;">
-                  Can you make it?
+                  ${escapeHtml(m.interviewInvite.canYouMakeIt)}
                 </p>
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                   <tr>
@@ -572,19 +621,19 @@ function buildInterviewInvitationHtml(subject: string, bodyText: string, data: I
                           <td style="padding:0 4px;">
                             <a href="${escapeHtml(data.responseUrls.accepted)}" target="_blank" rel="noopener noreferrer"
                                style="display:inline-block;padding:10px 20px;background-color:#16a34a;color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;border-radius:6px;line-height:1;">
-                              &#10003; Accept
+                              &#10003; ${escapeHtml(m.interviewInvite.accept)}
                             </a>
                           </td>
                           <td style="padding:0 4px;">
                             <a href="${escapeHtml(data.responseUrls.tentative)}" target="_blank" rel="noopener noreferrer"
                                style="display:inline-block;padding:10px 20px;background-color:#ca8a04;color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;border-radius:6px;line-height:1;">
-                              &#63; Maybe
+                              &#63; ${escapeHtml(m.interviewInvite.maybe)}
                             </a>
                           </td>
                           <td style="padding:0 4px;">
                             <a href="${escapeHtml(data.responseUrls.declined)}" target="_blank" rel="noopener noreferrer"
                                style="display:inline-block;padding:10px 20px;background-color:#dc2626;color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;border-radius:6px;line-height:1;">
-                              &#10005; Decline
+                              &#10005; ${escapeHtml(m.interviewInvite.decline)}
                             </a>
                           </td>
                         </tr>
@@ -597,8 +646,12 @@ function buildInterviewInvitationHtml(subject: string, bodyText: string, data: I
           </tr>`
     : ''
 
+  const footer = m.interviewInvite.sentByVia
+    .replace('{organizationName}', data.organizationName)
+    .replace('{brand}', APP_BRAND_NAME)
+
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -627,7 +680,7 @@ function buildInterviewInvitationHtml(subject: string, bodyText: string, data: I
           <tr>
             <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
               <p style="margin:0;font-size:12px;color:#a1a1aa;">
-                Sent by ${escapeHtml(data.organizationName)} via Reqcore
+                ${escapeHtml(footer)}
               </p>
             </td>
           </tr>
@@ -645,19 +698,241 @@ function buildInterviewInvitationHtml(subject: string, bodyText: string, data: I
 function buildInterviewInvitationText(
   renderedBody: string,
   responseUrls?: InterviewEmailData['responseUrls'],
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE,
 ): string {
   if (!responseUrls) return renderedBody
+  const m = getEmailMessages(locale)
 
   return [
     renderedBody,
     '',
     '─────────────────────────────',
-    'Respond to this invitation:',
+    m.interviewInvite.respondHeading,
     '',
-    `✓ Accept: ${responseUrls.accepted}`,
-    `? Maybe:  ${responseUrls.tentative}`,
-    `✗ Decline: ${responseUrls.declined}`,
+    `✓ ${m.interviewInvite.textAccept}: ${responseUrls.accepted}`,
+    `? ${m.interviewInvite.textMaybe}:  ${responseUrls.tentative}`,
+    `✗ ${m.interviewInvite.textDecline}: ${responseUrls.declined}`,
     '',
     '─────────────────────────────',
   ].join('\n')
+}
+
+const INTERVIEWER_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Extract unique valid email addresses from interviewer form values. */
+export function extractInterviewerEmails(interviewers: string[] | null | undefined): string[] {
+  if (!interviewers?.length) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const value of interviewers) {
+    const trimmed = value.trim()
+    if (!INTERVIEWER_EMAIL_RE.test(trimmed)) continue
+    const key = trimmed.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(trimmed)
+  }
+  return result
+}
+
+export interface InterviewerNotificationParams {
+  interviewId: string
+  interviewerEmails: string[]
+  candidateName: string
+  candidateEmail: string
+  jobTitle: string
+  interviewTitle: string
+  scheduledAt: Date
+  durationMinutes: number
+  interviewType: string
+  location: string | null
+  organizationName: string
+  timezone?: string | null
+  locale?: string | null
+}
+
+/**
+ * Notify interviewers they are scheduled for an interview.
+ * Sends one email (with .ics) per interviewer address. Failures are logged
+ * per recipient and do not throw — scheduling should not fail because of this.
+ */
+export async function notifyInterviewers(params: InterviewerNotificationParams): Promise<{ sent: string[], failed: string[] }> {
+  const emails = extractInterviewerEmails(params.interviewerEmails)
+  if (emails.length === 0) return { sent: [], failed: [] }
+
+  const locale = resolveEmailLocale(params.locale)
+  const m = getEmailMessages(locale)
+  const tz = params.timezone ?? 'UTC'
+  const fromEmail = getFromEmail().replace(/^.*</, '').replace(/>$/, '')
+
+  const interviewDate = params.scheduledAt.toLocaleDateString(locale, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: tz,
+  })
+  const interviewTime = params.scheduledAt.toLocaleTimeString(locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: locale.startsWith('en'),
+    timeZone: tz,
+  })
+  const interviewTypeLabel = m.interviewTypes[params.interviewType] ?? params.interviewType
+  const durationLabel = m.interviewerNotify.durationValue.replace('{n}', String(params.durationMinutes))
+  const locationLabel = params.location?.trim() || m.common.toBeConfirmed
+
+  const subject = m.interviewerNotify.subject
+    .replace('{candidateName}', params.candidateName)
+    .replace('{jobTitle}', params.jobTitle)
+
+  const intro = m.interviewerNotify.intro.replace('{organizationName}', params.organizationName)
+  const footer = m.interviewerNotify.sentByVia
+    .replace('{organizationName}', params.organizationName)
+    .replace('{brand}', APP_BRAND_NAME)
+
+  const sent: string[] = []
+  const failed: string[] = []
+
+  for (const to of emails) {
+    const icsContent = generateInterviewICS({
+      interviewId: params.interviewId,
+      summary: subject,
+      description: [
+        `${m.interviewerNotify.title}`,
+        '',
+        `${m.interviewerNotify.candidateLabel}: ${params.candidateName} (${params.candidateEmail})`,
+        `${m.interviewerNotify.jobLabel}: ${params.jobTitle}`,
+        `${m.interviewerNotify.dateLabel}: ${interviewDate}`,
+        `${m.interviewerNotify.timeLabel}: ${interviewTime}`,
+        `${m.interviewerNotify.durationLabel}: ${durationLabel}`,
+        `${m.interviewerNotify.typeLabel}: ${interviewTypeLabel}`,
+        `${m.interviewerNotify.locationLabel}: ${locationLabel}`,
+      ].join('\n'),
+      startTime: params.scheduledAt,
+      durationMinutes: params.durationMinutes,
+      location: params.location,
+      organizerName: params.organizationName,
+      organizerEmail: fromEmail,
+      attendeeEmail: to,
+      attendeeName: to,
+    })
+
+    const text = [
+      m.interviewerNotify.title,
+      '',
+      intro,
+      '',
+      `${m.interviewerNotify.candidateLabel}: ${params.candidateName} (${params.candidateEmail})`,
+      `${m.interviewerNotify.jobLabel}: ${params.jobTitle}`,
+      `${m.interviewerNotify.dateLabel}: ${interviewDate}`,
+      `${m.interviewerNotify.timeLabel}: ${interviewTime}`,
+      `${m.interviewerNotify.durationLabel}: ${durationLabel}`,
+      `${m.interviewerNotify.typeLabel}: ${interviewTypeLabel}`,
+      `${m.interviewerNotify.locationLabel}: ${locationLabel}`,
+      '',
+      m.interviewerNotify.calendarHint,
+    ].join('\n')
+
+    const html = buildInterviewerNotifyHtml({
+      locale,
+      subject,
+      title: m.interviewerNotify.title,
+      intro,
+      rows: [
+        [m.interviewerNotify.candidateLabel, `${params.candidateName} (${params.candidateEmail})`],
+        [m.interviewerNotify.jobLabel, params.jobTitle],
+        [m.interviewerNotify.dateLabel, interviewDate],
+        [m.interviewerNotify.timeLabel, interviewTime],
+        [m.interviewerNotify.durationLabel, durationLabel],
+        [m.interviewerNotify.typeLabel, interviewTypeLabel],
+        [m.interviewerNotify.locationLabel, locationLabel],
+      ],
+      calendarHint: m.interviewerNotify.calendarHint,
+      footer,
+      organizationName: params.organizationName,
+    })
+
+    try {
+      await sendEmail({
+        to,
+        subject,
+        html,
+        text,
+        icsAttachment: Buffer.from(icsContent),
+        resendTags: [
+          { name: 'category', value: 'interviewer-notification' },
+          { name: 'interview', value: params.interviewTitle.slice(0, 256).replace(/[^a-zA-Z0-9_-]/g, '_') },
+        ],
+        logFallback:
+          `Interviewer notification → ${to} | ` +
+          `Subject: ${subject} | ` +
+          `Interview: ${params.interviewTitle} | ` +
+          `Candidate: ${params.candidateName}`,
+        errorCategory: 'email.interviewer_notification_send_failed',
+      })
+      sent.push(to)
+    }
+    catch {
+      failed.push(to)
+    }
+  }
+
+  return { sent, failed }
+}
+
+function buildInterviewerNotifyHtml(params: {
+  locale: EmailLocale
+  subject: string
+  title: string
+  intro: string
+  rows: [string, string][]
+  calendarHint: string
+  footer: string
+  organizationName: string
+}): string {
+  const rowsHtml = params.rows.map(([label, value]) => `
+                <tr>
+                  <td style="padding:6px 0;font-size:13px;color:#71717a;width:140px;vertical-align:top;">${escapeHtml(label)}</td>
+                  <td style="padding:6px 0;font-size:14px;color:#18181b;font-weight:500;">${escapeHtml(value)}</td>
+                </tr>`).join('')
+
+  return `<!DOCTYPE html>
+<html lang="${params.locale}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(params.subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
+          <tr>
+            <td style="padding:32px 32px 24px;text-align:center;border-bottom:1px solid #f4f4f5;">
+              <h1 style="margin:0;font-size:20px;font-weight:600;color:#09090b;">${escapeHtml(params.organizationName)}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <h2 style="margin:0 0 12px;font-size:18px;font-weight:600;color:#09090b;">${escapeHtml(params.title)}</h2>
+              <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#3f3f46;">${escapeHtml(params.intro)}</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+                ${rowsHtml}
+              </table>
+              <p style="margin:0;font-size:13px;line-height:1.5;color:#71717a;">${escapeHtml(params.calendarHint)}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 32px;text-align:center;border-top:1px solid #f4f4f5;background-color:#fafafa;">
+              <p style="margin:0;font-size:12px;color:#a1a1aa;">${escapeHtml(params.footer)}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
 }

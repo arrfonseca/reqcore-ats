@@ -47,6 +47,21 @@ export const SCORING_TEMPLATE_IDS = [
 
 export type ScoringTemplateId = (typeof SCORING_TEMPLATE_IDS)[number]
 
+export const ISCO_CATEGORY_IDS = [
+  'executive_management',
+  'science_engineering_it',
+  'healthcare_medical',
+  'legal_finance_business',
+  'education_arts',
+  'sales_customer_service',
+  'administration_operations',
+  'services_hospitality_tourism',
+  'agriculture_trades_manufacturing',
+  'other_lifecycle',
+] as const
+
+export type IscoCategoryId = (typeof ISCO_CATEGORY_IDS)[number]
+
 export const ISCO_CATEGORIES: IscoCategory[] = [
   {
     id: 'executive_management',
@@ -328,4 +343,24 @@ export function hasTemplatesForCategory(categoryId: string): boolean {
 
 export function isValidScoringTemplateId(id: string): id is ScoringTemplateId {
   return (SCORING_TEMPLATE_IDS as readonly string[]).includes(id)
+}
+
+/** Stable keys for premade rubric criteria (not custom / AI-generated). */
+export const PREMADE_CRITERION_KEYS = [
+  'technical_skills',
+  'relevant_experience',
+  'education_fit',
+  'core_tech_stack',
+  'system_design',
+  'engineering_practices',
+  'leadership_collab',
+  'communication',
+  'domain_knowledge',
+  'culture_fit',
+] as const
+
+export type PremadeCriterionKey = (typeof PREMADE_CRITERION_KEYS)[number]
+
+export function isPremadeCriterionKey(key: string): key is PremadeCriterionKey {
+  return (PREMADE_CRITERION_KEYS as readonly string[]).includes(key)
 }

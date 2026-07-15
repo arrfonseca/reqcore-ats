@@ -3,6 +3,7 @@ import { X, AlertTriangle, CheckCircle, Info, AlertCircle, ExternalLink, Chevron
 import type { Toast } from '~/composables/useToast'
 
 const { toasts, remove } = useToast()
+const { t } = useI18n()
 
 const expandedToasts = ref(new Set<string>())
 
@@ -100,7 +101,7 @@ function getConfig(type: string) {
                     class="size-3.5 transition-transform duration-200"
                     :class="{ 'rotate-180': expandedToasts.has(toast.id) }"
                   />
-                  {{ expandedToasts.has(toast.id) ? 'Hide details' : 'Show details' }}
+                  {{ expandedToasts.has(toast.id) ? t('toasts.hideDetails') : t('toasts.showDetails') }}
                 </button>
 
                 <!-- Expanded details -->

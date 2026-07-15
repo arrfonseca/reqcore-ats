@@ -12,6 +12,7 @@
 import { Sparkles, Star, Check, ChevronUp } from 'lucide-vue-next'
 
 const { agents, selectedAgentId } = useChatbot()
+const { t } = useI18n()
 const emit = defineEmits<{ manage: [] }>()
 
 const open = ref(false)
@@ -20,7 +21,7 @@ const root = useTemplateRef<HTMLDivElement>('root')
 const selectedAgent = computed(() =>
   agents.value.find((a) => a.id === selectedAgentId.value) ?? null,
 )
-const label = computed(() => selectedAgent.value?.name ?? 'Default assistant')
+const label = computed(() => selectedAgent.value?.name ?? t('components.chatbotAgentPicker.defaultAssistant'))
 
 function pick(id: string | null) {
   selectedAgentId.value = id
@@ -63,9 +64,9 @@ onUnmounted(() => window.removeEventListener('click', onWindowClick))
         />
         <div class="min-w-0 flex-1">
           <div class="text-sm font-medium text-surface-800 dark:text-surface-100">
-            Default assistant
+            {{ t('components.chatbotAgentPicker.defaultAssistant') }}
           </div>
-          <div class="text-[11px] text-surface-500">No custom system prompt</div>
+          <div class="text-[11px] text-surface-500">{{ t('components.chatbotAgentPicker.noCustomPrompt') }}</div>
         </div>
       </button>
 
@@ -98,7 +99,7 @@ onUnmounted(() => window.removeEventListener('click', onWindowClick))
         @click="open = false; emit('manage')"
       >
         <Sparkles class="size-3.5" />
-        Manage agents…
+        {{ t('components.chatbotAgentPicker.manageAgents') }}
       </button>
     </div>
   </div>

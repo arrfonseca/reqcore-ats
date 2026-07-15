@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ArrowLeft, Pencil, Trash2, Mail, Phone, Calendar, Clock, Briefcase, FileText, Plus, Upload, Download, Eye, X, AlertTriangle, Venus, Mars } from 'lucide-vue-next'
+import { ArrowLeft, Pencil, Trash2, Mail, Phone, Calendar, Clock, Briefcase, FileText, Plus, Upload, Download, Eye, X, AlertTriangle, Venus, Mars, MessageSquare, ExternalLink } from 'lucide-vue-next'
 import { z } from 'zod'
 import { usePreviewReadOnly } from '~/composables/usePreviewReadOnly'
+
+const { t, locale } = useI18n()
 
 definePageMeta({
   layout: 'dashboard',
@@ -19,10 +21,18 @@ const { formatCandidateName, formatDate } = useOrgSettings()
 useSeoMeta({
   title: computed(() =>
     candidate.value
-      ? `${candidate.value.firstName} ${candidate.value.lastName} — Reqcore`
-      : 'Candidate — Reqcore',
+      ? `${candidate.value.firstName} ${candidate.value.lastName} — ${t('common.brand.name')}`
+      : t('dashboard.candidates.detail.seoTitle'),
   ),
 })
+
+function formatLocaleDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString(locale.value, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
 
 // ─────────────────────────────────────────────
 // Tabs
@@ -64,28 +74,28 @@ function cancelEdit() {
   editErrors.value = {}
 }
 
-const editSchema = z.object({
-  firstName: z.string().min(1, 'First name is required').max(100),
-  lastName: z.string().min(1, 'Last name is required').max(100),
+const editSchema = computed(() => z.object({
+  firstName: z.string().min(1, t('dashboard.candidates.new.errors.firstNameRequired')).max(100),
+  lastName: z.string().min(1, t('dashboard.candidates.new.errors.lastNameRequired')).max(100),
   displayName: z.string().max(200).optional(),
-  email: z.string().min(1, 'Email is required').email('Invalid email address').max(255),
+  email: z.string().min(1, t('dashboard.candidates.new.errors.emailRequired')).email(t('dashboard.candidates.new.errors.invalidEmail')).max(255),
   phone: z.string().max(50).optional(),
   gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']).optional(),
   dateOfBirth: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
+    .regex(/^\d{4}-\d{2}-\d{2}$/, t('dashboard.candidates.new.errors.dateFormat'))
     .refine((v) => {
       const d = new Date(v)
       return !isNaN(d.getTime()) && d.getFullYear() >= 1900 && d <= new Date()
-    }, 'Must be a valid past date')
+    }, t('dashboard.candidates.new.errors.pastDate'))
     .optional(),
-})
+}))
 
 const isSaving = ref(false)
 const editErrors = ref<Record<string, string>>({})
 
 async function handleSave() {
-  const result = editSchema.safeParse({
+  const result = editSchema.value.safeParse({
     ...editForm.value,
     gender: editForm.value.gender || undefined,
     dateOfBirth: editForm.value.dateOfBirth || undefined,
@@ -115,7 +125,7 @@ async function handleSave() {
     isEditing.value = false
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    const message = err.data?.statusMessage ?? 'Failed to save changes'
+    const message = err.data?.statusMessage ?? t('dashboard.candidates.detail.errors.saveFailed')
     if (err.statusCode === 409 || err.data?.statusCode === 409) {
       editErrors.value.email = message
     } else {
@@ -139,7 +149,7 @@ async function handleDelete() {
     await deleteCandidate()
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to delete candidate', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('dashboard.candidates.detail.errors.deleteFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
     isDeleting.value = false
     showDeleteConfirm.value = false
   }
@@ -158,18 +168,27 @@ const applicationStatusClasses: Record<string, string> = {
   rejected: 'bg-surface-100 text-surface-500 dark:bg-surface-800 dark:text-surface-400',
 }
 
-const genderLabels: Record<string, string> = {
-  male: 'Male',
-  female: 'Female',
-  other: 'Other',
-  prefer_not_to_say: 'Prefer not to say',
-}
+const genderLabels = computed(() => ({
+  male: t('dashboard.candidates.shared.gender.male'),
+  female: t('dashboard.candidates.shared.gender.female'),
+  other: t('dashboard.candidates.shared.gender.other'),
+  prefer_not_to_say: t('dashboard.candidates.shared.gender.prefer_not_to_say'),
+}))
 
-const documentTypeLabels: Record<string, string> = {
-  resume: 'Resume',
-  cover_letter: 'Cover Letter',
-  other: 'Other',
-}
+const documentTypeLabels = computed(() => ({
+  resume: t('dashboard.candidates.shared.documentTypes.resume'),
+  cover_letter: t('dashboard.candidates.shared.documentTypes.cover_letter'),
+  other: t('dashboard.candidates.shared.documentTypes.other'),
+}))
+
+const stageLabels = computed(() => ({
+  new: t('common.stages.new'),
+  screening: t('common.stages.screening'),
+  interview: t('common.stages.interview'),
+  offer: t('common.stages.offer'),
+  hired: t('common.stages.hired'),
+  rejected: t('common.stages.rejected'),
+}))
 
 // ─────────────────────────────────────────────
 // Apply to job modal
@@ -192,6 +211,33 @@ const interviewTargetApp = ref<{ id: string; jobTitle: string } | null>(null)
 function openScheduleInterview(app: { id: string; job: { title: string } }) {
   interviewTargetApp.value = { id: app.id, jobTitle: app.job.title }
   showInterviewSidebar.value = true
+}
+
+// ─────────────────────────────────────────────
+// Quick notes
+// ─────────────────────────────────────────────
+
+const isEditingQuickNotes = ref(false)
+const quickNotesInput = ref('')
+const isSavingQuickNotes = ref(false)
+
+function startEditQuickNotes() {
+  quickNotesInput.value = candidate.value?.quickNotes ?? ''
+  isEditingQuickNotes.value = true
+}
+
+async function saveQuickNotes() {
+  if (isSavingQuickNotes.value) return
+  isSavingQuickNotes.value = true
+  try {
+    await updateCandidate({ quickNotes: quickNotesInput.value || null })
+    isEditingQuickNotes.value = false
+  } catch (err: any) {
+    if (handlePreviewReadOnlyError(err)) return
+    toast.error(t('dashboard.candidates.detail.errors.saveFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+  } finally {
+    isSavingQuickNotes.value = false
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -232,7 +278,7 @@ async function handlePreview(docId: string, mimeType?: string) {
 
   // Find the document name from the candidate data
   const doc = candidate.value?.documents?.find((d: any) => d.id === docId)
-  previewFilename.value = doc?.originalFilename ?? 'Document'
+  previewFilename.value = doc?.originalFilename ?? t('dashboard.candidates.documents.preview')
   previewMimeType.value = doc?.mimeType ?? 'application/pdf'
 
   // Use the API endpoint URL directly — server streams the PDF (same-origin)
@@ -263,7 +309,7 @@ async function handleFileSelected(event: Event) {
   try {
     await uploadDocument(candidateId, file, selectedDocType.value)
   } catch (err: any) {
-    const msg = err.data?.statusMessage ?? err.statusMessage ?? 'Upload failed'
+    const msg = err.data?.statusMessage ?? err.statusMessage ?? t('dashboard.candidates.detail.errors.uploadFailed')
     uploadError.value = msg
   } finally {
     isUploading.value = false
@@ -276,7 +322,7 @@ async function handleDownload(docId: string) {
   try {
     await downloadDocument(docId)
   } catch {
-    toast.error('Failed to download document')
+    toast.error(t('dashboard.candidates.detail.errors.downloadFailed'))
   }
 }
 
@@ -287,7 +333,7 @@ async function handleDeleteDoc(docId: string) {
     showDocDeleteConfirm.value = null
   } catch (err: any) {
     if (handlePreviewReadOnlyError(err)) return
-    toast.error('Failed to delete document', { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
+    toast.error(t('dashboard.candidates.detail.errors.deleteDocumentFailed'), { message: err.data?.statusMessage, statusCode: err.data?.statusCode })
   } finally {
     isDeletingDoc.value = false
   }
@@ -303,19 +349,19 @@ function formatFileSize(bytes: number | null | undefined): string {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl">
+  <div class="mx-auto max-w-4xl">
     <!-- Back link -->
     <NuxtLink
       :to="$localePath('/dashboard/candidates')"
       class="inline-flex items-center gap-1 text-sm text-surface-500 hover:text-surface-700 mb-6 transition-colors"
     >
       <ArrowLeft class="size-4" />
-      Back to Candidates
+      {{ t('dashboard.candidates.detail.backToCandidates') }}
     </NuxtLink>
 
     <!-- Loading -->
     <div v-if="fetchStatus === 'pending'" class="text-center py-12 text-surface-400">
-      Loading candidate…
+      {{ t('dashboard.candidates.detail.loading') }}
     </div>
 
     <!-- Error / not found -->
@@ -323,8 +369,8 @@ function formatFileSize(bytes: number | null | undefined): string {
       v-else-if="error"
       class="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-700"
     >
-      {{ error.statusCode === 404 ? 'Candidate not found.' : 'Failed to load candidate.' }}
-      <NuxtLink :to="$localePath('/dashboard/candidates')" class="underline ml-1">Back to Candidates</NuxtLink>
+      {{ error.statusCode === 404 ? t('dashboard.candidates.detail.notFound') : t('dashboard.candidates.detail.loadFailed') }}
+      <NuxtLink :to="$localePath('/dashboard/candidates')" class="underline ml-1">{{ t('dashboard.candidates.detail.backToCandidates') }}</NuxtLink>
     </div>
 
     <!-- Candidate detail -->
@@ -359,24 +405,24 @@ function formatFileSize(bytes: number | null | undefined): string {
               @click="startEdit"
             >
               <Pencil class="size-3.5" />
-              Edit
+              {{ t('dashboard.candidates.detail.edit') }}
             </button>
             <button
               class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-danger-300 dark:border-danger-700 px-3 py-1.5 text-sm font-medium text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors"
               @click="showDeleteConfirm = true"
             >
               <Trash2 class="size-3.5" />
-              Delete
+              {{ t('dashboard.candidates.detail.delete') }}
             </button>
           </div>
         </div>
 
         <!-- Contact details -->
         <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 mb-4">
-          <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200 mb-3">Details</h2>
+          <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200 mb-3">{{ t('dashboard.candidates.detail.details') }}</h2>
           <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div>
-              <dt class="text-surface-400">Email</dt>
+              <dt class="text-surface-400">{{ t('dashboard.candidates.detail.email') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
                 <a
                   :href="`mailto:${candidate.email}`"
@@ -386,25 +432,25 @@ function formatFileSize(bytes: number | null | undefined): string {
               </dd>
             </div>
             <div>
-              <dt class="text-surface-400">Phone</dt>
+              <dt class="text-surface-400">{{ t('dashboard.candidates.detail.phone') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
                 {{ candidate.phone || '—' }}
               </dd>
             </div>
             <div v-if="candidate.gender">
-              <dt class="text-surface-400">Gender</dt>
+              <dt class="text-surface-400">{{ t('dashboard.candidates.detail.gender') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
                 {{ genderLabels[candidate.gender] ?? candidate.gender }}
               </dd>
             </div>
             <div v-if="candidate.dateOfBirth">
-              <dt class="text-surface-400">Date of Birth</dt>
+              <dt class="text-surface-400">{{ t('dashboard.candidates.detail.dateOfBirth') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
                 {{ formatDate(candidate.dateOfBirth) }}
               </dd>
             </div>
             <div v-if="candidate.displayName">
-              <dt class="text-surface-400">Display Name</dt>
+              <dt class="text-surface-400">{{ t('dashboard.candidates.detail.displayName') }}</dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
                 {{ candidate.displayName }}
               </dd>
@@ -412,19 +458,19 @@ function formatFileSize(bytes: number | null | undefined): string {
             <div>
               <dt class="text-surface-400 inline-flex items-center gap-1">
                 <Calendar class="size-3.5" />
-                Created
+                {{ t('dashboard.candidates.detail.created') }}
               </dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
-                <TimelineDateLink :date="candidate.createdAt">{{ new Date(candidate.createdAt).toLocaleDateString() }}</TimelineDateLink>
+                <TimelineDateLink :date="candidate.createdAt">{{ formatLocaleDate(candidate.createdAt) }}</TimelineDateLink>
               </dd>
             </div>
             <div>
               <dt class="text-surface-400 inline-flex items-center gap-1">
                 <Clock class="size-3.5" />
-                Updated
+                {{ t('dashboard.candidates.detail.updated') }}
               </dt>
               <dd class="text-surface-700 dark:text-surface-200 font-medium">
-                <TimelineDateLink :date="candidate.updatedAt">{{ new Date(candidate.updatedAt).toLocaleDateString() }}</TimelineDateLink>
+                <TimelineDateLink :date="candidate.updatedAt">{{ formatLocaleDate(candidate.updatedAt) }}</TimelineDateLink>
               </dd>
             </div>
           </dl>
@@ -432,13 +478,69 @@ function formatFileSize(bytes: number | null | undefined): string {
 
         <!-- Custom properties (Notion-style) -->
         <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-4 mb-4">
-          <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200 mb-2 px-2">Properties</h2>
+          <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200 mb-2 px-2">{{ t('dashboard.candidates.detail.properties') }}</h2>
           <PropertyBlock
             entity-type="candidate"
             :entity-id="candidateId"
             :entries="(candidate.properties ?? []) as import('~~/shared/properties').PropertyEntry[]"
             @refresh="refresh()"
           />
+        </div>
+
+        <!-- Quick notes -->
+        <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 mb-4">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2.5">
+              <div class="flex size-7 items-center justify-center rounded-lg bg-warning-50 dark:bg-warning-950/40">
+                <MessageSquare class="size-3.5 text-warning-600 dark:text-warning-400" />
+              </div>
+              <h2 class="text-sm font-semibold text-surface-700 dark:text-surface-200">{{ t('dashboard.candidates.detail.quickNotes') }}</h2>
+            </div>
+            <button
+              v-if="!isEditingQuickNotes"
+              type="button"
+              class="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 font-medium transition-colors"
+              @click="startEditQuickNotes"
+            >
+              <Plus class="size-3.5" />
+              {{ candidate.quickNotes ? t('common.actions.edit') : t('dashboard.candidates.detail.addNewNote') }}
+            </button>
+          </div>
+
+          <div v-if="isEditingQuickNotes">
+            <textarea
+              v-model="quickNotesInput"
+              rows="4"
+              maxlength="1000"
+              :placeholder="t('dashboard.candidates.detail.notesPlaceholder')"
+              class="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+            />
+            <div class="flex items-center gap-2 mt-2">
+              <button
+                type="button"
+                :disabled="isSavingQuickNotes"
+                class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                @click="saveQuickNotes"
+              >
+                {{ isSavingQuickNotes ? t('common.actions.saving') : t('common.actions.save') }}
+              </button>
+              <button
+                type="button"
+                class="rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+                @click="isEditingQuickNotes = false"
+              >
+                {{ t('common.actions.cancel') }}
+              </button>
+            </div>
+          </div>
+
+          <p
+            v-else-if="candidate.quickNotes"
+            class="text-sm leading-relaxed text-surface-600 dark:text-surface-300 whitespace-pre-wrap"
+          >
+            {{ candidate.quickNotes }}
+          </p>
+          <p v-else class="text-sm text-surface-400 italic">{{ t('dashboard.candidates.detail.noQuickNotes') }}</p>
         </div>
 
         <!-- Tabs -->
@@ -451,7 +553,7 @@ function formatFileSize(bytes: number | null | undefined): string {
                 : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:hover:text-surface-300'"
               @click="activeTab = 'applications'"
             >
-              Applications ({{ candidate.applications?.length ?? 0 }})
+              {{ t('dashboard.candidates.detail.applications') }} ({{ candidate.applications?.length ?? 0 }})
             </button>
             <button
               class="cursor-pointer px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px"
@@ -460,7 +562,7 @@ function formatFileSize(bytes: number | null | undefined): string {
                 : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300 dark:hover:text-surface-300'"
               @click="activeTab = 'documents'"
             >
-              Documents ({{ candidate.documents?.length ?? 0 }})
+              {{ t('dashboard.candidates.detail.documents') }} ({{ candidate.documents?.length ?? 0 }})
             </button>
           </div>
         </div>
@@ -474,7 +576,7 @@ function formatFileSize(bytes: number | null | undefined): string {
               @click="showApplyModal = true"
             >
               <Plus class="size-3.5" />
-              Apply to Job
+              {{ t('dashboard.candidates.detail.applyToJob') }}
             </button>
           </div>
 
@@ -483,41 +585,62 @@ function formatFileSize(bytes: number | null | undefined): string {
             class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-8 text-center"
           >
             <Briefcase class="size-8 text-surface-300 dark:text-surface-600 mx-auto mb-2" />
-            <p class="text-sm text-surface-500 dark:text-surface-400">No applications yet.</p>
+            <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('dashboard.candidates.detail.noApplications') }}</p>
           </div>
 
-          <div v-else class="space-y-2">
+          <div v-else class="space-y-4">
             <div
               v-for="app in candidate.applications"
               :key="app.id"
-              class="flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-4 py-3 hover:border-surface-300 dark:hover:border-surface-700 hover:shadow-sm transition-all group gap-2"
+              class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-hidden"
             >
-              <NuxtLink
-                :to="$localePath(`/dashboard/applications/${app.id}`)"
-                class="min-w-0 flex-1 block"
-              >
-                <h4 class="text-sm font-semibold text-surface-900 dark:text-surface-100 group-hover:text-brand-600 transition-colors truncate">
-                  {{ app.job.title }}
-                </h4>
-                <span class="text-xs text-surface-400">
-                  Applied <TimelineDateLink :date="app.createdAt">{{ new Date(app.createdAt).toLocaleDateString() }}</TimelineDateLink>
-                </span>
-              </NuxtLink>
-              <div class="flex items-center gap-2 shrink-0 sm:ml-3">
-                <button
-                  class="inline-flex items-center gap-1 rounded-lg border border-surface-200 dark:border-surface-700 px-2 py-1 text-xs font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/30 hover:text-brand-700 dark:hover:text-brand-300 transition-all cursor-pointer"
-                  title="Schedule Interview"
-                  @click="openScheduleInterview(app)"
-                >
-                  <Calendar class="size-3" />
-                  Schedule
-                </button>
-                <span
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
-                  :class="applicationStatusClasses[app.status] ?? 'bg-surface-100 text-surface-600'"
-                >
-                  {{ app.status }}
-                </span>
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 py-3 gap-2 border-b border-surface-100 dark:border-surface-800">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <NuxtLink
+                      :to="$localePath(`/dashboard/jobs/${app.job.id}`)"
+                      class="text-sm font-semibold text-surface-900 dark:text-surface-100 hover:text-brand-600 dark:hover:text-brand-400 transition-colors truncate"
+                    >
+                      {{ app.job.title }}
+                    </NuxtLink>
+                    <NuxtLink
+                      :to="$localePath(`/dashboard/jobs/${app.job.id}`)"
+                      class="shrink-0 text-surface-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                      :title="t('dashboard.candidates.detail.openJobPipeline')"
+                    >
+                      <ExternalLink class="size-3.5" />
+                    </NuxtLink>
+                  </div>
+                  <span class="text-xs text-surface-400">
+                    {{ t('dashboard.candidates.detail.applied') }} <TimelineDateLink :date="app.createdAt">{{ formatLocaleDate(app.createdAt) }}</TimelineDateLink>
+                  </span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <ScheduleInterviewButton
+                    :application-id="app.id"
+                    variant="compact"
+                    @schedule="openScheduleInterview(app)"
+                  />
+                  <NuxtLink
+                    :to="$localePath(`/dashboard/applications/${app.id}`)"
+                    class="inline-flex items-center gap-1 rounded-lg border border-surface-200 dark:border-surface-700 px-2 py-1 text-xs font-medium text-surface-600 dark:text-surface-400 hover:border-brand-400 dark:hover:border-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/30 hover:text-brand-700 dark:hover:text-brand-300 transition-all"
+                  >
+                    {{ t('dashboard.candidates.detail.viewApplication') }}
+                  </NuxtLink>
+                  <span
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
+                    :class="applicationStatusClasses[app.status] ?? 'bg-surface-100 text-surface-600'"
+                  >
+                    {{ stageLabels[app.status as keyof typeof stageLabels] ?? app.status }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="p-4">
+                <ScoreBreakdown
+                  :application-id="app.id"
+                  @scored="refresh()"
+                />
               </div>
             </div>
           </div>
@@ -561,13 +684,13 @@ function formatFileSize(bytes: number | null | undefined): string {
                 @click="closePreview"
               >
                 <ArrowLeft class="size-3.5" />
-                Back to documents
+                {{ t('dashboard.candidates.documents.backToDocuments') }}
               </button>
               <div class="flex items-center gap-1">
                 <button
                   v-if="previewDocId"
                   class="rounded-lg p-1.5 text-surface-400 hover:text-brand-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                  title="Download"
+                  :title="t('dashboard.candidates.documents.download')"
                   @click="handleDownload(previewDocId!)"
                 >
                   <Download class="size-4" />
@@ -594,7 +717,7 @@ function formatFileSize(bytes: number | null | undefined): string {
                 class="mt-3 text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 font-medium"
                 @click="closePreview"
               >
-                Go back
+                {{ t('dashboard.candidates.documents.goBack') }}
               </button>
             </div>
 
@@ -604,7 +727,7 @@ function formatFileSize(bytes: number | null | undefined): string {
               :src="previewUrl"
               class="w-full rounded-lg border border-surface-200 dark:border-surface-800"
               style="height: 70vh;"
-              title="Document preview"
+              :title="t('dashboard.candidates.documents.preview')"
             />
           </template>
 
@@ -617,9 +740,9 @@ function formatFileSize(bytes: number | null | undefined): string {
                   v-model="selectedDocType"
                   class="rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 px-2.5 py-1.5 text-sm text-surface-700 dark:text-surface-300 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
-                  <option value="resume">Resume</option>
-                  <option value="cover_letter">Cover Letter</option>
-                  <option value="other">Other</option>
+                  <option value="resume">{{ t('dashboard.candidates.shared.documentTypes.resume') }}</option>
+                  <option value="cover_letter">{{ t('dashboard.candidates.shared.documentTypes.cover_letter') }}</option>
+                  <option value="other">{{ t('dashboard.candidates.shared.documentTypes.other') }}</option>
                 </select>
               </div>
               <button
@@ -628,7 +751,7 @@ function formatFileSize(bytes: number | null | undefined): string {
                 @click="triggerFileSelect"
               >
                 <Upload class="size-3.5" />
-                {{ isUploading ? 'Uploading…' : 'Upload Document' }}
+                {{ isUploading ? t('dashboard.candidates.documents.uploading') : t('dashboard.candidates.documents.upload') }}
               </button>
             </div>
 
@@ -638,7 +761,7 @@ function formatFileSize(bytes: number | null | undefined): string {
               class="rounded-lg border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-950 p-3 text-sm text-danger-700 dark:text-danger-400 mb-3"
             >
               {{ uploadError }}
-              <button class="underline ml-1" @click="uploadError = null">Dismiss</button>
+              <button class="underline ml-1" @click="uploadError = null">{{ t('dashboard.candidates.documents.dismiss') }}</button>
             </div>
 
             <!-- Empty state -->
@@ -647,9 +770,9 @@ function formatFileSize(bytes: number | null | undefined): string {
               class="rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-8 text-center"
             >
               <FileText class="size-8 text-surface-300 dark:text-surface-600 mx-auto mb-2" />
-              <p class="text-sm text-surface-500 dark:text-surface-400">No documents yet.</p>
+              <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('dashboard.candidates.documents.empty') }}</p>
               <p class="text-xs text-surface-400 mt-1">
-                Upload a resume, cover letter, or other document (PDF, DOC, DOCX — max 10 MB).
+                {{ t('dashboard.candidates.documents.uploadHint') }}
               </p>
             </div>
 
@@ -670,8 +793,8 @@ function formatFileSize(bytes: number | null | undefined): string {
                     </p>
                     <span class="text-xs text-surface-400">
                       {{ documentTypeLabels[doc.type] ?? doc.type }}
-                      · <TimelineDateLink :date="doc.createdAt">{{ new Date(doc.createdAt).toLocaleDateString() }}</TimelineDateLink>
-                      <template v-if="doc.mimeType === 'application/pdf'"> · <span class="text-brand-500 dark:text-brand-400">Click to preview</span></template>
+                      · <TimelineDateLink :date="doc.createdAt">{{ formatLocaleDate(doc.createdAt) }}</TimelineDateLink>
+                      <template v-if="doc.mimeType === 'application/pdf'"> · <span class="text-brand-500 dark:text-brand-400">{{ t('dashboard.candidates.documents.clickToPreview') }}</span></template>
                     </span>
                   </div>
                 </div>
@@ -679,21 +802,21 @@ function formatFileSize(bytes: number | null | undefined): string {
                   <button
                     v-if="doc.mimeType === 'application/pdf'"
                     class="rounded-lg p-1.5 text-surface-400 hover:text-brand-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                    title="Preview PDF"
+                    :title="t('dashboard.candidates.documents.previewPdf')"
                     @click="handlePreview(doc.id, doc.mimeType)"
                   >
                     <Eye class="size-4" />
                   </button>
                   <button
                     class="rounded-lg p-1.5 text-surface-400 hover:text-brand-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                    title="Download"
+                    :title="t('dashboard.candidates.documents.download')"
                     @click="handleDownload(doc.id)"
                   >
                     <Download class="size-4" />
                   </button>
                   <button
                     class="rounded-lg p-1.5 text-surface-400 hover:text-danger-600 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-                    title="Delete"
+                    :title="t('common.actions.delete')"
                     @click="showDocDeleteConfirm = doc.id"
                   >
                     <Trash2 class="size-4" />
@@ -708,9 +831,9 @@ function formatFileSize(bytes: number | null | undefined): string {
             <div v-if="showDocDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center">
               <div class="absolute inset-0 bg-black/50" @click="showDocDeleteConfirm = null" />
               <div class="relative bg-white dark:bg-surface-900 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-                <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-2">Delete Document</h3>
+                <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-2">{{ t('dashboard.candidates.documents.deleteDocument') }}</h3>
                 <p class="text-sm text-surface-600 dark:text-surface-400 mb-4">
-                  Are you sure you want to delete this document? This action cannot be undone.
+                  {{ t('dashboard.candidates.documents.deleteConfirm') }}
                 </p>
                 <div class="flex justify-end gap-2">
                   <button
@@ -718,14 +841,14 @@ function formatFileSize(bytes: number | null | undefined): string {
                     class="rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                     @click="showDocDeleteConfirm = null"
                   >
-                    Cancel
+                    {{ t('common.cancel') }}
                   </button>
                   <button
                     :disabled="isDeletingDoc"
                     class="rounded-lg bg-danger-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-50 transition-colors"
                     @click="handleDeleteDoc(showDocDeleteConfirm!)"
                   >
-                    {{ isDeletingDoc ? 'Deleting…' : 'Delete' }}
+                    {{ isDeletingDoc ? t('common.actions.deleting') : t('common.actions.delete') }}
                   </button>
                 </div>
               </div>
@@ -736,13 +859,13 @@ function formatFileSize(bytes: number | null | undefined): string {
 
       <!-- EDIT MODE -->
       <div v-else>
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50 mb-6">Edit Candidate</h1>
+        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50 mb-6">{{ t('common.actions.edit') }} — {{ formatCandidateName(candidate) }}</h1>
 
         <form class="space-y-5" @submit.prevent="handleSave">
           <!-- First Name -->
           <div>
             <label for="edit-firstName" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-              First Name <span class="text-danger-500">*</span>
+              {{ t('dashboard.candidates.new.firstName') }} <span class="text-danger-500">*</span>
             </label>
             <input
               id="edit-firstName"
@@ -757,7 +880,7 @@ function formatFileSize(bytes: number | null | undefined): string {
           <!-- Last Name -->
           <div>
             <label for="edit-lastName" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-              Last Name <span class="text-danger-500">*</span>
+              {{ t('dashboard.candidates.new.lastName') }} <span class="text-danger-500">*</span>
             </label>
             <input
               id="edit-lastName"
@@ -772,7 +895,7 @@ function formatFileSize(bytes: number | null | undefined): string {
           <!-- Email -->
           <div>
             <label for="edit-email" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-              Email <span class="text-danger-500">*</span>
+              {{ t('dashboard.candidates.new.email') }} <span class="text-danger-500">*</span>
             </label>
             <input
               id="edit-email"
@@ -787,7 +910,7 @@ function formatFileSize(bytes: number | null | undefined): string {
           <!-- Phone -->
           <div>
             <label for="edit-phone" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-              Phone
+              {{ t('dashboard.candidates.new.phone') }}
             </label>
             <input
               id="edit-phone"
@@ -800,14 +923,14 @@ function formatFileSize(bytes: number | null | undefined): string {
           <!-- Display Name -->
           <div>
             <label for="edit-displayName" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-              Display Name
-              <span class="ml-1 text-xs font-normal text-surface-400">(optional — overrides default name format)</span>
+              {{ t('dashboard.candidates.new.displayName') }}
+              <span class="ml-1 text-xs font-normal text-surface-400">{{ t('dashboard.candidates.new.displayNameHint') }}</span>
             </label>
             <input
               id="edit-displayName"
               v-model="editForm.displayName"
               type="text"
-              placeholder="e.g. Nguyễn Văn A"
+              :placeholder="t('dashboard.candidates.new.placeholders.displayName')"
               class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
             />
           </div>
@@ -816,23 +939,23 @@ function formatFileSize(bytes: number | null | undefined): string {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label for="edit-gender" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                Gender
+                {{ t('dashboard.candidates.new.gender') }}
               </label>
               <select
                 id="edit-gender"
                 v-model="editForm.gender"
                 class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
               >
-                <option value="">Not specified</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-                <option value="prefer_not_to_say">Prefer not to say</option>
+                <option value="">{{ t('dashboard.candidates.new.notSpecified') }}</option>
+                <option value="male">{{ t('dashboard.candidates.shared.gender.male') }}</option>
+                <option value="female">{{ t('dashboard.candidates.shared.gender.female') }}</option>
+                <option value="other">{{ t('dashboard.candidates.shared.gender.other') }}</option>
+                <option value="prefer_not_to_say">{{ t('dashboard.candidates.shared.gender.prefer_not_to_say') }}</option>
               </select>
             </div>
             <div>
               <label for="edit-dateOfBirth" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-                Date of Birth
+                {{ t('dashboard.candidates.new.dateOfBirth') }}
               </label>
               <input
                 id="edit-dateOfBirth"
@@ -853,14 +976,14 @@ function formatFileSize(bytes: number | null | undefined): string {
               :disabled="isSaving"
               class="inline-flex items-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {{ isSaving ? 'Saving…' : 'Save Changes' }}
+              {{ isSaving ? t('common.actions.saving') : t('common.actions.saveChanges') }}
             </button>
             <button
               type="button"
               class="rounded-lg border border-surface-300 dark:border-surface-700 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
               @click="cancelEdit"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </button>
           </div>
         </form>
@@ -871,10 +994,9 @@ function formatFileSize(bytes: number | null | undefined): string {
         <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center">
           <div class="absolute inset-0 bg-black/50" @click="showDeleteConfirm = false" />
           <div class="relative bg-white dark:bg-surface-900 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-2">Delete Candidate</h3>
+            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-2">{{ t('common.actions.delete') }} — {{ formatCandidateName(candidate) }}</h3>
             <p class="text-sm text-surface-600 dark:text-surface-400 mb-4">
-              Are you sure you want to delete <strong>{{ formatCandidateName(candidate) }}</strong>?
-              This will also delete all their applications and documents. This action cannot be undone.
+              {{ t('dashboard.jobs.detail.settings.deleteConfirm', { title: formatCandidateName(candidate) }) }}
             </p>
             <div class="flex justify-end gap-2">
               <button
@@ -882,14 +1004,14 @@ function formatFileSize(bytes: number | null | undefined): string {
                 class="rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
                 @click="showDeleteConfirm = false"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </button>
               <button
                 :disabled="isDeleting"
                 class="rounded-lg bg-danger-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-700 disabled:opacity-50 transition-colors"
                 @click="handleDelete"
               >
-                {{ isDeleting ? 'Deleting…' : 'Delete' }}
+                {{ isDeleting ? t('common.actions.deleting') : t('common.actions.delete') }}
               </button>
             </div>
           </div>

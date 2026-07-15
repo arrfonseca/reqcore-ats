@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { X, Plus, Trash2 } from 'lucide-vue-next'
 
+const { t } = useI18n()
+
 const props = defineProps<{
   /** If provided, we're editing an existing question */
   question?: {
@@ -24,17 +26,17 @@ const emit = defineEmits<{
   (e: 'cancel'): void
 }>()
 
-const questionTypes = [
-  { value: 'short_text', label: 'Short Text' },
-  { value: 'long_text', label: 'Long Text' },
-  { value: 'single_select', label: 'Single Select' },
-  { value: 'multi_select', label: 'Multi Select' },
-  { value: 'number', label: 'Number' },
-  { value: 'date', label: 'Date' },
-  { value: 'url', label: 'URL' },
-  { value: 'checkbox', label: 'Checkbox (Yes/No)' },
-  { value: 'file_upload', label: 'File Upload' },
-]
+const questionTypes = computed(() => [
+  { value: 'short_text', label: t('dashboard.jobs.shared.questionTypes.short_text') },
+  { value: 'long_text', label: t('dashboard.jobs.shared.questionTypes.long_text') },
+  { value: 'single_select', label: t('dashboard.jobs.shared.questionTypes.single_select') },
+  { value: 'multi_select', label: t('dashboard.jobs.shared.questionTypes.multi_select') },
+  { value: 'number', label: t('dashboard.jobs.shared.questionTypes.number') },
+  { value: 'date', label: t('dashboard.jobs.shared.questionTypes.date') },
+  { value: 'url', label: t('dashboard.jobs.shared.questionTypes.url') },
+  { value: 'checkbox', label: t('dashboard.jobs.shared.questionTypes.checkboxYesNo') },
+  { value: 'file_upload', label: t('dashboard.jobs.shared.questionTypes.file_upload') },
+])
 
 const form = ref({
   label: props.question?.label ?? '',
@@ -64,13 +66,13 @@ function validate(): boolean {
   errors.value = {}
 
   if (!form.value.label.trim()) {
-    errors.value.label = 'Question label is required'
+    errors.value.label = t('components.questionForm.errors.labelRequired')
   }
 
   if (isSelectType.value) {
     const nonEmpty = form.value.options.filter((o) => o.trim())
     if (nonEmpty.length === 0) {
-      errors.value.options = 'At least one option is required for select questions'
+      errors.value.options = t('components.questionForm.errors.optionsRequired')
     }
   }
 
@@ -112,7 +114,7 @@ const isEditing = computed(() => !!props.question)
   <div class="rounded-lg border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-900 p-4">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-sm font-semibold text-surface-700 dark:text-surface-300">
-        {{ isEditing ? 'Edit Question' : 'Add Question' }}
+        {{ isEditing ? t('components.questionForm.editQuestion') : t('components.questionForm.addQuestion') }}
       </h3>
       <button
         type="button"
@@ -127,13 +129,13 @@ const isEditing = computed(() => !!props.question)
       <!-- Label -->
       <div>
         <label for="q-label" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-          Question <span class="text-danger-500">*</span>
+          {{ t('components.questionForm.question') }} <span class="text-danger-500">*</span>
         </label>
         <input
           id="q-label"
           v-model="form.label"
           type="text"
-          placeholder="e.g. How many years of experience do you have?"
+          :placeholder="t('components.questionForm.questionPlaceholder')"
           class="w-full rounded-lg border px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
           :class="errors.label ? 'border-danger-300' : 'border-surface-300 dark:border-surface-700'"
         />
@@ -143,7 +145,7 @@ const isEditing = computed(() => !!props.question)
       <!-- Type -->
       <div>
         <label for="q-type" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-          Field Type
+          {{ t('components.questionForm.fieldType') }}
         </label>
         <select
           id="q-type"
@@ -159,13 +161,13 @@ const isEditing = computed(() => !!props.question)
       <!-- Description / help text -->
       <div>
         <label for="q-desc" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-          Help Text <span class="text-surface-400 font-normal">(optional)</span>
+          {{ t('components.questionForm.helpText') }} <span class="text-surface-400 font-normal">({{ t('common.fields.optional') }})</span>
         </label>
         <input
           id="q-desc"
           v-model="form.description"
           type="text"
-          placeholder="Additional context shown below the field"
+          :placeholder="t('components.questionForm.helpTextPlaceholder')"
           class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
         />
       </div>
@@ -173,14 +175,14 @@ const isEditing = computed(() => !!props.question)
       <!-- Options (for select types) -->
       <div v-if="isSelectType">
         <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
-          Options <span class="text-danger-500">*</span>
+          {{ t('components.questionForm.options') }} <span class="text-danger-500">*</span>
         </label>
         <div class="space-y-2">
           <div v-for="(_, index) in form.options" :key="index" class="flex items-center gap-2">
             <input
               v-model="form.options[index]"
               type="text"
-              :placeholder="`Option ${index + 1}`"
+              :placeholder="t('components.questionForm.optionPlaceholder', { number: index + 1 })"
               class="flex-1 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
             />
             <button
@@ -199,7 +201,7 @@ const isEditing = computed(() => !!props.question)
           @click="addOption"
         >
           <Plus class="size-3.5" />
-          Add option
+          {{ t('components.questionForm.addOption') }}
         </button>
         <p v-if="errors.options" class="mt-1 text-xs text-danger-600 dark:text-danger-400">{{ errors.options }}</p>
       </div>
@@ -211,7 +213,7 @@ const isEditing = computed(() => !!props.question)
           type="checkbox"
           class="size-4 rounded border-surface-300 dark:border-surface-700 text-brand-600 focus:ring-brand-500"
         />
-        <span class="text-sm text-surface-700 dark:text-surface-300">Required</span>
+        <span class="text-sm text-surface-700 dark:text-surface-300">{{ t('components.questionForm.required') }}</span>
       </label>
 
       <!-- Actions -->
@@ -220,14 +222,14 @@ const isEditing = computed(() => !!props.question)
           type="submit"
           class="inline-flex items-center rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
         >
-          {{ isEditing ? 'Update' : 'Add Question' }}
+          {{ isEditing ? t('common.actions.update') : t('components.questionForm.addQuestion') }}
         </button>
         <button
           type="button"
           class="rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
           @click="emit('cancel')"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </button>
       </div>
     </form>

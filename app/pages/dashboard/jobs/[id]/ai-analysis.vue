@@ -3,6 +3,8 @@ import {
   Brain, Sparkles, SlidersHorizontal, Plus, Trash2, Loader2, Save, RotateCcw,
 } from 'lucide-vue-next'
 
+const { t } = useI18n()
+
 definePageMeta({
   layout: 'dashboard',
   middleware: ['auth', 'require-org'],
@@ -12,12 +14,17 @@ const route = useRoute()
 const jobId = route.params.id as string
 const toast = useToast()
 const { track } = useTrack()
+const { aiSettingsPath, aiSettingsLinkLabel } = useEffectiveAi()
+
+const { isPremadeCriterionKey, resolveCriterionDisplay } = useScoringCriteriaTemplates()
 
 const { job, status: jobFetchStatus, error: jobError, updateJob } = useJob(jobId)
 
 useSeoMeta({
   title: computed(() =>
-    job.value ? `AI Analysis — ${job.value.title} — Reqcore` : 'AI Analysis — Reqcore',
+    job.value
+      ? t('dashboard.jobs.aiAnalysis.seoTitle', { title: job.value.title })
+      : t('dashboard.jobs.aiAnalysis.seoTitleFallback'),
   ),
   robots: 'noindex, nofollow',
 })
@@ -35,14 +42,14 @@ type ScoringCriterionDraft = {
   weight: number
 }
 
-const categoryLabels: Record<string, string> = {
-  technical: 'Qualifications',
-  experience: 'Experience',
-  soft_skills: 'Soft Skills',
-  education: 'Education',
-  culture: 'Culture',
-  custom: 'Custom',
-}
+const categoryLabels = computed<Record<string, string>>(() => ({
+  technical: t('dashboard.jobs.shared.categories.technical'),
+  experience: t('dashboard.jobs.shared.categories.experience'),
+  soft_skills: t('dashboard.jobs.shared.categories.soft_skills'),
+  education: t('dashboard.jobs.shared.categories.education'),
+  culture: t('dashboard.jobs.shared.categories.culture'),
+  custom: t('dashboard.jobs.shared.categories.custom'),
+}))
 
 const categoryColorClasses: Record<string, string> = {
   technical: 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:ring-blue-800',
@@ -106,9 +113,9 @@ async function toggleAutoScore() {
       method: 'PATCH',
       body: { autoScoreOnApply: autoScoreOnApply.value },
     })
-    toast.success('Auto-score setting updated')
+    toast.success(t('dashboard.jobs.aiAnalysis.toasts.autoScoreUpdated'))
   } catch (err: any) {
-    toast.error('Failed to update setting', { message: err?.data?.statusMessage })
+    toast.error(t('dashboard.jobs.aiAnalysis.toasts.updateSettingFailed'), { message: err?.data?.statusMessage })
     autoScoreOnApply.value = !autoScoreOnApply.value
   } finally {
     isSavingAutoScore.value = false
@@ -125,7 +132,7 @@ const { getCriteria: getTemplateCriteria } = useScoringCriteriaTemplates()
 function loadTemplate(templateId: string) {
   const criteria = getTemplateCriteria(templateId)
   if (criteria.length === 0) {
-    toast.error('Failed to load template', { message: 'Unknown or empty template.' })
+    toast.error(t('dashboard.jobs.aiAnalysis.toasts.loadTemplateFailed'), { message: t('dashboard.jobs.aiAnalysis.toasts.unknownTemplate') })
     return
   }
   scoringCriteria.value = criteria
@@ -140,7 +147,7 @@ const isGeneratingCriteria = ref(false)
 
 async function generateAiCriteria() {
   if (!job.value?.description) {
-    toast.warning('Job description required', 'Add a job description first so AI can generate relevant criteria.')
+    toast.warning(t('dashboard.jobs.aiAnalysis.toasts.jobDescriptionRequired'), t('dashboard.jobs.aiAnalysis.toasts.jobDescriptionRequiredHint'))
     return
   }
   isGeneratingCriteria.value = true
@@ -161,20 +168,20 @@ async function generateAiCriteria() {
       weight: c.weight ?? 50,
     }))
     track('ai_criteria_generated', { job_id: jobId, criteria_count: scoringCriteria.value.length })
-    toast.success('Criteria generated', `${scoringCriteria.value.length} scoring criteria created from job description.`)
+    toast.success(t('dashboard.jobs.aiAnalysis.toasts.criteriaGenerated'), t('dashboard.jobs.aiAnalysis.toasts.criteriaGeneratedHint', scoringCriteria.value.length))
   } catch (err: any) {
     const statusCode = err?.data?.statusCode ?? err?.statusCode
     const statusMessage = err?.data?.statusMessage ?? ''
     if (statusCode === 422 && statusMessage.includes('AI provider not configured')) {
       toast.add({
         type: 'warning',
-        title: 'AI provider not configured',
-        message: 'Set up your AI provider and model before generating criteria.',
-        link: { label: 'Go to AI Settings', href: '/dashboard/settings/ai' },
+        title: t('dashboard.jobs.aiAnalysis.toasts.aiNotConfigured'),
+        message: t('dashboard.jobs.aiAnalysis.toasts.aiNotConfiguredHint'),
+        link: { label: aiSettingsLinkLabel.value, href: aiSettingsPath.value },
         duration: 10000,
       })
     } else {
-      toast.error('Failed to generate criteria', { message: statusMessage })
+      toast.error(t('dashboard.jobs.aiAnalysis.toasts.generateFailed'), { message: statusMessage })
     }
   } finally {
     isGeneratingCriteria.value = false
@@ -208,7 +215,7 @@ function addCustomCriterion() {
 
   const keyExists = scoringCriteria.value.some(c => c.key === f.key)
   if (keyExists) {
-    toast.warning('Duplicate criterion', `A criterion with key "${f.key}" already exists.`)
+    toast.warning(t('dashboard.jobs.aiAnalysis.toasts.duplicateCriterion'), t('dashboard.jobs.aiAnalysis.toasts.duplicateCriterionHint', { key: f.key }))
     return
   }
 
@@ -253,10 +260,10 @@ async function saveCriteria() {
     })
     hasUnsavedChanges.value = false
     track('scoring_criteria_saved', { job_id: jobId, criteria_count: scoringCriteria.value.length })
-    toast.success('Criteria saved', `${scoringCriteria.value.length} scoring criteria updated.`)
+    toast.success(t('dashboard.jobs.aiAnalysis.toasts.criteriaSaved'), t('dashboard.jobs.aiAnalysis.toasts.criteriaSavedHint', scoringCriteria.value.length))
     await refreshCriteria()
   } catch (err: any) {
-    toast.error('Failed to save criteria', { message: err?.data?.statusMessage })
+    toast.error(t('dashboard.jobs.aiAnalysis.toasts.saveFailed'), { message: err?.data?.statusMessage })
   } finally {
     isSaving.value = false
   }
@@ -285,7 +292,7 @@ function resetCriteria() {
 
     <!-- Loading -->
     <div v-if="jobFetchStatus === 'pending' || criteriaFetchStatus === 'pending'" class="text-center py-12 text-surface-400">
-      Loading…
+      {{ t('common.actions.loading') }}
     </div>
 
     <!-- Error -->
@@ -293,16 +300,16 @@ function resetCriteria() {
       v-else-if="jobError"
       class="rounded-lg border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-950 p-4 text-sm text-danger-700 dark:text-danger-400"
     >
-      {{ jobError.statusCode === 404 ? 'Job not found.' : 'Failed to load job.' }}
-      <NuxtLink :to="$localePath('/dashboard')" class="underline ml-1">Back to Jobs</NuxtLink>
+      {{ jobError.statusCode === 404 ? t('dashboard.jobs.aiAnalysis.jobNotFound') : t('dashboard.jobs.aiAnalysis.loadFailed') }}
+      <NuxtLink :to="$localePath('/dashboard')" class="underline ml-1">{{ t('common.actions.backToJobs') }}</NuxtLink>
     </div>
 
     <template v-else-if="job">
       <!-- Header -->
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">AI Analysis</h1>
+        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">{{ t('dashboard.jobs.aiAnalysis.title') }}</h1>
         <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">
-          Configure how AI evaluates and scores candidates for <strong>{{ job.title }}</strong>.
+          {{ t('dashboard.jobs.aiAnalysis.subtitle', { title: job.title }) }}
         </p>
       </div>
 
@@ -322,9 +329,9 @@ function resetCriteria() {
               <Brain class="size-5 text-brand-600 dark:text-brand-400" />
             </div>
             <div>
-              <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">Pre-made templates</span>
+              <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.aiAnalysis.premadeTemplates') }}</span>
               <span class="text-xs text-surface-500 dark:text-surface-400 mt-1 block leading-relaxed">
-                Choose from expert-designed scoring rubrics for common role types.
+                {{ t('dashboard.jobs.aiAnalysis.premadeHint') }}
               </span>
             </div>
           </button>
@@ -339,9 +346,9 @@ function resetCriteria() {
               <Sparkles class="size-5 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">Generate from job description</span>
+              <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.aiAnalysis.generateFromDescription') }}</span>
               <span class="text-xs text-surface-500 dark:text-surface-400 mt-1 block leading-relaxed">
-                AI analyzes your job description and creates tailored criteria.
+                {{ t('dashboard.jobs.aiAnalysis.generateHint') }}
               </span>
             </div>
             <span v-if="isGeneratingCriteria" class="absolute top-3 right-3">
@@ -359,9 +366,9 @@ function resetCriteria() {
               <SlidersHorizontal class="size-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">Write your own</span>
+              <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.aiAnalysis.writeYourOwn') }}</span>
               <span class="text-xs text-surface-500 dark:text-surface-400 mt-1 block leading-relaxed">
-                Create custom scoring criteria tailored to your exact needs.
+                {{ t('dashboard.jobs.aiAnalysis.writeHint') }}
               </span>
             </div>
           </button>
@@ -375,7 +382,7 @@ function resetCriteria() {
 
         <!-- No criteria hint -->
         <div v-if="scoringSetupMode !== 'premade'" class="text-center py-4 text-sm text-surface-400">
-          <p>No scoring criteria configured yet. Choose a starting point above, or add criteria manually.</p>
+          <p>{{ t('dashboard.jobs.aiAnalysis.noCriteriaYet') }}</p>
         </div>
       </div>
 
@@ -383,7 +390,7 @@ function resetCriteria() {
       <div v-if="scoringCriteria.length > 0" class="space-y-4">
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">
-            {{ scoringCriteria.length }} {{ scoringCriteria.length === 1 ? 'criterion' : 'criteria' }} configured
+            {{ t('dashboard.jobs.aiAnalysis.criteriaConfigured', scoringCriteria.length) }}
           </h3>
           <div class="flex items-center gap-2">
             <button
@@ -393,14 +400,14 @@ function resetCriteria() {
               @click="resetCriteria"
             >
               <RotateCcw class="size-3" />
-              Reset
+              {{ t('common.actions.reset') }}
             </button>
             <button
               type="button"
               class="text-xs text-danger-600 dark:text-danger-400 hover:underline"
               @click="scoringCriteria = []"
             >
-              Clear all
+              {{ t('dashboard.jobs.aiAnalysis.clearAll') }}
             </button>
           </div>
         </div>
@@ -414,7 +421,7 @@ function resetCriteria() {
             <div class="flex items-start justify-between gap-3 mb-3">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1">
-                  <span class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ criterion.name }}</span>
+                  <span class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ resolveCriterionDisplay(criterion).name }}</span>
                   <span
                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset"
                     :class="categoryColorClasses[criterion.category] ?? categoryColorClasses.custom"
@@ -422,14 +429,14 @@ function resetCriteria() {
                     {{ categoryLabels[criterion.category] ?? criterion.category }}
                   </span>
                 </div>
-                <p v-if="criterion.description" class="text-xs text-surface-500 dark:text-surface-400 leading-relaxed">
-                  {{ criterion.description }}
+                <p v-if="resolveCriterionDisplay(criterion).description" class="text-xs text-surface-500 dark:text-surface-400 leading-relaxed">
+                  {{ resolveCriterionDisplay(criterion).description }}
                 </p>
               </div>
               <button
                 type="button"
                 class="rounded p-1 text-surface-400 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors shrink-0"
-                title="Remove"
+                :title="t('common.actions.remove')"
                 @click="removeCriterion(criterion.key)"
               >
                 <Trash2 class="size-4" />
@@ -438,7 +445,7 @@ function resetCriteria() {
 
             <!-- Weight slider -->
             <div class="flex items-center gap-4">
-              <label class="text-xs font-medium text-surface-500 dark:text-surface-400 shrink-0 w-12">Weight</label>
+              <label class="text-xs font-medium text-surface-500 dark:text-surface-400 shrink-0 w-12">{{ t('dashboard.jobs.aiAnalysis.weight') }}</label>
               <input
                 type="range"
                 :min="0"
@@ -452,8 +459,8 @@ function resetCriteria() {
             </div>
 
             <div class="flex items-center gap-4 mt-2 text-xs text-surface-400">
-              <span>Max score: {{ criterion.maxScore }}</span>
-              <span>Key: <code class="rounded bg-surface-100 dark:bg-surface-800 px-1 py-0.5 font-mono text-[10px]">{{ criterion.key }}</code></span>
+              <span>{{ t('dashboard.jobs.aiAnalysis.maxScore', { count: criterion.maxScore }) }}</span>
+              <span v-if="!isPremadeCriterionKey(criterion.key)">{{ t('dashboard.jobs.aiAnalysis.keyLabel') }}: <code class="rounded bg-surface-100 dark:bg-surface-800 px-1 py-0.5 font-mono text-[10px]">{{ criterion.key }}</code></span>
             </div>
           </div>
         </div>
@@ -466,7 +473,7 @@ function resetCriteria() {
           @click="showCustomForm = true"
         >
           <Plus class="size-4" />
-          Add criterion
+          {{ t('dashboard.jobs.aiAnalysis.addCriterion') }}
         </button>
 
         <!-- Save / Reset bar -->
@@ -479,28 +486,28 @@ function resetCriteria() {
           >
             <Loader2 v-if="isSaving" class="size-4 animate-spin" />
             <Save v-else class="size-4" />
-            Save criteria
+            {{ t('dashboard.jobs.aiAnalysis.saveCriteria') }}
           </button>
-          <span v-if="hasUnsavedChanges" class="text-xs text-amber-600 dark:text-amber-400">Unsaved changes</span>
+          <span v-if="hasUnsavedChanges" class="text-xs text-amber-600 dark:text-amber-400">{{ t('dashboard.jobs.aiAnalysis.unsavedChanges') }}</span>
         </div>
       </div>
 
       <!-- Custom criterion form -->
       <div v-if="showCustomForm" class="rounded-xl border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-900/50 p-5 space-y-4 mt-6">
-        <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">Add custom criterion</h3>
+        <h3 class="text-sm font-semibold text-surface-800 dark:text-surface-200">{{ t('dashboard.jobs.aiAnalysis.addCustomCriterion') }}</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">Name *</label>
+            <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('common.fields.name') }} *</label>
             <input
               v-model="customCriterionForm.name"
               @input="customCriterionForm.key = autoGenerateKey(customCriterionForm.name)"
               type="text"
-              placeholder="e.g. React Expertise"
+              :placeholder="t('dashboard.jobs.create.ai.criterionNamePlaceholder')"
               class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
           <div>
-            <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">Category</label>
+            <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('common.fields.category') }}</label>
             <select
               v-model="customCriterionForm.category"
               class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -510,17 +517,17 @@ function resetCriteria() {
           </div>
         </div>
         <div>
-          <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">Description</label>
+          <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('common.fields.description') }}</label>
           <textarea
             v-model="customCriterionForm.description"
             rows="2"
-            placeholder="Describe what the AI should evaluate for this criterion..."
+            :placeholder="t('dashboard.jobs.create.ai.criterionDescPlaceholder')"
             class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">Max Score</label>
+            <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.jobs.create.ai.maxScore') }}</label>
             <input
               v-model.number="customCriterionForm.maxScore"
               type="number"
@@ -530,7 +537,7 @@ function resetCriteria() {
             />
           </div>
           <div>
-            <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">Initial Weight (0–100)</label>
+            <label class="block text-xs font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('dashboard.jobs.create.ai.initialWeight') }}</label>
             <input
               v-model.number="customCriterionForm.weight"
               type="number"
@@ -547,14 +554,14 @@ function resetCriteria() {
             class="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             @click="addCustomCriterion"
           >
-            Add criterion
+            {{ t('dashboard.jobs.aiAnalysis.addCriterion') }}
           </button>
           <button
             type="button"
             class="px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-lg transition-colors"
             @click="showCustomForm = false"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </button>
         </div>
       </div>
@@ -570,10 +577,10 @@ function resetCriteria() {
           />
           <div>
             <span class="block text-sm font-semibold text-surface-900 dark:text-surface-100">
-              Automatically score every new applicant
+              {{ t('dashboard.jobs.aiAnalysis.autoScoreOnApply') }}
             </span>
             <span class="text-xs text-surface-500 dark:text-surface-400 mt-0.5 block leading-relaxed">
-              When a candidate applies, AI will automatically analyze their resume against these criteria and assign a score. Requires an AI provider configured in settings plus a resume upload.
+              {{ t('dashboard.jobs.aiAnalysis.autoScoreHint') }}
             </span>
           </div>
         </label>

@@ -1,4 +1,5 @@
 import type { Ref } from 'vue'
+import type { JobTypeId } from '~~/shared/job-types'
 
 /**
  * Composable for managing the jobs list with filtering, pagination, and mutations.
@@ -9,12 +10,14 @@ export function useJobs(options?: {
 }) {
   const { handlePreviewReadOnlyError } = usePreviewReadOnly()
 
+  const { effectiveOrgSlug } = useTenantPaths()
+
   const query = computed(() => ({
     ...(toValue(options?.status) && { status: toValue(options?.status) }),
   }))
 
   const { data, status: fetchStatus, error, refresh } = useFetch('/api/jobs', {
-    key: 'jobs',
+    key: () => `jobs-${effectiveOrgSlug.value ?? 'none'}`,
     query,
     headers: useRequestHeaders(['cookie']),
   })
@@ -27,12 +30,13 @@ export function useJobs(options?: {
     title: string
     description?: string
     location?: string
-    type?: 'full_time' | 'part_time' | 'contract' | 'internship'
+    type?: JobTypeId
     experienceLevel?: 'junior' | 'mid' | 'senior' | 'lead'
     remoteStatus?: 'remote' | 'hybrid' | 'onsite'
     requireResume?: boolean
     requireCoverLetter?: boolean
     autoScoreOnApply?: boolean
+    iscoCategoryId: string
   }) {
     try {
       const created = await $fetch('/api/jobs', {

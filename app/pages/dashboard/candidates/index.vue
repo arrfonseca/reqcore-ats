@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { Users, Plus, Search, Mail, Phone, ArrowUp, ArrowDown, ArrowUpDown, SlidersHorizontal, X, StickyNote, Maximize2, Minimize2, Check } from 'lucide-vue-next'
 
+const { t } = useI18n()
+
 definePageMeta({
   layout: 'dashboard',
   middleware: ['auth', 'require-org'],
 })
 
 useSeoMeta({
-  title: 'Candidates — Reqcore',
-  description: 'Manage your candidate pool',
+  title: t('dashboard.candidates.list.seoTitle'),
+  description: t('dashboard.candidates.list.seoDescription'),
 })
 
 // ── Column visibility ─────────────────────────────────────────────────────────
@@ -28,12 +30,12 @@ const visibleColumns = ref<Record<string, boolean>>({ ...defaultColumnVisibility
 const { definitions: propertyDefs } = useProperties({ entityType: () => 'candidate' })
 
 const candidateColumns = computed(() => [
-  { key: 'name', label: 'Name', required: true },
-  { key: 'email', label: 'Email' },
-  { key: 'phone', label: 'Phone' },
-  { key: 'applications', label: 'Applications' },
-  { key: 'added', label: 'Added' },
-  { key: 'quickNotes', label: 'Quick notes' },
+  { key: 'name', label: t('dashboard.candidates.list.columns.name'), required: true },
+  { key: 'email', label: t('dashboard.candidates.list.columns.email') },
+  { key: 'phone', label: t('dashboard.candidates.list.columns.phone') },
+  { key: 'applications', label: t('dashboard.candidates.list.columns.applications') },
+  { key: 'added', label: t('dashboard.candidates.list.columns.added') },
+  { key: 'quickNotes', label: t('dashboard.candidates.list.columns.quickNotes') },
   ...propertyDefs.value.map((d) => ({ key: `prop_${d.id}`, label: d.name })),
 ])
 
@@ -273,9 +275,9 @@ const selectedCandidateId = ref<string | null>(null)
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">Candidates</h1>
+        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">{{ t('dashboard.candidates.list.title') }}</h1>
         <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">
-          Manage your candidate pool and track applicants.
+          {{ t('dashboard.candidates.list.subtitle') }}
         </p>
       </div>
       <NuxtLink
@@ -283,7 +285,7 @@ const selectedCandidateId = ref<string | null>(null)
         class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
       >
         <Plus class="size-4" />
-        Add Candidate
+        {{ t('dashboard.candidates.list.addCandidate') }}
       </NuxtLink>
     </div>
 
@@ -294,7 +296,7 @@ const selectedCandidateId = ref<string | null>(null)
         <input
           v-model="searchInput"
           type="text"
-          placeholder="Search by name or email…"
+          :placeholder="t('dashboard.candidates.list.searchPlaceholder')"
           class="w-full rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 pl-10 pr-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
         />
       </div>
@@ -321,7 +323,7 @@ const selectedCandidateId = ref<string | null>(null)
         @click="drawerOpen = true"
       >
         <SlidersHorizontal class="size-4" />
-        Filters
+        {{ t('dashboard.candidates.list.filters') }}
         <span
           v-if="activeFilterCount > 0"
           class="inline-flex items-center justify-center size-4 rounded-full bg-surface-700 dark:bg-surface-300 text-white dark:text-surface-900 text-xs font-semibold"
@@ -333,12 +335,12 @@ const selectedCandidateId = ref<string | null>(null)
         @click="clearFilters"
       >
         <X class="size-3" />
-        Clear
+        {{ t('common.actions.clear') }}
       </button>
       <button
         type="button"
         class="inline-flex items-center gap-1.5 rounded-lg border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-2.5 py-2 text-surface-500 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
-        :title="isFullscreen ? 'Exit fullscreen' : 'Fullscreen table'"
+        :title="isFullscreen ? t('dashboard.candidates.list.exitFullscreen') : t('dashboard.candidates.list.fullscreenTable')"
         @click="isFullscreen = !isFullscreen"
       >
         <Maximize2 v-if="!isFullscreen" class="size-4" />
@@ -349,36 +351,36 @@ const selectedCandidateId = ref<string | null>(null)
     <!-- Filter drawer -->
     <FilterDrawer
       v-model="drawerOpen"
-      title="Filter candidates"
-      description="Customize your view, then save it for quick access."
+      :title="t('dashboard.candidates.list.filterTitle')"
+      :description="t('dashboard.candidates.list.filterDescription')"
       :active-count="activeFilterCount"
       saveable
-      :default-save-name="`View ${views.length + 1}`"
+      :default-save-name="t('savedViews.numberedView', { n: views.length + 1 })"
       @reset="applySettings(defaultSettings)"
       @save-view="onSaveView"
     >
       <div class="space-y-6">
         <!-- Gender -->
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">Gender</label>
+          <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">{{ t('dashboard.candidates.filters.gender') }}</label>
           <select
             v-model="filterGender"
             class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
           >
-            <option :value="undefined">Any</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-            <option value="prefer_not_to_say">Prefer not to say</option>
+            <option :value="undefined">{{ t('dashboard.candidates.filters.any') }}</option>
+            <option value="male">{{ t('dashboard.candidates.filters.male') }}</option>
+            <option value="female">{{ t('dashboard.candidates.filters.female') }}</option>
+            <option value="other">{{ t('dashboard.candidates.filters.other') }}</option>
+            <option value="prefer_not_to_say">{{ t('dashboard.candidates.filters.preferNotToSay') }}</option>
           </select>
         </div>
 
         <!-- Date of birth range -->
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">Date of birth</label>
+          <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">{{ t('dashboard.candidates.filters.dateOfBirth') }}</label>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <span class="block text-[11px] text-surface-500 mb-1">From</span>
+              <span class="block text-[11px] text-surface-500 mb-1">{{ t('dashboard.candidates.filters.from') }}</span>
               <input
                 v-model="filterDobFrom"
                 type="date"
@@ -386,7 +388,7 @@ const selectedCandidateId = ref<string | null>(null)
               />
             </div>
             <div>
-              <span class="block text-[11px] text-surface-500 mb-1">To</span>
+              <span class="block text-[11px] text-surface-500 mb-1">{{ t('dashboard.candidates.filters.to') }}</span>
               <input
                 v-model="filterDobTo"
                 type="date"
@@ -398,37 +400,37 @@ const selectedCandidateId = ref<string | null>(null)
 
         <!-- Sort -->
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">Sort by</label>
+          <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">{{ t('dashboard.candidates.filters.sortBy') }}</label>
           <div class="flex gap-2">
             <select
               v-model="sortKey"
               class="flex-1 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
             >
-              <option value="created">Date added</option>
-              <option value="name">Name</option>
-              <option value="email">Email</option>
-              <option value="phone">Phone</option>
-              <option value="applications">Applications</option>
+              <option value="created">{{ t('dashboard.candidates.filters.dateAdded') }}</option>
+              <option value="name">{{ t('dashboard.candidates.list.columns.name') }}</option>
+              <option value="email">{{ t('dashboard.candidates.list.columns.email') }}</option>
+              <option value="phone">{{ t('dashboard.candidates.list.columns.phone') }}</option>
+              <option value="applications">{{ t('dashboard.candidates.list.columns.applications') }}</option>
             </select>
             <select
               v-model="sortDir"
               class="w-32 rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
             >
-              <option value="asc">Ascending</option>
-              <option value="desc">Descending</option>
+              <option value="asc">{{ t('dashboard.candidates.filters.ascending') }}</option>
+              <option value="desc">{{ t('dashboard.candidates.filters.descending') }}</option>
             </select>
           </div>
         </div>
 
         <!-- Property filters -->
         <div v-if="propertyDefs.length > 0">
-          <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">Properties</label>
+          <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">{{ t('dashboard.candidates.filters.properties') }}</label>
           <PropertyFilterBar v-model="propertyFilters" entity-type="candidate" />
         </div>
 
         <!-- Columns -->
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">Columns</label>
+          <label class="block text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">{{ t('dashboard.candidates.filters.columns') }}</label>
           <div class="space-y-1.5">
             <label
               v-for="col in candidateColumns.filter(c => !c.required)"
@@ -451,7 +453,7 @@ const selectedCandidateId = ref<string | null>(null)
 
     <!-- Loading state -->
     <div v-if="fetchStatus === 'pending'" class="text-center py-12 text-surface-400">
-      Loading candidates…
+      {{ t('dashboard.candidates.states.loading') }}
     </div>
 
     <!-- Error state -->
@@ -459,8 +461,8 @@ const selectedCandidateId = ref<string | null>(null)
       v-else-if="error"
       class="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-700"
     >
-      Failed to load candidates. Please try again.
-      <button class="underline ml-1" @click="refresh()">Retry</button>
+      {{ t('dashboard.candidates.states.loadFailed') }}
+      <button class="underline ml-1" @click="refresh()">{{ t('common.actions.retry') }}</button>
     </div>
 
     <!-- Empty state -->
@@ -470,12 +472,12 @@ const selectedCandidateId = ref<string | null>(null)
     >
       <Users class="size-10 text-surface-300 dark:text-surface-600 mx-auto mb-3" />
       <h3 class="text-base font-semibold text-surface-700 dark:text-surface-200 mb-1">
-        {{ debouncedSearch ? 'No candidates found' : 'No candidates yet' }}
+        {{ debouncedSearch ? t('dashboard.candidates.states.noResults') : t('dashboard.candidates.states.empty') }}
       </h3>
       <p class="text-sm text-surface-500 dark:text-surface-400 mb-4">
         {{ debouncedSearch
-          ? 'Try adjusting your search terms.'
-          : 'Add your first candidate to start building your talent pool.'
+          ? t('dashboard.candidates.states.trySearch')
+          : t('dashboard.candidates.states.emptyHint')
         }}
       </p>
       <NuxtLink
@@ -484,7 +486,7 @@ const selectedCandidateId = ref<string | null>(null)
         class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
       >
         <Plus class="size-4" />
-        Add Candidate
+        {{ t('dashboard.candidates.list.addCandidate') }}
       </NuxtLink>
     </div>
 
@@ -495,7 +497,7 @@ const selectedCandidateId = ref<string | null>(null)
           <!-- Fullscreen header -->
           <div v-if="isFullscreen" class="flex items-center justify-between px-4 py-3 border-b border-surface-200 dark:border-surface-800 shrink-0 bg-white dark:bg-surface-950">
             <span class="text-sm font-semibold text-surface-900 dark:text-surface-100">
-              Candidates — {{ sortedCandidates.length }} result{{ sortedCandidates.length === 1 ? '' : 's' }}
+              {{ t('dashboard.candidates.list.fullscreenHeader', sortedCandidates.length, { count: sortedCandidates.length }) }}
             </span>
             <button
               type="button"
@@ -503,7 +505,7 @@ const selectedCandidateId = ref<string | null>(null)
               @click="isFullscreen = false"
             >
               <Minimize2 class="size-4" />
-              Exit fullscreen
+              {{ t('dashboard.candidates.list.exitFullscreen') }}
             </button>
           </div>
           <div :class="isFullscreen ? 'flex-1 overflow-auto p-4' : ''">
@@ -513,7 +515,7 @@ const selectedCandidateId = ref<string | null>(null)
             <tr class="bg-surface-50 dark:bg-surface-800/50 border-b border-surface-200 dark:border-surface-800">
               <th class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">
                 <button class="inline-flex items-center gap-1 hover:text-surface-900 dark:hover:text-surface-100 transition-colors" @click="toggleSort('name')">
-                  Name
+                  {{ t('dashboard.candidates.list.columns.name') }}
                   <ArrowUp v-if="sortKey === 'name' && sortDir === 'asc'" class="size-3.5" />
                   <ArrowDown v-else-if="sortKey === 'name' && sortDir === 'desc'" class="size-3.5" />
                   <ArrowUpDown v-else class="size-3.5 opacity-40" />
@@ -521,7 +523,7 @@ const selectedCandidateId = ref<string | null>(null)
               </th>
               <th v-if="visibleColumns.email" class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">
                 <button class="inline-flex items-center gap-1 hover:text-surface-900 dark:hover:text-surface-100 transition-colors" @click="toggleSort('email')">
-                  Email
+                  {{ t('dashboard.candidates.list.columns.email') }}
                   <ArrowUp v-if="sortKey === 'email' && sortDir === 'asc'" class="size-3.5" />
                   <ArrowDown v-else-if="sortKey === 'email' && sortDir === 'desc'" class="size-3.5" />
                   <ArrowUpDown v-else class="size-3.5 opacity-40" />
@@ -529,7 +531,7 @@ const selectedCandidateId = ref<string | null>(null)
               </th>
               <th v-if="visibleColumns.phone" class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden md:table-cell">
                 <button class="inline-flex items-center gap-1 hover:text-surface-900 dark:hover:text-surface-100 transition-colors" @click="toggleSort('phone')">
-                  Phone
+                  {{ t('dashboard.candidates.list.columns.phone') }}
                   <ArrowUp v-if="sortKey === 'phone' && sortDir === 'asc'" class="size-3.5" />
                   <ArrowDown v-else-if="sortKey === 'phone' && sortDir === 'desc'" class="size-3.5" />
                   <ArrowUpDown v-else class="size-3.5 opacity-40" />
@@ -537,7 +539,7 @@ const selectedCandidateId = ref<string | null>(null)
               </th>
               <th v-if="visibleColumns.applications" class="text-center px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden sm:table-cell">
                 <button class="inline-flex items-center gap-1 hover:text-surface-900 dark:hover:text-surface-100 transition-colors" @click="toggleSort('applications')">
-                  Applications
+                  {{ t('dashboard.candidates.list.columns.applications') }}
                   <ArrowUp v-if="sortKey === 'applications' && sortDir === 'asc'" class="size-3.5" />
                   <ArrowDown v-else-if="sortKey === 'applications' && sortDir === 'desc'" class="size-3.5" />
                   <ArrowUpDown v-else class="size-3.5 opacity-40" />
@@ -545,14 +547,14 @@ const selectedCandidateId = ref<string | null>(null)
               </th>
               <th v-if="visibleColumns.added" class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400">
                 <button class="inline-flex items-center gap-1 hover:text-surface-900 dark:hover:text-surface-100 transition-colors" @click="toggleSort('created')">
-                  Added
+                  {{ t('dashboard.candidates.list.columns.added') }}
                   <ArrowUp v-if="sortKey === 'created' && sortDir === 'asc'" class="size-3.5" />
                   <ArrowDown v-else-if="sortKey === 'created' && sortDir === 'desc'" class="size-3.5" />
                   <ArrowUpDown v-else class="size-3.5 opacity-40" />
                 </button>
               </th>
               <th v-if="visibleColumns.quickNotes" class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400 hidden lg:table-cell w-52">
-                Quick notes
+                {{ t('dashboard.candidates.list.columns.quickNotes') }}
               </th>
               <template v-for="d in propertyDefs" :key="d.id">
                 <th v-if="visibleColumns[`prop_${d.id}`]" class="text-left px-4 py-3 font-medium text-surface-500 dark:text-surface-400 whitespace-nowrap">
@@ -624,12 +626,12 @@ const selectedCandidateId = ref<string | null>(null)
                       :disabled="isSavingNotes"
                       class="rounded bg-brand-600 px-2 py-0.5 text-xs text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
                       @click="saveNotes(c.id)"
-                    >Save</button>
+                    >{{ t('dashboard.candidates.states.save') }}</button>
                     <button
                       type="button"
                       class="rounded border border-surface-300 dark:border-surface-700 px-2 py-0.5 text-xs text-surface-500 hover:text-surface-700 transition-colors"
                       @click="cancelEditNotes"
-                    >Cancel</button>
+                    >{{ t('dashboard.candidates.states.cancel') }}</button>
                   </div>
                 </div>
                 <button
@@ -643,7 +645,7 @@ const selectedCandidateId = ref<string | null>(null)
                     v-if="c.quickNotes"
                     class="text-xs text-surface-600 dark:text-surface-400 line-clamp-2 group-hover/notes:text-surface-900 dark:group-hover/notes:text-surface-100 transition-colors"
                   >{{ c.quickNotes }}</span>
-                  <span v-else class="text-xs text-surface-300 dark:text-surface-600 group-hover/notes:text-surface-400 transition-colors italic">Add note…</span>
+                  <span v-else class="text-xs text-surface-300 dark:text-surface-600 group-hover/notes:text-surface-400 transition-colors italic">{{ t('dashboard.candidates.states.addNote') }}</span>
                 </button>
               </td>
               <!-- Property columns (must come AFTER quick notes to match header order) -->
@@ -664,7 +666,7 @@ const selectedCandidateId = ref<string | null>(null)
 
       <!-- Total count -->
       <p class="text-xs text-surface-400 pt-3">
-        {{ total }} candidate{{ total === 1 ? '' : 's' }} total
+        {{ t('dashboard.candidates.list.candidatesTotal', total, { count: total }) }}
       </p>
           </div>
         </div>

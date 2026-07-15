@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'auth' })
 
+const { t } = useI18n()
+
 useSeoMeta({ robots: 'noindex, nofollow' })
 
 onMounted(() => {
@@ -15,6 +17,6 @@ onMounted(() => {
 
 <template>
   <div class="flex items-center justify-center min-h-[60vh]">
-    <p class="text-sm text-surface-500 dark:text-surface-400">Redirecting…</p>
+    <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('auth.common.redirecting') }}</p>
   </div>
 </template>
