@@ -36,6 +36,13 @@ export default defineNitroPlugin(async () => {
     await migrate(db, {
       migrationsFolder: './server/database/migrations',
     })
+    // Enum values added in 0030 are only usable after that migration commits.
+    // Drizzle runs every pending migration in one transaction, so the backfill
+    // cannot live in a later SQL file from the same batch.
+    await db.execute(`UPDATE "job" SET "type" = 'prazo_indeterminado' WHERE "type" = 'full_time'`)
+    await db.execute(`UPDATE "job" SET "type" = 'prazo_determinado' WHERE "type" IN ('part_time', 'contract')`)
+    await db.execute(`UPDATE "job" SET "type" = 'aprendizagem' WHERE "type" = 'internship'`)
+    await db.execute(`ALTER TABLE "job" ALTER COLUMN "type" SET DEFAULT 'prazo_indeterminado'`)
     await db.execute(`SET client_min_messages TO notice`)
     console.log('[Reqcore] Database migrations applied successfully')
     logInfo('migrations.completed')
