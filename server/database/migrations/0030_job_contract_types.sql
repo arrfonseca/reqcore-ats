@@ -6,8 +6,4 @@ ALTER TYPE "job_type" ADD VALUE IF NOT EXISTS 'trabalho_intermitente';--> statem
 ALTER TYPE "job_type" ADD VALUE IF NOT EXISTS 'teletrabalho';--> statement-breakpoint
 ALTER TYPE "job_type" ADD VALUE IF NOT EXISTS 'trabalho_temporario';--> statement-breakpoint
 ALTER TYPE "job_type" ADD VALUE IF NOT EXISTS 'aprendizagem';--> statement-breakpoint
-ALTER TYPE "job_type" ADD VALUE IF NOT EXISTS 'contrato_pj';--> statement-breakpoint
-UPDATE "job" SET "type" = 'prazo_indeterminado' WHERE "type" = 'full_time';--> statement-breakpoint
-UPDATE "job" SET "type" = 'prazo_determinado' WHERE "type" IN ('part_time', 'contract');--> statement-breakpoint
-UPDATE "job" SET "type" = 'aprendizagem' WHERE "type" = 'internship';--> statement-breakpoint
-ALTER TABLE "job" ALTER COLUMN "type" SET DEFAULT 'prazo_indeterminado';
+ALTER TYPE "job_type" ADD VALUE IF NOT EXISTS 'contrato_pj';
