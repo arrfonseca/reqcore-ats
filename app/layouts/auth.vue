@@ -41,7 +41,7 @@ const brandTagline = computed(() => {
           <OrgBrandedLogo class="w-[100px] h-auto max-w-[180px]" />
         </div>
         <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">{{ brandName }}</h1>
-        <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">{{ brandTagline }}</p>
+        <p v-if="brandTagline" class="text-sm text-surface-500 dark:text-surface-400 mt-1">{{ brandTagline }}</p>
       </div>
       <slot />
     </div>
