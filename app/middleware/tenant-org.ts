@@ -40,14 +40,20 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo(localePath('/admin'))
   }
 
-  const { activeOrg } = useCurrentOrg()
+  let activeSlug: string | null = null
+  try {
+    const active = await $fetch<{ slug: string | null }>('/api/tenant/active-org', { headers })
+    activeSlug = active.slug
+  }
+  catch {
+    activeSlug = null
+  }
 
-  if (!activeOrg.value) {
+  if (!activeSlug) {
     return navigateTo(localePath(`/?org=${encodeURIComponent(orgSlugParam)}`))
   }
 
-  if (activeOrg.value.slug !== orgSlugParam) {
-    const base = `/${activeOrg.value.slug}/admin`
-    return navigateTo(localePath(base))
+  if (activeSlug !== orgSlugParam) {
+    return navigateTo(localePath(`/${activeSlug}/admin`), { external: true })
   }
 })

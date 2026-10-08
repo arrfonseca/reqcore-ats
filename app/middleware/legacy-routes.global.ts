@@ -35,7 +35,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
       })
       if (active.slug) {
         const target = rest ? `/${active.slug}/admin/${rest}` : `/${active.slug}/admin`
-        return navigateTo(localePath(target), { redirectCode: 301 })
+        return navigateTo(localePath(target), { redirectCode: 301, external: true })
       }
     }
     catch {

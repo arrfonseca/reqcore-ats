@@ -126,6 +126,48 @@ async function handleInvite() {
   }
 }
 
+const manualEmail = ref('')
+const manualPassword = ref('')
+const manualRole = ref<'admin' | 'member'>('member')
+const isAddingMember = ref(false)
+const manualSuccess = ref('')
+const manualError = ref('')
+
+async function handleManualAdd() {
+  if (!canInvite.value || !manualEmail.value.trim() || manualPassword.value.length < 8) return
+  isAddingMember.value = true
+  manualError.value = ''
+  manualSuccess.value = ''
+
+  try {
+    const result = await $fetch<{ created: boolean; email: string }>('/api/org/members', {
+      method: 'POST',
+      body: {
+        email: manualEmail.value.trim().toLowerCase(),
+        password: manualPassword.value,
+        role: manualRole.value,
+      },
+    })
+    manualSuccess.value = result.created
+      ? t('settings.members.manualAddCreated', { email: result.email })
+      : t('settings.members.manualAddAttached', { email: result.email })
+    manualEmail.value = ''
+    manualPassword.value = ''
+    manualRole.value = 'member'
+    setTimeout(() => { manualSuccess.value = '' }, 5000)
+    await fetchMembers()
+  }
+  catch (err: any) {
+    const statusMessage = err?.data?.statusMessage as string | undefined
+    manualError.value = statusMessage === 'ALREADY_MEMBER'
+      ? t('settings.members.errors.alreadyMember')
+      : t('settings.members.errors.manualAddFailed')
+  }
+  finally {
+    isAddingMember.value = false
+  }
+}
+
 // ─────────────────────────────────────────────
 // Pending invitations
 // ─────────────────────────────────────────────
@@ -810,6 +852,76 @@ onUnmounted(() => {
               {{ t('settings.members.revoke') }}
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Add member manually -->
+      <div class="px-4 sm:px-6 py-4 border-t border-surface-200 dark:border-surface-800">
+        <h3 class="text-sm font-medium text-surface-900 dark:text-surface-100 mb-1 flex items-center gap-2">
+          <UserPlus class="size-4 text-brand-600 dark:text-brand-400" />
+          {{ t('settings.members.manualAddTitle') }}
+        </h3>
+        <p class="text-xs text-surface-500 dark:text-surface-400 mb-3">
+          {{ t('settings.members.manualAddHint') }}
+        </p>
+
+        <div class="flex flex-col gap-3">
+          <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex-1">
+              <label for="manual-email" class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">{{ t('settings.members.inviteEmail') }}</label>
+              <input
+                id="manual-email"
+                v-model="manualEmail"
+                type="email"
+                autocomplete="off"
+                :placeholder="t('settings.members.emailPlaceholder')"
+                class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+              />
+            </div>
+            <div class="flex-1">
+              <label for="manual-password" class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">{{ t('settings.members.manualAddPassword') }}</label>
+              <input
+                id="manual-password"
+                v-model="manualPassword"
+                type="password"
+                autocomplete="new-password"
+                :placeholder="t('settings.members.manualAddPasswordPlaceholder')"
+                class="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+              />
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div class="relative">
+              <label for="manual-role" class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">{{ t('settings.members.role') }}</label>
+              <select
+                id="manual-role"
+                v-model="manualRole"
+                class="appearance-none rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 pl-3 pr-8 py-2 text-sm text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors cursor-pointer"
+              >
+                <option value="member">{{ t('settings.members.roles.member') }}</option>
+                <option value="admin">{{ t('settings.members.roles.admin') }}</option>
+              </select>
+              <ChevronDown class="absolute right-2.5 bottom-2.5 size-3.5 text-surface-400 pointer-events-none" />
+            </div>
+            <button
+              :disabled="isAddingMember || !manualEmail.trim() || manualPassword.length < 8"
+              class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              @click="handleManualAdd"
+            >
+              <Loader2 v-if="isAddingMember" class="size-4 animate-spin" />
+              <UserPlus v-else class="size-4" />
+              {{ isAddingMember ? t('settings.members.manualAddAdding') : t('settings.members.manualAddSubmit') }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="manualSuccess" class="mt-3 flex items-center gap-2 text-sm text-success-600 dark:text-success-400">
+          <Check class="size-4" />
+          {{ manualSuccess }}
+        </div>
+        <div v-if="manualError" class="mt-3 rounded-lg bg-danger-50 dark:bg-danger-950/40 border border-danger-200 dark:border-danger-900 px-3 py-2 text-sm text-danger-700 dark:text-danger-400">
+          {{ manualError }}
         </div>
       </div>
     </section>

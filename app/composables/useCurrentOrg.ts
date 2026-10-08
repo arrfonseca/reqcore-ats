@@ -34,6 +34,7 @@ export function useCurrentOrg() {
    * Reloads the app to reset all cached data.
    */
   async function switchOrg(orgId: string) {
+    const org = orgs.value.find(o => o.id === orgId)
     if (isSaasAdmin.value) {
       await $fetch('/api/saas/switch-org', {
         method: 'POST',
@@ -41,10 +42,10 @@ export function useCurrentOrg() {
       })
     }
     else {
-      await authClient.organization.setActive({ organizationId: orgId })
+      const result = await authClient.organization.setActive({ organizationId: orgId })
+      if (result.error) throw result.error
     }
 
-    const org = orgs.value.find(o => o.id === orgId)
     window.location.href = org?.slug
       ? localePath(`/${org.slug}/admin`)
       : localePath('/onboarding/create-org')

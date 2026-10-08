@@ -23,13 +23,6 @@ const { acceptInviteLink } = useInviteLinks()
 const localePath = useLocalePath()
 const { track } = useTrack()
 
-watch([orgs, isOrgsLoading, isSaasAdmin], ([orgList, loading, saasAdmin]) => {
-  if (loading || saasAdmin) return
-  if (orgList.length > 0) {
-    navigateTo(localePath('/dashboard'))
-  }
-}, { immediate: true })
-
 onMounted(() => track('onboarding_viewed', { mode: viewMode.value }))
 
 const orgName = ref('')

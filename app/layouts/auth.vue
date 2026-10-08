@@ -38,7 +38,7 @@ const brandTagline = computed(() => {
     <div class="w-full max-w-[540px] bg-white dark:bg-surface-900 rounded-lg shadow-sm dark:shadow-none dark:border dark:border-surface-800 p-8">
       <div class="text-center mb-8">
         <div class="flex justify-center mb-3">
-          <OrgBrandedLogo class="size-16 max-w-[180px]" />
+          <OrgBrandedLogo class="w-[100px] h-auto max-w-[180px]" />
         </div>
         <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100">{{ brandName }}</h1>
         <p class="text-sm text-surface-500 dark:text-surface-400 mt-1">{{ brandTagline }}</p>
