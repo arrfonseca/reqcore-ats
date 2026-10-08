@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Cloud, Server, Sparkles, ChevronDown, X, Shield } from 'lucide-vue-next'
+import { Server, Sparkles, ChevronDown, X, Shield } from 'lucide-vue-next'
 
 const props = defineProps<{
   mobile?: boolean
@@ -150,23 +150,6 @@ onUnmounted(() => document.removeEventListener('click', onClickOutsideGetStarted
               </p>
             </div>
             <div class="p-2 space-y-1">
-              <NuxtLink
-                :to="localePath('/auth/fresh-signup')"
-                class="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-brand-50 dark:hover:bg-brand-950/30 no-underline group/item"
-                @click="onNavClick"
-              >
-                <div class="flex items-center justify-center size-8 rounded-lg bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400 shrink-0 mt-0.5">
-                  <Cloud class="size-4" />
-                </div>
-                <div>
-                  <div class="text-sm font-semibold text-surface-900 dark:text-surface-100 group-hover/item:text-brand-700 dark:group-hover/item:text-brand-300 transition-colors">
-                    {{ t('dashboard.topBar.cloudHosted') }}
-                  </div>
-                  <div class="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-                    {{ t('dashboard.topBar.cloudHostedDescription') }}
-                  </div>
-                </div>
-              </NuxtLink>
               <a
                 href="https://github.com/reqcore-inc/reqcore#quick-start"
                 target="_blank"

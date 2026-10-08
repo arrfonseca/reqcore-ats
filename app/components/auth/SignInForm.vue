@@ -204,21 +204,5 @@ async function handleSocialSignIn(providerId: string) {
         >
             {{ isLoading ? t("auth.signIn.submitting") : t("auth.signIn.submit") }}
         </button>
-
-        <p class="text-center text-sm text-surface-500 dark:text-surface-400">
-            {{ t("auth.signIn.noAccount") }}
-            <NuxtLink
-                :to="
-                    route.query.invitation
-                        ? $localePath({
-                              path: '/auth/sign-up',
-                              query: { invitation: route.query.invitation },
-                          })
-                        : $localePath('/auth/sign-up')
-                "
-                class="text-brand-600 dark:text-brand-400 hover:underline"
-                >{{ t("auth.signIn.signUp") }}</NuxtLink
-            >
-        </p>
     </form>
 </template>

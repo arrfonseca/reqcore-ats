@@ -149,12 +149,6 @@ onMounted(() => {
       >
         {{ t('auth.invitation.signIn') }}
       </NuxtLink>
-      <NuxtLink
-        :to="localePath({ path: '/auth/sign-up', query: { invitation: invitationId } })"
-        class="flex-1 text-center px-4 py-2.5 border border-surface-300 dark:border-surface-700 text-surface-700 dark:text-surface-300 rounded-md text-sm font-medium hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors no-underline"
-      >
-        {{ t('auth.invitation.createAccount') }}
-      </NuxtLink>
     </div>
   </div>
 </template>

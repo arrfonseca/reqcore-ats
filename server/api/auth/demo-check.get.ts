@@ -2,7 +2,7 @@
  * Server-side check: is the current session a demo account?
  *
  * Used by the fresh-signup page to reliably detect demo sessions
- * before signing out and redirecting to sign-up.
+ * before signing out and redirecting to sign-in.
  */
 export default defineEventHandler(async (event) => {
   const session = await auth.api.getSession({ headers: event.headers })

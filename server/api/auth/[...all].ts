@@ -1,4 +1,12 @@
 export default defineEventHandler(async (event) => {
+  const requestPath = getRequestURL(event).pathname
+  if (requestPath.includes('/sign-up')) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Public sign-up is disabled',
+    })
+  }
+
   try {
     return await auth.handler(toWebRequest(event))
   } catch (error) {

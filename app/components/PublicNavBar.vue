@@ -61,15 +61,9 @@ const { isDark, toggle: toggleColorMode } = useColorMode()
         <template v-else>
           <NuxtLink
             :to="localePath('/')"
-            class="hidden rounded-md px-3 py-1.5 text-[13px] font-medium text-surface-500 dark:text-surface-400 transition hover:text-surface-900 dark:hover:text-white sm:inline-flex"
-          >
-            {{ t('home.nav.logIn') }}
-          </NuxtLink>
-          <NuxtLink
-            :to="localePath('/auth/sign-up')"
             class="rounded-md bg-surface-900 dark:bg-white px-3.5 py-1.5 text-[13px] font-semibold text-white dark:text-[#09090b] transition hover:bg-surface-800 dark:hover:bg-white/90"
           >
-            {{ t('home.nav.signUp') }}
+            {{ t('home.nav.logIn') }}
           </NuxtLink>
         </template>
       </div>

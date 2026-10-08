@@ -31,6 +31,7 @@ const JOB_LOCATION = 'Remote'
 
 let applicationLink = ''
 let jobSlug = ''
+let recruiterOrgSlug = process.env.E2E_ORG_SLUG || 'reqcore-demo'
 
 function applicant(index: number) {
   return {
@@ -47,63 +48,45 @@ test.describe('Resume Upload — All File Formats', () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   test.beforeAll('create and publish a job requiring resume + file_upload question', async ({ browser }) => {
-    // We need a fresh authenticated page to set up the job.
-    // Re-use the same signup logic from fixtures.ts.
+    // Sign in with an existing account. Public registration is disabled.
     const context = await browser.newContext()
     const page = await context.newPage()
 
-    const id = `${Date.now()}-setup`
-    const account = {
-      name: `Upload Test Recruiter ${id}`,
-      email: `upload-test-${id}@test.local`,
-      password: 'TestPassword123!',
-      orgName: `Upload Test Org ${id}`,
-    }
+    const email = process.env.E2E_TEST_EMAIL || 'demo@reqcore.com'
+    const password = process.env.E2E_TEST_PASSWORD || 'demo1234'
 
-    // ── Sign up ────────────────────────────────────────────────────────────
-    await page.goto('/auth/sign-up')
+    await page.goto('/')
     await page.waitForLoadState('networkidle')
-    await page.getByLabel('Name').fill(account.name)
-    await page.getByLabel('Email').fill(account.email)
-    await page.getByLabel('Password', { exact: true }).fill(account.password)
-    await page.getByLabel('Confirm password').fill(account.password)
+    await page.getByLabel('Email').fill(email)
+    await page.getByLabel('Senha').fill(password)
 
     await Promise.all([
       page.waitForResponse(
-        resp => resp.url().includes('/api/auth/sign-up') && resp.status() === 200,
+        resp => resp.url().includes('/api/auth/sign-in') && resp.status() === 200,
         { timeout: 30_000 },
       ),
-      page.getByRole('button', { name: 'Sign up' }).click(),
+      page.getByRole('button', { name: 'Entrar' }).click(),
     ])
 
     await page.waitForURL(
-      url => url.pathname.includes('/onboarding/') || url.pathname === '/' || url.pathname.includes('/auth/sign-in'),
+      url => url.pathname.includes('/admin') || url.pathname.includes('/onboarding/'),
       { waitUntil: 'commit', timeout: 30_000 },
     )
 
-    if (page.url().includes('/auth/sign-in') || new URL(page.url()).pathname === '/') {
-      await page.waitForLoadState('networkidle')
-      await page.getByLabel('Email').fill(account.email)
-      await page.getByLabel('Password').fill(account.password)
-      await Promise.all([
-        page.waitForResponse(
-          resp => resp.url().includes('/api/auth/sign-in') && resp.status() === 200,
-          { timeout: 30_000 },
-        ),
-        page.getByRole('button', { name: 'Sign in' }).click(),
-      ])
-      await page.waitForURL('**/onboarding/**', { waitUntil: 'commit', timeout: 30_000 })
+    if (page.url().includes('/onboarding/')) {
+      await page.getByLabel('Organization name').waitFor({ state: 'visible', timeout: 30_000 })
+      await page.getByLabel('Organization name').fill(process.env.E2E_ORG_NAME || 'Reqcore Demo')
+      await page.getByRole('button', { name: 'Create organization' }).click()
+      await page.waitForURL('**/admin**', { waitUntil: 'commit' })
     }
 
-    await page.getByLabel('Organization name').waitFor({ state: 'visible', timeout: 30_000 })
-    await page.getByLabel('Organization name').fill(account.orgName)
-    await page.getByRole('button', { name: 'Create organization' }).click()
-    await page.waitForURL('**/admin**', { waitUntil: 'commit' })
+    const slugMatch = new URL(page.url()).pathname.match(/\/([^/]+)\/admin/)
+    if (slugMatch?.[1]) recruiterOrgSlug = slugMatch[1]
 
     // ── Create job ─────────────────────────────────────────────────────────
 
     // Step 1: Job details
-    await page.goto(`/${testAccount.orgSlug}/admin/jobs/new`)
+    await page.goto(`/${recruiterOrgSlug}/admin/jobs/new`)
     await page.waitForLoadState('networkidle')
     await page.getByLabel('Job title').waitFor({ state: 'visible', timeout: 15_000 })
     await page.getByLabel('Job title').fill(JOB_TITLE)
@@ -270,7 +253,7 @@ async function assertUploadResult(
     expect(status, `${fileConfig.label}: expected 2xx but got ${status}`).toBeLessThan(300)
 
     // Verify confirmation page
-    await page.waitForURL(`**/${testAccount.orgSlug}/${jobSlug}/confirmation`, {
+    await page.waitForURL(`**/${recruiterOrgSlug}/${jobSlug}/confirmation`, {
       waitUntil: 'commit',
       timeout: 15_000,
     })

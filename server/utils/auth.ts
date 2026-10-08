@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { organization, genericOAuth } from "better-auth/plugins";
 import { sso } from "@better-auth/sso";
@@ -250,13 +251,26 @@ function getAuth(): Auth {
 
       emailAndPassword: {
         enabled: true,
-        // Server-side password policy — prevents bypass via direct API calls.
-        // Client-side validation (sign-up.vue) is UX only; this is the enforcement.
+        disableSignUp: true,
         minPasswordLength: 8,
         maxPasswordLength: 128,
         // Password reset via email.
         async sendResetPassword({ user, url, token }, request) {
           void sendPasswordResetEmail({ user, url, token });
+        },
+      },
+
+      // Manual member creation writes the user row directly and does not
+      // pass through this hook. Social and SSO first-login do.
+      databaseHooks: {
+        user: {
+          create: {
+            before: async () => {
+              throw new APIError("FORBIDDEN", {
+                message: "Public sign-up is disabled",
+              });
+            },
+          },
         },
       },
 

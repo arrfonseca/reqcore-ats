@@ -5,6 +5,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const localePath = useLocalePath()
   const path = to.path.replace(/^\/(en|pt-BR)/, '') || to.path
 
+  if (path === '/auth/sign-up') {
+    return navigateTo(localePath('/'), { redirectCode: 301 })
+  }
+
   if (path.startsWith('/dashboard/saas') || path === '/dashboard/saas') {
     const rest = path.replace(/^\/dashboard\/saas\/?/, '')
     return navigateTo(localePath(rest ? `/admin/${rest}` : '/admin'), { redirectCode: 301 })

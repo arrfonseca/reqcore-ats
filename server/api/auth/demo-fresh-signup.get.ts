@@ -5,8 +5,8 @@
  *   marketing site "Use Cloud" → GET /api/auth/demo-fresh-signup → this handler
  *
  * Behaviour:
- *   - No session           → redirect to /auth/sign-up
- *   - Demo account session → sign out, then redirect to /auth/sign-up
+ *   - No session           → redirect to sign-in
+ *   - Demo account session → sign out, then redirect to sign-in
  *   - Any other account    → redirect to /dashboard (already logged in)
  *
  * Demo detection uses the user email (liveDemoEmail runtime config,
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
   const session = await auth.api.getSession({ headers: event.headers })
 
   if (!session) {
-    return sendRedirect(event, '/auth/sign-up')
+    return sendRedirect(event, '/')
   }
 
   const demoEmail = (useRuntimeConfig().public.liveDemoEmail as string) || 'demo@reqcore.com'
@@ -41,5 +41,5 @@ export default defineEventHandler(async (event) => {
     appendResponseHeader(event, 'set-cookie', cookie)
   }
 
-  return sendRedirect(event, '/auth/sign-up')
+  return sendRedirect(event, '/')
 })

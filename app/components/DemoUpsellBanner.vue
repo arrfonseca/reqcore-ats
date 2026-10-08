@@ -1,16 +1,7 @@
 <script setup lang="ts">
-import { Cloud, Server, ArrowRight, Sparkles } from 'lucide-vue-next'
+import { Server, ArrowRight, Sparkles } from 'lucide-vue-next'
 
 const { t } = useI18n()
-const localePath = useLocalePath()
-const isLoading = ref(false)
-
-async function handleUpgrade() {
-  isLoading.value = true
-  await authClient.signOut()
-  clearNuxtData()
-  await navigateTo(localePath('/auth/sign-up'))
-}
 </script>
 
 <template>
@@ -41,18 +32,7 @@ async function handleUpgrade() {
             </div>
           </div>
 
-          <!-- Two CTA buttons -->
-          <div class="mt-3.5 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              :disabled="isLoading"
-              class="group cursor-pointer flex items-center gap-2 whitespace-nowrap rounded-xl border border-white/[0.06] bg-white/[0.04] px-3 py-2.5 transition-all hover:border-brand-400/30 hover:bg-brand-500/10 hover:shadow-md hover:shadow-brand-500/5 active:scale-[0.97] disabled:opacity-50"
-              @click="handleUpgrade"
-            >
-              <Cloud class="size-4 text-brand-400 transition-colors group-hover:text-brand-300" />
-              <span class="text-[12px] font-semibold text-white/70 transition-colors group-hover:text-white">{{ t('components.demoUpsell.cloud') }}</span>
-              <ArrowRight class="ml-auto size-3 text-white/20 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
-            </button>
+          <div class="mt-3.5">
             <a
               href="https://github.com/reqcore-inc/reqcore"
               target="_blank"
