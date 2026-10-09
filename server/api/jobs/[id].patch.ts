@@ -61,6 +61,7 @@ export default defineEventHandler(async (event) => {
       autoScoreOnApply: job.autoScoreOnApply,
       experienceLevel: job.experienceLevel,
       iscoCategoryId: job.iscoCategoryId,
+      isTestDescription: job.isTestDescription,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     })

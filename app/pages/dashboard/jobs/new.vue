@@ -99,6 +99,7 @@ const form = ref({
   title: '',
   iscoCategoryId: '' as '' | (typeof ISCO_CATEGORY_IDS)[number],
   description: '',
+  isTestDescription: false,
   location: '',
   type: DEFAULT_JOB_TYPE,
   experienceLevel: 'mid' as 'junior' | 'mid' | 'senior' | 'lead',
@@ -201,6 +202,8 @@ async function generateAiCriteria() {
       body: {
         title: form.value.title,
         description: form.value.description,
+        iscoCategoryId: form.value.iscoCategoryId || null,
+        isTestDescription: form.value.isTestDescription,
       },
     })
     scoringCriteria.value = (result.criteria ?? []).map((c: any) => ({
@@ -314,6 +317,7 @@ function restoreFormFromStorage() {
     if (data.form) {
       Object.assign(form.value, data.form)
       form.value.iscoCategoryId = form.value.iscoCategoryId ?? ''
+      form.value.isTestDescription = form.value.isTestDescription ?? false
     }
     if (data.applicationForm) Object.assign(applicationForm.value, data.applicationForm)
     if (data.scoringCriteria) scoringCriteria.value = data.scoringCriteria
@@ -379,6 +383,7 @@ function resetState() {
     title: '',
     iscoCategoryId: '',
     description: '',
+    isTestDescription: false,
     location: '',
     type: DEFAULT_JOB_TYPE,
     experienceLevel: 'mid',
@@ -585,6 +590,7 @@ const formSchema = computed(() => z.object({
     .unknown()
     .refine(isValidIscoCategoryId, { message: iscoCategoryRequiredMessage() }),
   description: z.string().optional(),
+  isTestDescription: z.boolean().optional(),
   location: z.string().optional(),
   type: z.enum(JOB_CONTRACT_TYPE_IDS),
 }))
@@ -735,6 +741,7 @@ async function handleSubmit(mode: 'publish' | 'draft' = publishChoice.value) {
       title: form.value.title,
       iscoCategoryId: form.value.iscoCategoryId,
       description: form.value.description || undefined,
+      isTestDescription: form.value.isTestDescription,
       location: form.value.location || undefined,
       type: form.value.type,
       experienceLevel: form.value.experienceLevel || undefined,
@@ -1066,6 +1073,9 @@ const questionTypeLabels = computed<Record<string, string>>(() => ({
                   <label for="description" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
                     {{ t('dashboard.jobs.create.fields.aboutTheRole') }}
                   </label>
+                  <p class="mb-2 whitespace-pre-line rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-xs leading-relaxed text-surface-600 dark:border-surface-700 dark:bg-surface-800/60 dark:text-surface-300">
+                    {{ t('dashboard.jobs.create.descriptionGuide') }}
+                  </p>
                   <textarea
                     id="description"
                     v-model="form.description"
@@ -1073,6 +1083,18 @@ const questionTypeLabels = computed<Record<string, string>>(() => ({
                     :placeholder="t('dashboard.jobs.create.placeholders.description')"
                     class="w-full rounded-lg border px-4 py-3 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors border-surface-300 dark:border-surface-700"
                   />
+                  <label class="mt-3 flex items-start gap-3 cursor-pointer">
+                    <input
+                      id="is-test-description"
+                      v-model="form.isTestDescription"
+                      type="checkbox"
+                      class="mt-0.5 size-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-600"
+                    />
+                    <span>
+                      <span class="text-sm font-medium text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.testDescription') }}</span>
+                      <p class="text-xs text-surface-500 dark:text-surface-400">{{ t('dashboard.jobs.create.testDescriptionHint') }}</p>
+                    </span>
+                  </label>
                   <p class="mt-2 text-xs text-surface-500">{{ t('dashboard.jobs.create.helpers.minCharacters') }}</p>
                 </div>
               </div>

@@ -79,6 +79,8 @@ export const job = pgTable('job', {
   experienceLevel: experienceLevelEnum('experience_level'),
   /** Internal ISCO-style occupation category — not exposed on public job listings */
   iscoCategoryId: text('isco_category_id'),
+  /** When true, AI still scores this text as the real posting, including examples. Does not hide the job. */
+  isTestDescription: boolean('is_test_description').notNull().default(false),
   // ── Application form settings ──
   requireResume: boolean('require_resume').notNull().default(false),
   requireCoverLetter: boolean('require_cover_letter').notNull().default(false),

@@ -1,10 +1,11 @@
 import { eq, and } from 'drizzle-orm'
 import {
-  application, scoringCriterion, criterionScore,
-  analysisRun, document, candidate,
+  application, scoringCriterion,
+  analysisRun, document,
 } from '../../../database/schema'
-import { scoreApplication, computeCompositeScore } from '../../../utils/ai/scoring'
+import { scoreApplication } from '../../../utils/ai/scoring'
 import type { CriterionDefinition } from '../../../utils/ai/scoring'
+import { persistApplicationScore } from '../../../utils/ai/persistApplicationScore'
 import type { SupportedProvider } from '../../../utils/ai/provider'
 import { loadEffectiveAiConfig } from '../../../utils/ai/loadConfig'
 import { extractResumeText } from '../../../utils/resume-parser'
@@ -41,7 +42,13 @@ export default defineEventHandler(async (event) => {
         columns: { id: true, firstName: true, lastName: true },
       },
       job: {
-        columns: { id: true, title: true, description: true },
+        columns: {
+          id: true,
+          title: true,
+          description: true,
+          iscoCategoryId: true,
+          isTestDescription: true,
+        },
       },
     },
   })
@@ -140,6 +147,8 @@ export default defineEventHandler(async (event) => {
     result = await scoreApplication(providerConfig, {
       jobTitle: app.job.title,
       jobDescription: app.job.description,
+      iscoCategoryId: app.job.iscoCategoryId,
+      isTestDescription: app.job.isTestDescription,
       criteria: criteriaDefinitions,
       resumeText,
       coverLetterText: app.coverLetterText,
@@ -164,52 +173,16 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Compute composite score
-  const compositeScore = computeCompositeScore(criteriaDefinitions, result.scoring.evaluations)
-
-  // Insert scores, update application, and record run atomically
-  const scoreValues = result.scoring.evaluations.map(evaluation => ({
-    organizationId: orgId,
+  const saved = await persistApplicationScore({
+    orgId,
     applicationId,
-    criterionKey: evaluation.criterionKey,
-    maxScore: evaluation.maxScore,
-    applicantScore: evaluation.applicantScore,
-    confidence: evaluation.confidence,
-    evidence: evaluation.evidence,
-    strengths: evaluation.strengths,
-    gaps: evaluation.gaps,
-  }))
-
-  const [run] = await db.transaction(async (tx) => {
-    // Delete previous scores for this application (replace strategy)
-    await tx.delete(criterionScore)
-      .where(and(
-        eq(criterionScore.applicationId, applicationId),
-        eq(criterionScore.organizationId, orgId),
-      ))
-
-    if (scoreValues.length > 0) {
-      await tx.insert(criterionScore).values(scoreValues)
-    }
-
-    // Update application composite score
-    await tx.update(application)
-      .set({ score: compositeScore, updatedAt: new Date() })
-      .where(eq(application.id, applicationId))
-
-    // Record analysis run
-    return tx.insert(analysisRun).values({
-      organizationId: orgId,
-      applicationId,
-      status: 'completed',
-      provider: config.provider,
-      model: config.model,
-      criteriaSnapshot: criteriaDefinitions as any,
-      compositeScore,
-      promptTokens: result.usage.promptTokens,
-      completionTokens: result.usage.completionTokens,
-      scoredById: session.user.id,
-    }).returning()
+    criteria: criteriaDefinitions,
+    scoring: result.scoring,
+    provider: config.provider,
+    model: config.model,
+    promptTokens: result.usage.promptTokens,
+    completionTokens: result.usage.completionTokens,
+    scoredById: session.user.id,
   })
 
   recordActivity({
@@ -219,17 +192,19 @@ export default defineEventHandler(async (event) => {
     resourceType: 'application',
     resourceId: applicationId,
     metadata: {
-      compositeScore,
+      compositeScore: saved.compositeScore,
       model: config.model,
-      criterionCount: result.scoring.evaluations.length,
+      criterionCount: saved.evaluations.length,
+      insufficientJobDescription: saved.status === 'partial',
     },
   })
 
   return {
-    compositeScore,
-    evaluations: result.scoring.evaluations,
-    summary: result.scoring.summary,
-    analysisRunId: run!.id,
+    compositeScore: saved.compositeScore,
+    evaluations: saved.evaluations,
+    summary: saved.summary,
+    insufficientJobDescription: saved.status === 'partial',
+    analysisRunId: saved.analysisRunId,
     usage: result.usage,
   }
 })

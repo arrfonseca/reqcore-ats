@@ -33,6 +33,7 @@ export default defineEventHandler(async (event) => {
     autoScoreOnApply: body.autoScoreOnApply,
     experienceLevel: body.experienceLevel,
     iscoCategoryId: body.iscoCategoryId,
+    isTestDescription: body.isTestDescription,
   }).returning({
     id: job.id,
     title: job.title,
@@ -53,6 +54,7 @@ export default defineEventHandler(async (event) => {
     autoScoreOnApply: job.autoScoreOnApply,
     experienceLevel: job.experienceLevel,
     iscoCategoryId: job.iscoCategoryId,
+    isTestDescription: job.isTestDescription,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   })

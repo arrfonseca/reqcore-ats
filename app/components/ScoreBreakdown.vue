@@ -79,6 +79,11 @@ watch(scoreData, (val) => {
 
 const resolvedScoreData = computed(() => scoreData.value ?? cachedScoreData.value)
 const hasScores = computed(() => (resolvedScoreData.value?.scores?.length ?? 0) > 0)
+const insufficiencyMessage = computed(() => {
+  const run = resolvedScoreData.value?.latestRun as { status?: string, errorMessage?: string | null } | null | undefined
+  if (!run || hasScores.value || run.status !== 'partial') return null
+  return run.errorMessage || null
+})
 const isInitialLoad = computed(() => status.value === 'pending' && !cachedScoreData.value)
 
 function scoreColor(score: number, max: number): string {
@@ -166,7 +171,9 @@ async function retryParse() {
             <Brain class="size-3.5 text-brand-600 dark:text-brand-400" />
           </div>
           <div>
-            <p class="text-sm font-medium text-surface-600 dark:text-surface-300">{{ t('components.scoreBreakdown.noAnalysis') }}</p>
+            <p class="text-sm font-medium text-surface-600 dark:text-surface-300">
+              {{ insufficiencyMessage ? t('components.scoreBreakdown.compositeScore') : t('components.scoreBreakdown.noAnalysis') }}
+            </p>
           </div>
         </div>
         <div class="flex items-center gap-1.5">
@@ -198,6 +205,12 @@ async function retryParse() {
           </button>
         </div>
       </div>
+      <p
+        v-if="insufficiencyMessage"
+        class="mt-3 text-sm leading-relaxed text-surface-700 dark:text-surface-200"
+      >
+        {{ insufficiencyMessage }}
+      </p>
     </div>
 
     <!-- Loading (only on very first load with no cached data) -->

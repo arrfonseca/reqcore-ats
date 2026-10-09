@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ISCO_CATEGORY_IDS } from '~~/shared/scoring-criteria-templates'
 import { generateCriteriaFromDescription } from '../../utils/ai/scoring'
 import type { SupportedProvider } from '../../utils/ai/provider'
 import { loadEffectiveAiConfig } from '../../utils/ai/loadConfig'
@@ -9,6 +10,8 @@ const bodySchema = z.object({
   description: z.string().min(1).max(50000),
   /** Optional override — defaults to the org's analysis configuration. */
   aiConfigId: z.string().min(1).nullable().optional(),
+  iscoCategoryId: z.enum(ISCO_CATEGORY_IDS).nullable().optional(),
+  isTestDescription: z.boolean().optional().default(false),
 })
 
 const limiter = createRateLimiter({
@@ -41,6 +44,10 @@ export default defineEventHandler(async (event) => {
     },
     body.title,
     body.description,
+    {
+      iscoCategoryId: body.iscoCategoryId,
+      isTestDescription: body.isTestDescription,
+    },
   )
 
   return { criteria, source: 'ai' }

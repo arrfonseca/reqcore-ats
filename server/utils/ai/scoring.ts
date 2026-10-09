@@ -1,97 +1,54 @@
 /**
  * AI Scoring Engine
  *
- * Evaluates candidates against job-specific scoring criteria using LLMs.
- * Produces structured, evidence-based scores with confidence ratings.
+ * Evaluates candidates against the published job text and the selected occupation.
+ * All free-text output is Brazilian Portuguese.
  */
-import { z } from 'zod'
 import { buildPremadeCriteriaMap } from '~~/shared/scoring-criteria-templates'
 import { generateStructuredOutput, type ProviderConfig } from './provider'
+import {
+  buildGenerateCriteriaMessages,
+  buildScoreApplicationMessages,
+  generatedCriteriaSchema,
+  resolveStoredScoring,
+  scoringResponseSchema,
+  type CriterionDefinition,
+  type ScoringContext,
+  type ScoringResponse,
+} from './scoringPrompt'
 
-// ─── Scoring Output Locale ─────────────────────────────────────────
-
-/** All LLM-generated scoring text is produced in Brazilian Portuguese. */
-const SCORING_OUTPUT_LANGUAGE = 'Brazilian Portuguese (pt-BR)'
-
-// ─── Scoring Output Schema ────────────────────────────────────────
-
-/** Schema for a single criterion evaluation from the LLM */
-const criterionEvaluationSchema = z.object({
-  criterionKey: z.string(),
-  maxScore: z.number().int().min(0),
-  applicantScore: z.number().int().min(0),
-  confidence: z.number().min(0).max(100).int(),
-  evidence: z.string(),
-  strengths: z.array(z.string()),
-  gaps: z.array(z.string()),
-})
-
-/** Full scoring response from the LLM */
-const scoringResponseSchema = z.object({
-  evaluations: z.array(criterionEvaluationSchema),
-  summary: z.string(),
-})
-
-export type CriterionEvaluation = z.infer<typeof criterionEvaluationSchema>
-export type ScoringResponse = z.infer<typeof scoringResponseSchema>
-
-// ─── Criterion Definition ─────────────────────────────────────────
-
-export interface CriterionDefinition {
-  key: string
-  name: string
-  description: string | null
-  category: string
-  maxScore: number
-  weight: number
-}
-
-// ─── Pre-made Criteria Templates (from shared registry) ───────────
+export {
+  computeCompositeScore,
+  INSUFFICIENT_JOB_DESCRIPTION_MESSAGE,
+  portugueseIscoLabel,
+  resolveStoredScoring,
+  SCORING_OUTPUT_LANGUAGE,
+} from './scoringPrompt'
+export type { CriterionDefinition, CriterionEvaluation, ScoringResponse } from './scoringPrompt'
 
 export const PREMADE_CRITERIA: Record<string, CriterionDefinition[]> =
   buildPremadeCriteriaMap()
 
-// ─── Rubric Generation from Job Description ───────────────────────
-
-const generatedCriteriaSchema = z.object({
-  criteria: z.array(z.object({
-    key: z.string(),
-    name: z.string(),
-    description: z.string(),
-    category: z.enum(['technical', 'experience', 'soft_skills', 'education', 'culture', 'custom']),
-    maxScore: z.number().int().min(1).max(10).describe('Always use 10'),
-    suggestedWeight: z.number().int().min(10).max(100),
-  })),
-})
-
 /**
  * Use AI to generate scoring criteria from a job description.
- * Returns 4–6 criteria tailored to the specific role.
+ * Criteria follow the occupation and the written posting, in Brazilian Portuguese.
  */
 export async function generateCriteriaFromDescription(
   config: ProviderConfig,
   jobTitle: string,
   jobDescription: string,
+  context?: ScoringContext,
 ): Promise<CriterionDefinition[]> {
+  const messages = buildGenerateCriteriaMessages(jobTitle, jobDescription, context)
   const result = await generateStructuredOutput(config, {
-    system: `You are an expert HR analyst specializing in creating objective, unbiased candidate evaluation criteria.
-Your task is to analyze a job description and create 4–6 measurable scoring criteria.
-
-Rules:
-- Each criterion must be specific and measurable from a resume/CV
-- Avoid criteria that could introduce bias (age, gender, ethnicity, disability)
-- Focus on skills, experience, and qualifications that are directly relevant to the role
-- Use clear, professional language
-- Write criterion names and descriptions in ${SCORING_OUTPUT_LANGUAGE}
-- Each key must be unique, lowercase, and use underscores (e.g. "react_expertise")
-- Set suggestedWeight higher for more critical criteria (10–100 scale)`,
-    prompt: `Job Title: ${jobTitle}\n\nJob Description:\n${jobDescription}`,
+    system: messages.system,
+    prompt: messages.prompt,
     schema: generatedCriteriaSchema,
     schemaName: 'GeneratedCriteria',
-    schemaDescription: 'Scoring criteria generated from job description',
+    schemaDescription: 'Critérios de pontuação em português do Brasil, derivados da descrição publicada e da ocupação',
   })
 
-  return result.object.criteria.map((c, i) => ({
+  return result.object.criteria.map(c => ({
     key: c.key,
     name: c.name,
     description: c.description,
@@ -101,11 +58,9 @@ Rules:
   }))
 }
 
-// ─── Score Application ────────────────────────────────────────────
-
 /**
- * Score a single application against the job's scoring criteria.
- * Returns structured evaluations for each criterion.
+ * Score a single application against the job's published text.
+ * Returns Portuguese evaluations, or an insufficient-description result with no scores.
  */
 export async function scoreApplication(
   config: ProviderConfig,
@@ -116,79 +71,30 @@ export async function scoreApplication(
     resumeText: string
     coverLetterText?: string | null
     applicationNotes?: string | null
-  },
-): Promise<{ scoring: ScoringResponse; usage: { promptTokens: number; completionTokens: number } }> {
-  const criteriaBlock = params.criteria
-    .map((c, i) => `${i + 1}. **${c.name}** (key: "${c.key}", max: ${c.maxScore})\n   ${c.description ?? 'No description provided.'}`)
-    .join('\n\n')
-
-  const candidateInfo = [
-    `RESUME:\n${params.resumeText}`,
-    params.coverLetterText ? `\nCOVER LETTER:\n${params.coverLetterText}` : '',
-    params.applicationNotes ? `\nAPPLICATION NOTES:\n${params.applicationNotes}` : '',
-  ].filter(Boolean).join('\n')
-
+  } & ScoringContext,
+): Promise<{
+  scoring: ScoringResponse
+  outcome: ReturnType<typeof resolveStoredScoring>
+  usage: { promptTokens: number; completionTokens: number }
+}> {
+  const messages = buildScoreApplicationMessages(params)
   const result = await generateStructuredOutput(config, {
-    system: `You are an expert, unbiased candidate evaluator for an applicant tracking system.
-Your task is to objectively evaluate a candidate against specific scoring criteria for a job.
-
-IMPORTANT RULES:
-- Score ONLY based on evidence found in the provided materials (resume, cover letter, notes)
-- If information for a criterion is missing, give a low score and note it in gaps
-- Be fair and consistent — avoid bias based on name, gender, age, or background
-- Confidence reflects how much relevant information was available (0–100)
-- Evidence must cite specific details from the candidate's materials
-- Each strength and gap must be a single, specific statement
-- applicantScore must not exceed maxScore for each criterion
-- Provide a brief summary of the overall evaluation
-- Write all text output (evidence, strengths, gaps, summary) in ${SCORING_OUTPUT_LANGUAGE}`,
-    prompt: `JOB TITLE: ${params.jobTitle}
-
-JOB DESCRIPTION:
-${params.jobDescription}
-
-SCORING CRITERIA:
-${criteriaBlock}
-
-CANDIDATE MATERIALS:
-${candidateInfo}
-
-Evaluate this candidate against each criterion. Return your evaluation.`,
+    system: messages.system,
+    prompt: messages.prompt,
     schema: scoringResponseSchema,
     schemaName: 'CandidateScoring',
-    schemaDescription: 'Structured candidate evaluation with per-criterion scores',
+    schemaDescription: 'Avaliação do candidato em português do Brasil: Evidências, Pontos fortes e Lacunas',
   })
 
-  // Clamp applicantScore to maxScore — LLMs may occasionally exceed the maximum
-  for (const evaluation of result.object.evaluations) {
-    evaluation.applicantScore = Math.min(evaluation.applicantScore, evaluation.maxScore)
-  }
+  const outcome = resolveStoredScoring(result.object, params.criteria)
 
   return {
-    scoring: result.object,
+    scoring: {
+      insufficientJobDescription: outcome.status === 'partial',
+      evaluations: outcome.evaluations,
+      summary: outcome.summary,
+    },
+    outcome,
     usage: result.usage,
   }
-}
-
-/**
- * Compute a weighted composite score (0–100) from individual criterion scores.
- */
-export function computeCompositeScore(
-  criteria: CriterionDefinition[],
-  evaluations: CriterionEvaluation[],
-): number {
-  let totalWeightedScore = 0
-  let totalWeight = 0
-
-  for (const criterion of criteria) {
-    const evaluation = evaluations.find(e => e.criterionKey === criterion.key)
-    if (!evaluation) continue
-
-    const normalizedScore = (evaluation.applicantScore / evaluation.maxScore) * 100
-    totalWeightedScore += normalizedScore * criterion.weight
-    totalWeight += criterion.weight
-  }
-
-  if (totalWeight === 0) return 0
-  return Math.round(totalWeightedScore / totalWeight)
 }

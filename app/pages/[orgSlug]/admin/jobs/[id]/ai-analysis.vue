@@ -158,6 +158,8 @@ async function generateAiCriteria() {
       body: {
         title: job.value.title,
         description: job.value.description,
+        iscoCategoryId: job.value.iscoCategoryId,
+        isTestDescription: job.value.isTestDescription ?? false,
       },
     })
     scoringCriteria.value = (result.criteria ?? []).map((c: any) => ({

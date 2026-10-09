@@ -25,7 +25,13 @@ export default defineEventHandler(async (event) => {
   // Verify job belongs to org
   const jobRecord = await db.query.job.findFirst({
     where: and(eq(job.id, jobId), eq(job.organizationId, orgId)),
-    columns: { id: true, title: true, description: true },
+    columns: {
+      id: true,
+      title: true,
+      description: true,
+      iscoCategoryId: true,
+      isTestDescription: true,
+    },
   })
   if (!jobRecord) {
     throw createError({ statusCode: 404, statusMessage: 'Job not found' })
@@ -60,6 +66,10 @@ export default defineEventHandler(async (event) => {
     },
     jobRecord.title,
     jobRecord.description,
+    {
+      iscoCategoryId: jobRecord.iscoCategoryId,
+      isTestDescription: jobRecord.isTestDescription,
+    },
   )
 
   return { criteria, source: 'ai' }

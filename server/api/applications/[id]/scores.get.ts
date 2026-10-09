@@ -54,6 +54,7 @@ export default defineEventHandler(async (event) => {
     provider: analysisRun.provider,
     model: analysisRun.model,
     compositeScore: analysisRun.compositeScore,
+    errorMessage: analysisRun.errorMessage,
     promptTokens: analysisRun.promptTokens,
     completionTokens: analysisRun.completionTokens,
     createdAt: analysisRun.createdAt,

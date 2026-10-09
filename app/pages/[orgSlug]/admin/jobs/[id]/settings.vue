@@ -41,6 +41,7 @@ const form = ref({
   title: '',
   iscoCategoryId: '' as string,
   description: '',
+  isTestDescription: false,
   location: '',
   type: DEFAULT_JOB_TYPE as string,
   slug: '',
@@ -73,6 +74,7 @@ watch(job, (j) => {
       title: j.title ?? '',
       iscoCategoryId: j.iscoCategoryId ?? '',
       description: j.description ?? '',
+      isTestDescription: j.isTestDescription ?? false,
       location: j.location ?? '',
       type: j.type ?? DEFAULT_JOB_TYPE,
       slug: j.slug ?? '',
@@ -162,6 +164,7 @@ async function handleSave() {
       remoteStatus: form.value.remoteStatus || null,
       experienceLevel: (form.value.experienceLevel as 'junior' | 'mid' | 'senior' | 'lead' | null) || null,
       iscoCategoryId: form.value.iscoCategoryId || null,
+      isTestDescription: form.value.isTestDescription,
       // Send null when cleared so the DB column is set to NULL
       validThrough: form.value.validThrough ? new Date(form.value.validThrough) : null,
     }
@@ -326,6 +329,9 @@ function onSalaryMaxChange(e: Event) {
               <label for="settings-description" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
                 {{ t('common.fields.description') }}
               </label>
+              <p class="mb-2 whitespace-pre-line rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-xs leading-relaxed text-surface-600 dark:border-surface-700 dark:bg-surface-800/60 dark:text-surface-300">
+                {{ t('dashboard.jobs.create.descriptionGuide') }}
+              </p>
               <textarea
                 id="settings-description"
                 v-model="form.description"
@@ -333,6 +339,18 @@ function onSalaryMaxChange(e: Event) {
                 :placeholder="t('dashboard.jobs.settings.fields.descriptionPlaceholder')"
                 class="w-full rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
               />
+              <label class="mt-3 flex items-start gap-3 cursor-pointer">
+                <input
+                  id="settings-is-test-description"
+                  v-model="form.isTestDescription"
+                  type="checkbox"
+                  class="mt-0.5 size-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-600"
+                />
+                <span>
+                  <span class="text-sm font-medium text-surface-900 dark:text-surface-100">{{ t('dashboard.jobs.create.testDescription') }}</span>
+                  <p class="text-xs text-surface-500 dark:text-surface-400">{{ t('dashboard.jobs.create.testDescriptionHint') }}</p>
+                </span>
+              </label>
             </div>
 
             <!-- Location + Type row -->

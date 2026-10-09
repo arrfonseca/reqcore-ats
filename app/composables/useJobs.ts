@@ -37,6 +37,7 @@ export function useJobs(options?: {
     requireCoverLetter?: boolean
     autoScoreOnApply?: boolean
     iscoCategoryId: string
+    isTestDescription?: boolean
   }) {
     try {
       const created = await $fetch('/api/jobs', {

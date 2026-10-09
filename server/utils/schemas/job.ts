@@ -40,6 +40,8 @@ export const createJobSchema = z.object({
   experienceLevel: z.enum(['junior', 'mid', 'senior', 'lead']).optional(),
   /** Internal ISCO occupation category for org reporting — not shown on public listings */
   iscoCategoryId: iscoCategoryIdSchema,
+  /** Score this description as the real posting, including when it is an example */
+  isTestDescription: z.boolean().optional().default(false),
 })
 
 /** Schema for updating an existing job (all fields optional, no defaults — PATCH semantics) */
@@ -66,6 +68,8 @@ export const updateJobSchema = z.object({
   experienceLevel: z.enum(['junior', 'mid', 'senior', 'lead']).nullable().optional(),
   /** Internal ISCO occupation category for org reporting — not shown on public listings */
   iscoCategoryId: iscoCategoryIdSchema.nullable().optional(),
+  /** Score this description as the real posting, including when it is an example */
+  isTestDescription: z.boolean().optional(),
   status: z.enum(['draft', 'open', 'closed', 'archived']).optional(),
 })
 

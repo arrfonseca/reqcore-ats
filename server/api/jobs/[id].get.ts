@@ -30,6 +30,7 @@ export default defineEventHandler(async (event) => {
       autoScoreOnApply: true,
       experienceLevel: true,
       iscoCategoryId: true,
+      isTestDescription: true,
       createdAt: true,
       updatedAt: true,
     },

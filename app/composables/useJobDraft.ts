@@ -5,6 +5,7 @@ export type JobDraftSnapshot = {
     title?: string
     iscoCategoryId?: string
     description?: string
+    isTestDescription?: boolean
     location?: string
     type?: string
     experienceLevel?: string
