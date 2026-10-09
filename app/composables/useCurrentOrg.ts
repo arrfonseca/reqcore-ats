@@ -23,7 +23,7 @@ export function useCurrentOrg() {
   const activeOrg = computed(() => activeOrgState.value.data)
 
   const canSwitchOrg = computed(() => isSaasAdmin.value)
-  const canCreateOrg = computed(() => isSaasAdmin.value || orgs.value.length === 0)
+  const canCreateOrg = computed(() => isSaasAdmin.value)
 
   // ═══════════════════════════════════════════
   // 3. ACTIONS

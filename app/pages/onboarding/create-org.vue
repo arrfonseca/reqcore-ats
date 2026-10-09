@@ -23,8 +23,6 @@ const { acceptInviteLink } = useInviteLinks()
 const localePath = useLocalePath()
 const { track } = useTrack()
 
-onMounted(() => track('onboarding_viewed', { mode: viewMode.value }))
-
 const orgName = ref('')
 const slug = ref('')
 const slugEdited = ref(false)
@@ -49,8 +47,35 @@ watch([isSaasAdmin, () => route.query.mode], applySaasCreateMode, { immediate: t
 // Auto-switch: if user already belongs to exactly one org, activate it
 // ─────────────────────────────────────────────
 const autoSwitched = ref(false)
+const workspaceGate = ref<'pending' | 'allowed'>('pending')
+
+onMounted(async () => {
+  track('onboarding_viewed', { mode: viewMode.value })
+  try {
+    const entry = await fetchCompanyEntry()
+    if (entry.destination === 'admin') {
+      workspaceGate.value = 'allowed'
+      return
+    }
+    if (entry.destination === 'org') {
+      window.location.replace(localePath(`/${entry.slug}/admin`))
+      return
+    }
+    try {
+      await authClient.signOut()
+    }
+    catch {
+      // The server already removed the session.
+    }
+    window.location.replace(localePath('/'))
+  }
+  catch {
+    window.location.replace(localePath('/'))
+  }
+})
 
 watch([orgs, isOrgsLoading], async ([orgList, loading]) => {
+  if (workspaceGate.value !== 'allowed') return
   if (loading || autoSwitched.value || viewMode.value !== 'picker') return
   if (orgList.length === 1 && !activeOrg.value) {
     const firstOrg = orgList[0]
@@ -276,7 +301,7 @@ async function handleSubmitJoinRequest() {
 
 <template>
   <!-- Loading / auto-switching state -->
-  <div v-if="isLoading || isOrgsLoading" class="flex flex-col items-center gap-3 py-8">
+  <div v-if="workspaceGate === 'pending' || isLoading || isOrgsLoading" class="flex flex-col items-center gap-3 py-8">
     <div class="size-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
     <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('onboarding.organization.settingUp') }}</p>
   </div>

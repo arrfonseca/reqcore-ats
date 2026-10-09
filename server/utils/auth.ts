@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { ac, owner, admin, member } from "~~/shared/permissions";
 import { sendOrgInvitationEmail, sendPasswordResetEmail } from "./email";
 import * as schema from "../database/schema";
-import { member as memberTable } from "../database/schema";
+import { lookupCompanyEntry } from "./companyEntry";
 import { syncSaasAdminRole, resolveIsSaasAdmin } from "./saasAdmin";
 import type { SessionUserWithPlatformRole } from "./saasAdmin";
 
@@ -272,6 +272,20 @@ function getAuth(): Auth {
             },
           },
         },
+        session: {
+          create: {
+            before: async (session) => {
+              const entry = await lookupCompanyEntry(session.userId);
+              if (entry.destination !== "org") return;
+              return {
+                data: {
+                  ...session,
+                  activeOrganizationId: entry.organizationId,
+                },
+              };
+            },
+          },
+        },
       },
 
       // ── OAuth Token Encryption at Rest ──────────────────────
@@ -340,14 +354,7 @@ function getAuth(): Auth {
           },
 
           allowUserToCreateOrganization: async (user) => {
-            const platformUser = user as SessionUserWithPlatformRole;
-            if (await resolveIsSaasAdmin(platformUser)) return true;
-
-            const membershipCount = await db.$count(
-              memberTable,
-              eq(memberTable.userId, user.id),
-            );
-            return membershipCount === 0;
+            return resolveIsSaasAdmin(user as SessionUserWithPlatformRole);
           },
 
           // ── Invitation Email ────────────────────────────────────

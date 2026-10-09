@@ -14,6 +14,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
     if (pendingInvitation) {
       return navigateTo(localePath(`/auth/accept-invitation/${pendingInvitation}`))
     }
-    return navigateTo(await resolveDashboardEntryPath(localePath))
+    return navigateTo(await resolveDashboardEntryPath(localePath), { external: true })
   }
 })

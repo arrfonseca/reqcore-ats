@@ -1,30 +1,29 @@
+export type CompanyEntryResponse =
+  | { destination: 'admin' }
+  | { destination: 'org', slug: string }
+  | { destination: 'invalid' }
+
+export async function fetchCompanyEntry(): Promise<CompanyEntryResponse> {
+  const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined
+  return await $fetch<CompanyEntryResponse>('/api/auth/company-entry', { headers })
+}
+
 /**
- * Post-login / guest redirect target for SaaS operators and org members.
+ * Post-login target. SaaS operators go to the platform. Company users go to
+ * their company dashboard. A login with no company is signed out.
  */
 export async function resolveDashboardEntryPath(
   localePath: (path: string) => string,
 ): Promise<string> {
-  const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined
+  const entry = await fetchCompanyEntry()
+  if (entry.destination === 'admin') return localePath('/admin')
+  if (entry.destination === 'org') return localePath(`/${entry.slug}/admin`)
 
   try {
-    const status = await $fetch<{ isSaasAdmin: boolean }>('/api/saas/status', { headers })
-    if (status.isSaasAdmin) {
-      return localePath('/admin')
-    }
+    await authClient.signOut()
   }
   catch {
-    // fall through to ATS dashboard
+    // The server already removed the session.
   }
-
-  try {
-    const active = await $fetch<{ slug: string | null }>('/api/tenant/active-org', { headers })
-    if (active.slug) {
-      return localePath(`/${active.slug}/admin`)
-    }
-  }
-  catch {
-    // fall through
-  }
-
-  return localePath('/onboarding/create-org')
+  return localePath('/')
 }

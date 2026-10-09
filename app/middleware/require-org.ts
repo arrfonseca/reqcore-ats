@@ -1,7 +1,7 @@
 /**
- * Require-org middleware — redirects users without an active organization.
- * SaaS admins go to the org picker; others go to onboarding.
- * Must be used after the `auth` middleware.
+ * Company pages require an active organization.
+ * SaaS operators without one go to the platform. Company users are sent to
+ * the company they already belong to. A login with no company is signed out.
  */
 export default defineNuxtRouteMiddleware(async () => {
   const { data: session } = await authClient.useSession(useFetch)
@@ -9,23 +9,21 @@ export default defineNuxtRouteMiddleware(async () => {
 
   if (!session.value) return
 
-  const activeOrganizationId = session.value.session?.activeOrganizationId
-  if (activeOrganizationId) return
+  if (session.value.session?.activeOrganizationId) return
 
-  let isSaasAdminUserFlag = false
+  const entry = await fetchCompanyEntry()
+  if (entry.destination === 'admin') {
+    return navigateTo(localePath('/admin'), { external: true })
+  }
+  if (entry.destination === 'org') {
+    return navigateTo(localePath(`/${entry.slug}/admin`), { external: true })
+  }
+
   try {
-    const status = await $fetch<{ isSaasAdmin: boolean }>('/api/saas/status', {
-      headers: import.meta.server ? useRequestHeaders(['cookie']) : undefined,
-    })
-    isSaasAdminUserFlag = status.isSaasAdmin
+    await authClient.signOut()
   }
   catch {
-    isSaasAdminUserFlag = false
+    // The server already removed the session.
   }
-
-  if (isSaasAdminUserFlag) {
-    return navigateTo(localePath('/admin'))
-  }
-
-  return navigateTo(localePath('/onboarding/create-org'))
+  return navigateTo(localePath('/'), { external: true })
 })

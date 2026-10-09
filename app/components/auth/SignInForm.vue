@@ -66,18 +66,43 @@ async function handleSignIn() {
         return;
     }
 
-    clearNuxtData();
+    let entry: Awaited<ReturnType<typeof fetchCompanyEntry>>;
+    try {
+        entry = await fetchCompanyEntry();
+    } catch {
+        error.value = t("auth.signIn.errors.server");
+        isLoading.value = false;
+        return;
+    }
 
+    if (entry.destination === "invalid") {
+        try {
+            await authClient.signOut();
+        } catch {
+            // The server already removed the session.
+        }
+        clearNuxtData();
+        error.value = t("auth.signIn.errors.invalid");
+        isLoading.value = false;
+        return;
+    }
+
+    clearNuxtData();
     track("signin_completed");
 
     const pendingInvitation = route.query.invitation as string | undefined;
-    if (pendingInvitation) {
-        await navigateTo(
+    if (pendingInvitation && entry.destination === "org") {
+        window.location.assign(
             localePath(`/auth/accept-invitation/${pendingInvitation}`),
         );
-    } else {
-        await navigateTo(await resolveDashboardEntryPath(localePath));
+        return;
     }
+
+    window.location.assign(
+        entry.destination === "admin"
+            ? localePath("/admin")
+            : localePath(`/${entry.slug}/admin`),
+    );
 }
 
 async function handleSocialSignIn(providerId: string) {
