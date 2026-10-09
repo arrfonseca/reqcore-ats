@@ -8,6 +8,12 @@ import { ac, owner, admin, member } from "~~/shared/permissions";
 import { sendOrgInvitationEmail, sendPasswordResetEmail } from "./email";
 import * as schema from "../database/schema";
 import { lookupCompanyEntry } from "./companyEntry";
+import {
+  SESSION_FRESH_SECONDS,
+  SESSION_IDLE_SECONDS,
+  SESSION_REFRESH_SECONDS,
+  clampSessionExpiresAt,
+} from "./sessionPolicy";
 import { syncSaasAdminRole, resolveIsSaasAdmin } from "./saasAdmin";
 import type { SessionUserWithPlatformRole } from "./saasAdmin";
 
@@ -241,12 +247,12 @@ function getAuth(): Auth {
         },
       },
 
-      // ── Session Hardening ────────────────────────────────────
-      // Explicit session duration for an ATS handling sensitive hiring data.
-      // Default Better Auth values (7 days / 1 day) are too permissive.
+      // Idle window slides while the user is active. The absolute cap is
+      // enforced on refresh and by server/middleware/session-lifetime.ts.
       session: {
-        expiresIn: 60 * 60 * 24, // 24 hours
-        updateAge: 60 * 60,      // Refresh session every 1 hour
+        expiresIn: SESSION_IDLE_SECONDS,
+        updateAge: SESSION_REFRESH_SECONDS,
+        freshAge: SESSION_FRESH_SECONDS,
       },
 
       emailAndPassword: {
@@ -283,6 +289,19 @@ function getAuth(): Auth {
                   activeOrganizationId: entry.organizationId,
                 },
               };
+            },
+          },
+          update: {
+            before: async (session, context) => {
+              if (!session.expiresAt) return;
+              const current = (context as {
+                context?: { session?: { session?: { createdAt?: Date | string } } }
+              } | null)?.context?.session?.session;
+              if (!current?.createdAt) return;
+              const requested = new Date(session.expiresAt);
+              const clamped = clampSessionExpiresAt(current.createdAt, requested);
+              if (clamped.getTime() === requested.getTime()) return;
+              return { data: { expiresAt: clamped } };
             },
           },
         },
